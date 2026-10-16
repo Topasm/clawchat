@@ -9,11 +9,15 @@ class CalendarSourceResponse(BaseModel):
     color: str | None
     import_enabled: bool
     is_write_target: bool
+    suggestions_enabled: bool = True
     last_synced_at: UtcDatetime | None
 
 
 class CalendarAccountResponse(BaseModel):
     id: str
+    # "caldav", or "ics_url" for a read-only secret iCal address, whose
+    # server_url is only its host.
+    kind: str = "caldav"
     label: str
     server_url: str
     username: str
@@ -33,6 +37,14 @@ class CalendarAccountCreate(BaseModel):
     password: str = Field(min_length=1, max_length=500)
 
 
+class CalendarFeedCreate(BaseModel):
+    """A calendar's secret address in iCal format; stored encrypted, never returned."""
+
+    label: str = Field(default="", max_length=100)
+    url: str = Field(min_length=1, max_length=2000)
+
+
 class CalendarSourceUpdate(BaseModel):
     import_enabled: bool | None = None
     is_write_target: bool | None = None
+    suggestions_enabled: bool | None = None

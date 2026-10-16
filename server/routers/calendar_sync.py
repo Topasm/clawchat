@@ -8,6 +8,7 @@ from schemas.calendar_sync import (
     CalendarAccountCreate,
     CalendarAccountListResponse,
     CalendarAccountResponse,
+    CalendarFeedCreate,
     CalendarSourceResponse,
     CalendarSourceUpdate,
 )
@@ -25,6 +26,7 @@ def _utc(moment):
 async def _response(db: AsyncSession, account: CalendarAccount) -> CalendarAccountResponse:
     return CalendarAccountResponse(
         id=account.id,
+        kind=account.kind,
         label=account.label,
         server_url=account.server_url,
         username=account.username,
@@ -59,6 +61,12 @@ async def connect_account(body: CalendarAccountCreate, db: AsyncSession = Depend
     return await _response(db, account)
 
 
+@router.post("/feeds", response_model=CalendarAccountResponse, status_code=201)
+async def connect_feed(body: CalendarFeedCreate, db: AsyncSession = Depends(get_db)):
+    account = await sync.connect_feed(db, label=body.label, url=body.url)
+    return await _response(db, account)
+
+
 @router.delete("/accounts/{account_id}", status_code=204)
 async def delete_account(account_id: str, db: AsyncSession = Depends(get_db)):
     await sync.delete_account(db, account_id)
@@ -81,5 +89,6 @@ async def update_calendar(
         source_id,
         import_enabled=body.import_enabled,
         is_write_target=body.is_write_target,
+        suggestions_enabled=body.suggestions_enabled,
     )
     return CalendarSourceResponse(**sync.source_summary(source))

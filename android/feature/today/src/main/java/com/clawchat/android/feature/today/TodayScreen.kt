@@ -2,6 +2,7 @@ package com.clawchat.android.feature.today
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
@@ -64,6 +65,9 @@ import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodaySuggestion
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import com.clawchat.android.core.ui.ClawFab
 import com.clawchat.android.core.ui.ClawIconTile
 import com.clawchat.android.core.ui.ClawEmptyState
@@ -129,6 +133,7 @@ fun TodayScreen(
         onDelete = viewModel::deleteTask,
         onSetDueToday = viewModel::setDueToday,
         onQuickAdd = { showQuickAdd = true },
+        onAnswerSuggestion = viewModel::answerSuggestion,
     )
 
     if (showQuickAdd) {
@@ -163,6 +168,7 @@ internal fun TodayContent(
     onSetDueToday: (String) -> Unit,
     onQuickAdd: () -> Unit,
     agentLineOpen: Boolean = false,
+    onAnswerSuggestion: (id: String, answer: String) -> Unit = { _, _ -> },
 ) {
     val hasContent = state.overdueTodos.isNotEmpty() ||
         state.todayTodos.isNotEmpty() ||
@@ -236,6 +242,8 @@ internal fun TodayContent(
                             reviewCount = state.reviewCount,
                             runCount = state.runCount,
                             briefing = state.briefing,
+                            suggestions = state.suggestions,
+                            onAnswerSuggestion = onAnswerSuggestion,
                             initiallyOpen = agentLineOpen,
                             onNavigateToReview = onNavigateToReview,
                             onNavigateToRuns = onNavigateToRuns,
@@ -306,8 +314,9 @@ internal fun TodayContent(
 }
 
 /**
- * Agent work and the briefing as one line, "검토 2 · 실행 1". Tapping it opens
- * the briefing and the ways into the review queue and the runs.
+ * Suggestions, agent work and the briefing as one line, "제안 3 · 검토 2 · 실행 1".
+ * Tapping it opens the suggestions (one button each, swipe to dismiss), the
+ * briefing, and the ways into the review queue and the runs.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -315,6 +324,8 @@ private fun AgentLine(
     reviewCount: Int,
     runCount: Int,
     briefing: BriefingResponse?,
+    suggestions: List<TodaySuggestion>,
+    onAnswerSuggestion: (id: String, answer: String) -> Unit,
     initiallyOpen: Boolean,
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
@@ -333,8 +344,14 @@ private fun AgentLine(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val suggestionCount = suggestions.size + (briefing?.suggestions?.size ?: 0)
+            val agents = stringResource(R.string.today_agent_line, reviewCount, runCount)
             Text(
-                stringResource(R.string.today_agent_line, reviewCount, runCount),
+                if (suggestionCount > 0) {
+                    stringResource(R.string.today_suggestion_count, suggestionCount) + " · " + agents
+                } else {
+                    agents
+                },
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -350,6 +367,9 @@ private fun AgentLine(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                suggestions.forEach { suggestion ->
+                    SuggestionRow(suggestion) { answer -> onAnswerSuggestion(suggestion.id, answer) }
+                }
                 briefing?.let { BriefingLines(it) }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onNavigateToReview) { Text(stringResource(R.string.today_review_queue)) }
@@ -359,6 +379,109 @@ private fun AgentLine(
         }
     }
 }
+
+/** One suggestion: "추가" until added, then "되돌리기". Swiping it away dismisses it. */
+@Composable
+private fun SuggestionRow(suggestion: TodaySuggestion, onAnswer: (String) -> Unit) {
+    if (suggestion.isAdded) {
+        SuggestionContent(suggestion) {
+            TextButton(onClick = { onAnswer(SUGGESTION_UNDO) }) {
+                Text(stringResource(R.string.today_suggestion_undo))
+            }
+        }
+        return
+    }
+    val dismissLabel = stringResource(R.string.today_suggestion_dismiss)
+    Box(
+        Modifier.semantics {
+            customActions = listOf(CustomAccessibilityAction(dismissLabel) { onAnswer(SUGGESTION_DISMISS); true })
+        },
+    ) {
+        SwipeToDismissCard(onDelete = { onAnswer(SUGGESTION_DISMISS) }) {
+            SuggestionContent(suggestion) {
+                TextButton(onClick = { onAnswer(SUGGESTION_ACCEPT) }) {
+                    Text(stringResource(R.string.today_suggestion_add))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionContent(suggestion: TodaySuggestion, action: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .heightIn(min = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                suggestionTitle(suggestion),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                suggestionReason(suggestion),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        action()
+    }
+}
+
+@Composable
+private fun suggestionTitle(suggestion: TodaySuggestion): String {
+    val start = suggestion.blockStart?.let(::parseInstant)
+    val end = suggestion.blockEnd?.let(::parseInstant)
+    if (suggestion.kind == "time_block" && start != null && end != null) {
+        val locale = LocalLocale.current.platformLocale
+        val zone = ZoneId.systemDefault()
+        val day = DateTimeFormatter.ofPattern("EEE", locale).format(start.atZone(zone))
+        val clock = DateTimeFormatter.ofPattern("HH:mm", locale)
+        val window = "$day ${clock.format(start.atZone(zone))}–${clock.format(end.atZone(zone))}"
+        return stringResource(R.string.today_suggestion_time_block, window, suggestion.title)
+    }
+    return suggestion.title
+}
+
+@Composable
+private fun suggestionReason(suggestion: TodaySuggestion): String {
+    val event = shortDay(suggestion.eventStart)
+    val due = shortDay(suggestion.dueAt)
+    val reason = when (suggestion.kind) {
+        "prepare_exam" -> stringResource(R.string.today_suggestion_reason_exam, event)
+        "submit" -> stringResource(R.string.today_suggestion_reason_due, due)
+        "prepare_talk" -> stringResource(R.string.today_suggestion_reason_talk, event)
+        "prepare_meeting" -> stringResource(R.string.today_suggestion_reason_meeting, event)
+        "meeting_notes" -> stringResource(R.string.today_suggestion_reason_notes, suggestion.eventTitle.orEmpty())
+        "link_project" -> stringResource(R.string.today_suggestion_reason_repeating)
+        "time_block" -> stringResource(R.string.today_suggestion_reason_free, due)
+        else -> ""
+    }
+    return if (suggestion.isAdded && suggestion.autoAdded) {
+        reason + " · " + stringResource(R.string.today_suggestion_auto_added)
+    } else {
+        reason
+    }
+}
+
+@Composable
+private fun shortDay(raw: String?): String {
+    val instant = raw?.let(::parseInstant) ?: return ""
+    val locale = LocalLocale.current.platformLocale
+    return DateTimeFormatter.ofPattern("M/d", locale).format(instant.atZone(ZoneId.systemDefault()))
+}
+
+private fun parseInstant(raw: String): java.time.Instant? =
+    runCatching { OffsetDateTime.parse(raw).toInstant() }.getOrNull()
 
 /** The day's briefing, in plain lines under the agent line. */
 @Composable

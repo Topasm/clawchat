@@ -10,9 +10,15 @@ from domain.task import TaskStatus
 from models.event import Event
 from models.todo import Todo
 from schemas.calendar import EventResponse
-from schemas.today import TodayResponse
+from schemas.today import (
+    TodayResponse,
+    TodaySuggestion,
+    TodaySuggestionList,
+    TodaySuggestionSettings,
+)
 from schemas.todo import TodoResponse
 from services.ai import resolve_active_ai
+from services.calendar import event_suggestion_service as suggestions
 from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
@@ -51,7 +57,7 @@ def _todo_to_response(todo: Todo) -> TodoResponse:
         resp.sync_status = "synced"
     elif todo.source and todo.source.startswith("obsidian"):
         resp.sync_status = "linked"
-    if todo.source_id:
+    if todo.source_id and todo.source != suggestions.SOURCE_CALENDAR:
         resp.project_label = (
             todo.source_id.replace("_", " ").replace("-", " ").strip().title()
         )
@@ -82,6 +88,58 @@ async def get_briefing(
         "stats": result.get("stats", {}),
         "date": str(date.today()),
     }
+
+
+def _suggestion(row) -> TodaySuggestion:
+    return TodaySuggestion.model_validate(row, from_attributes=True)
+
+
+@router.get("/suggestions", response_model=TodaySuggestionList)
+async def list_suggestions(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    rows = await suggestions.visible(db)
+    return TodaySuggestionList(
+        suggestions=[_suggestion(row) for row in rows],
+        auto_add=await suggestions.auto_add_enabled(db),
+    )
+
+
+@router.put("/suggestions/settings", response_model=TodaySuggestionSettings)
+async def update_suggestion_settings(
+    body: TodaySuggestionSettings,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    return TodaySuggestionSettings(auto_add=await suggestions.set_auto_add(db, body.auto_add))
+
+
+@router.post("/suggestions/{suggestion_id}/accept", response_model=TodaySuggestion)
+async def accept_suggestion(
+    suggestion_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    return _suggestion(await suggestions.accept(db, suggestion_id))
+
+
+@router.post("/suggestions/{suggestion_id}/dismiss", response_model=TodaySuggestion)
+async def dismiss_suggestion(
+    suggestion_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    return _suggestion(await suggestions.dismiss(db, suggestion_id))
+
+
+@router.post("/suggestions/{suggestion_id}/undo", response_model=TodaySuggestion)
+async def undo_suggestion(
+    suggestion_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    return _suggestion(await suggestions.undo(db, suggestion_id))
 
 
 @router.get("", response_model=TodayResponse)

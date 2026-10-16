@@ -19,3 +19,106 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Suggestions: one folded line above the list; one button per row. */
+.cc-today-suggestions {
+  margin-bottom: 12px;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
+}
+
+.cc-today-suggestions__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-today-suggestions__line:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-today-suggestions__count {
+  color: var(--cc-text);
+  font-weight: 600;
+}
+
+.cc-today-suggestions__list {
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+}
+
+.cc-today-suggestions__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--cc-border-subtle);
+}
+
+.cc-today-suggestions__text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cc-today-suggestions__title {
+  overflow-wrap: anywhere;
+  color: var(--cc-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cc-today-suggestions__why {
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
+
+.cc-today-suggestions__kind {
+  margin-right: 6px;
+  color: var(--cc-text-tertiary);
+  font-weight: 600;
+}
+
+.cc-today-suggestions__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.cc-today-suggestions__row .cc-link-btn {
+  flex: none;
+  margin-top: 0;
+  color: var(--cc-text-secondary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cc-today-suggestions__dismiss {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--cc-radius-control);
+  background: none;
+  color: var(--cc-text-tertiary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cc-today-suggestions__dismiss:hover {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+}

@@ -104,7 +104,23 @@ an app-specific password. Checked calendars show in Schedule and count as busy t
 looks for free slots; their events are read-only in ClawChat. Pick one calendar under **Save
 ClawChat events to** and events you create in ClawChat are written there, and edits or deletions
 made to them in another app come back. When both sides changed the same event, the later change
-wins. Google Calendar needs OAuth and is not supported yet.
+wins.
+
+Google Calendar is read through its **Secret address in iCal format** (Google Calendar → Settings →
+the calendar → Integrate calendar). Paste it under **Google Calendar**: ClawChat keeps it encrypted
+(key in `CALENDAR_KEY_FILE`, by default beside `UPLOAD_DIR`), shows only its host, and reads it every
+15 minutes. Writing to Google needs OAuth and is not supported yet.
+
+### Suggestions from the calendar
+
+After each sync ClawChat reads the next two weeks of imported events by title and suggests the work
+they call for: a study task the day before an exam, a task on a deadline's day, slides two days
+before a talk, a progress note the day before a meeting, minutes after a meeting ends, a weekly
+class's project, and a free stretch of working hours for a task with a deadline. Exams and deadlines
+are added right away (turn that off in Calendar sync); everything else waits on Today behind one line,
+"Suggestions N", with one button per row. Anything added can be undone, a dismissed suggestion does
+not come back, and an event turned down twice gets no more. Holiday and birthday calendars are left
+out, and any calendar can opt out.
 
 ## Make Targets
 

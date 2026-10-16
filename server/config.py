@@ -234,6 +234,9 @@ class Settings(BaseSettings):
 
     # File uploads
     upload_dir: str = "data/uploads"
+    # Key that encrypts secret calendar addresses (a Google "secret address in
+    # iCal format") at rest. Empty keeps it next to the uploads folder.
+    calendar_key_file: str = ""
     max_upload_size_mb: int = 10
     allowed_extensions: str = "jpg,jpeg,png,gif,webp,svg,pdf,txt,md,zip"
 

@@ -49,4 +49,17 @@
     <string name="today_agent_line_open">Open</string>
     <string name="today_agent_line_closed">Closed</string>
     <string name="today_suggestion_line">%1$s: %2$s</string>
+    <string name="today_suggestion_count">Suggestions %1$d</string>
+    <string name="today_suggestion_add">Add</string>
+    <string name="today_suggestion_undo">Undo</string>
+    <string name="today_suggestion_dismiss">Dismiss</string>
+    <string name="today_suggestion_time_block">%1$s: %2$s</string>
+    <string name="today_suggestion_reason_exam">Exam on %1$s · due the day before</string>
+    <string name="today_suggestion_reason_due">Due %1$s</string>
+    <string name="today_suggestion_reason_talk">Talk on %1$s · due two days before</string>
+    <string name="today_suggestion_reason_meeting">Meeting on %1$s · due the day before</string>
+    <string name="today_suggestion_reason_notes">%1$s just ended</string>
+    <string name="today_suggestion_reason_repeating">A repeating event</string>
+    <string name="today_suggestion_reason_free">Due %1$s · this time is free</string>
+    <string name="today_suggestion_auto_added">Added automatically</string>
 </resources>

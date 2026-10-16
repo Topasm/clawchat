@@ -20,34 +20,3 @@
   border-radius: var(--cc-radius-panel);
   background: transparent;
 }
-
-.cc-briefing-card__suggestions {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cc-briefing-card__suggestion {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0;
-  border-top: 1px solid var(--cc-border-subtle);
-}
-
-.cc-briefing-card__suggestion-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-}
-
-.cc-briefing-card__suggestion-text summary {
-  cursor: pointer;
-  color: var(--cc-text);
-}
-
-.cc-briefing-card__suggestion-reason {
-  display: block;
-  margin-top: 4px;
-  color: var(--cc-text-secondary);
-}

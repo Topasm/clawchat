@@ -46,4 +46,17 @@
     <string name="today_agent_line_open">펼침</string>
     <string name="today_agent_line_closed">접힘</string>
     <string name="today_suggestion_line">%1$s: %2$s</string>
+    <string name="today_suggestion_count">제안 %1$d</string>
+    <string name="today_suggestion_add">추가</string>
+    <string name="today_suggestion_undo">되돌리기</string>
+    <string name="today_suggestion_dismiss">무시</string>
+    <string name="today_suggestion_time_block">%1$s에 %2$s</string>
+    <string name="today_suggestion_reason_exam">%1$s 시험 · 전날 마감</string>
+    <string name="today_suggestion_reason_due">%1$s 마감</string>
+    <string name="today_suggestion_reason_talk">%1$s 발표 · 2일 전 마감</string>
+    <string name="today_suggestion_reason_meeting">%1$s 면담 · 전날 마감</string>
+    <string name="today_suggestion_reason_notes">%1$s 끝남</string>
+    <string name="today_suggestion_reason_repeating">반복 일정</string>
+    <string name="today_suggestion_reason_free">%1$s 마감 · 이 시간이 비어 있음</string>
+    <string name="today_suggestion_auto_added">바로 추가됨</string>
 </resources>

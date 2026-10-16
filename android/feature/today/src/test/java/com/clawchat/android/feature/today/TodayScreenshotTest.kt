@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodaySuggestion
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,6 +52,32 @@ class TodayScreenshotTest {
         ),
         reviewCount = 2,
         runCount = 1,
+        suggestions = listOf(
+            TodaySuggestion(
+                id = "s1",
+                kind = "prepare_exam",
+                status = "accepted",
+                autoAdded = true,
+                title = "Prepare for GPU Computing midterm",
+                eventStart = "2026-10-22T01:00:00Z",
+                dueAt = "2026-10-21T14:59:00Z",
+            ),
+            TodaySuggestion(
+                id = "s2",
+                kind = "prepare_meeting",
+                title = "Write up progress before Advisor meeting",
+                eventStart = "2026-10-20T05:00:00Z",
+                dueAt = "2026-10-19T14:59:00Z",
+            ),
+            TodaySuggestion(
+                id = "s3",
+                kind = "time_block",
+                title = "GPU homework",
+                blockStart = "2026-10-08T05:00:00Z",
+                blockEnd = "2026-10-08T07:00:00Z",
+                dueAt = "2026-11-03T14:59:00Z",
+            ),
+        ),
         briefing = BriefingResponse(
             summary = "A full morning, then a lighter afternoon.",
             loadAssessment = "moderate",

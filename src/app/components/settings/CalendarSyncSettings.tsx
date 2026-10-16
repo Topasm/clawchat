@@ -2,8 +2,11 @@ import { useState } from 'react';
 import {
   useCalendarAccountsQuery,
   useConnectCalendarAccount,
+  useConnectCalendarFeed,
   useDeleteCalendarAccount,
+  useSetSuggestionAutoAdd,
   useSyncCalendarAccount,
+  useTodaySuggestionsQuery,
   useUpdateCalendarSource,
 } from '../../hooks/queries';
 import { translateUi, useTranslation } from '../../i18n';
@@ -11,6 +14,7 @@ import type { CalendarAccount } from '../../types/schemas';
 import { formatDateTime } from '../../utils/formatters';
 import SettingsRow from '../shared/SettingsRow';
 import SettingsSection from '../shared/SettingsSection';
+import Toggle from '../shared/Toggle';
 
 interface Preset {
   id: string;
@@ -19,7 +23,16 @@ interface Preset {
   hint: string;
 }
 
+/** Google is read through its secret iCal address: no OAuth app, nothing written back. */
+const GOOGLE = 'google';
+
 const PRESETS: Preset[] = [
+  {
+    id: GOOGLE,
+    label: 'Google Calendar',
+    url: '',
+    hint: 'In Google Calendar settings, choose the calendar and copy "Secret address in iCal format". ClawChat keeps it encrypted and only reads.',
+  },
   {
     id: 'icloud',
     label: 'iCloud',
@@ -55,7 +68,11 @@ function AccountBlock({ account }: { account: CalendarAccount }) {
     <li className="cc-calendar-sync__server">
       <div className="cc-calendar-sync__server-head">
         <strong>{account.label}</strong>
-        <span className="cc-calendar-sync__note">{account.username}</span>
+        <span className="cc-calendar-sync__note">
+          {account.kind === 'ics_url'
+            ? translateUi('{{host}} · read only', { host: account.server_url })
+            : account.username}
+        </span>
       </div>
       <span className="cc-calendar-sync__note">
         {account.last_sync_at
@@ -84,6 +101,21 @@ function AccountBlock({ account }: { account: CalendarAccount }) {
               />
               <span>{calendar.display_name}</span>
             </label>
+            {calendar.import_enabled && (
+              <label className="cc-calendar-sync__toggle cc-calendar-sync__note">
+                <input
+                  type="checkbox"
+                  checked={calendar.suggestions_enabled}
+                  onChange={(event) =>
+                    update.mutate({
+                      id: calendar.id,
+                      changes: { suggestions_enabled: event.target.checked },
+                    })
+                  }
+                />
+                <span>{translateUi('Suggest tasks from its events')}</span>
+              </label>
+            )}
           </li>
         ))}
       </ul>
@@ -111,12 +143,17 @@ function AccountBlock({ account }: { account: CalendarAccount }) {
 
 function ConnectForm({ onDone }: { onDone: () => void }) {
   const connect = useConnectCalendarAccount();
-  const [presetId, setPresetId] = useState('icloud');
+  const connectFeed = useConnectCalendarFeed();
+  const [presetId, setPresetId] = useState(GOOGLE);
   const preset = PRESETS.find((item) => item.id === presetId) ?? PRESETS[0];
+  const isFeed = presetId === GOOGLE;
   const [url, setUrl] = useState(preset.url);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const ready = /^https?:\/\/\S+$/.test(url.trim()) && username.trim() && password;
+  const ready = isFeed
+    ? /^(https?|webcal):\/\/\S+$/.test(url.trim())
+    : /^https?:\/\/\S+$/.test(url.trim()) && username.trim() && password;
+  const pending = connect.isPending || connectFeed.isPending;
 
   return (
     <form
@@ -124,6 +161,10 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
       onSubmit={(event) => {
         event.preventDefault();
         if (!ready) return;
+        if (isFeed) {
+          connectFeed.mutate({ label: '', url: url.trim() }, { onSuccess: onDone });
+          return;
+        }
         connect.mutate(
           {
             label: presetId === 'other' ? '' : preset.label,
@@ -156,29 +197,41 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
       <input
         className="cc-settings-input cc-calendar-sync__wide"
         value={url}
-        aria-label={translateUi('CalDAV server address')}
-        placeholder={translateUi('https://caldav.example.com/')}
+        autoComplete="off"
+        spellCheck={false}
+        aria-label={
+          isFeed
+            ? translateUi('Secret address in iCal format')
+            : translateUi('CalDAV server address')
+        }
+        placeholder={
+          isFeed
+            ? 'https://calendar.google.com/calendar/ical/…/basic.ics'
+            : translateUi('https://caldav.example.com/')
+        }
         onChange={(event) => setUrl(event.target.value)}
       />
-      <div className="cc-settings-inline-actions">
-        <input
-          className="cc-settings-input"
-          value={username}
-          autoComplete="username"
-          aria-label={translateUi('Username')}
-          placeholder={translateUi('Username')}
-          onChange={(event) => setUsername(event.target.value)}
-        />
-        <input
-          className="cc-settings-input"
-          type="password"
-          value={password}
-          autoComplete="new-password"
-          aria-label={translateUi('App password')}
-          placeholder={translateUi('App password')}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-      </div>
+      {!isFeed && (
+        <div className="cc-settings-inline-actions">
+          <input
+            className="cc-settings-input"
+            value={username}
+            autoComplete="username"
+            aria-label={translateUi('Username')}
+            placeholder={translateUi('Username')}
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <input
+            className="cc-settings-input"
+            type="password"
+            value={password}
+            autoComplete="new-password"
+            aria-label={translateUi('App password')}
+            placeholder={translateUi('App password')}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </div>
+      )}
       <p className="cc-calendar-sync__note">{translateUi(preset.hint)}</p>
       <div className="cc-settings-inline-actions">
         <button type="button" className="cc-btn cc-btn--compact" onClick={onDone}>
@@ -187,9 +240,9 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
         <button
           type="submit"
           className="cc-btn cc-btn--primary cc-btn--compact"
-          disabled={!ready || connect.isPending}
+          disabled={!ready || pending}
         >
-          {connect.isPending ? translateUi('Connecting…') : translateUi('Connect')}
+          {pending ? translateUi('Connecting…') : translateUi('Connect')}
         </button>
       </div>
     </form>
@@ -201,10 +254,15 @@ export default function CalendarSyncSettings() {
   const { t } = useTranslation();
   const { data: accounts = [] } = useCalendarAccountsQuery();
   const update = useUpdateCalendarSource();
+  const { data: suggestions } = useTodaySuggestionsQuery();
+  const setAutoAdd = useSetSuggestionAutoAdd();
   const [adding, setAdding] = useState(false);
-  const calendars = accounts.flatMap((account) =>
-    account.calendars.map((calendar) => ({ ...calendar, account: account.label })),
-  );
+  // A calendar read through its iCal address cannot take ClawChat's events.
+  const calendars = accounts
+    .filter((account) => account.kind !== 'ics_url')
+    .flatMap((account) =>
+      account.calendars.map((calendar) => ({ ...calendar, account: account.label })),
+    );
   const target = calendars.find((calendar) => calendar.is_write_target);
 
   return (
@@ -234,6 +292,23 @@ export default function CalendarSyncSettings() {
               </option>
             ))}
           </select>
+        </SettingsRow>
+      )}
+      {accounts.length > 0 && (
+        <SettingsRow
+          label={translateUi('Add exam and deadline tasks without asking')}
+          sublabel={translateUi(
+            'Talks and meetings are only suggested on Today, where anything added can be undone.',
+          )}
+        >
+          <Toggle
+            checked={
+              setAutoAdd.isPending ? !!setAutoAdd.variables : (suggestions?.auto_add ?? true)
+            }
+            disabled={!suggestions || setAutoAdd.isPending}
+            label={translateUi('Add exam and deadline tasks without asking')}
+            onChange={(enabled) => setAutoAdd.mutate(enabled)}
+          />
         </SettingsRow>
       )}
       <div className="cc-calendar-sync__block">

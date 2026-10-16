@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.TodaySuggestion
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.AgentRunRepository
@@ -42,6 +43,8 @@ data class TodayUiState(
     /** Agent runs queued or running now. */
     val runCount: Int = 0,
     val briefing: BriefingResponse? = null,
+    /** What the calendar suggests, folded into the agent line as "제안 N". */
+    val suggestions: List<TodaySuggestion> = emptyList(),
     val isBriefingLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     /** True while the screen is showing the last synced day instead of live data. */
@@ -58,6 +61,8 @@ sealed interface TodayAction {
     data class Delete(val todoId: String) : TodayAction
     data class SetDueToday(val todoId: String) : TodayAction
     data class Create(val input: TodoCreate) : TodayAction
+    /** [answer] is accept, dismiss, or undo. */
+    data class AnswerSuggestion(val id: String, val answer: String) : TodayAction
     data object Refresh : TodayAction
 }
 
@@ -79,8 +84,19 @@ class TodayViewModel @Inject constructor(
         doRefresh()
         fetchBriefing()
         refreshAgentWork()
-        viewModelScope.launch { syncManager.todoChanged.collect { doRefresh() } }
-        viewModelScope.launch { syncManager.eventChanged.collect { doRefresh() } }
+        fetchSuggestions()
+        viewModelScope.launch {
+            syncManager.todoChanged.collect {
+                doRefresh()
+                fetchSuggestions()
+            }
+        }
+        viewModelScope.launch {
+            syncManager.eventChanged.collect {
+                doRefresh()
+                fetchSuggestions()
+            }
+        }
         viewModelScope.launch { syncManager.reviewChanged.collect { refreshAgentWork() } }
         viewModelScope.launch { syncManager.runChanged.collect { refreshAgentWork() } }
     }
@@ -91,6 +107,7 @@ class TodayViewModel @Inject constructor(
             is TodayAction.Delete -> doDelete(action.todoId)
             is TodayAction.SetDueToday -> doSetDueToday(action.todoId)
             is TodayAction.Create -> doCreateTask(action.input)
+            is TodayAction.AnswerSuggestion -> doAnswerSuggestion(action.id, action.answer)
             is TodayAction.Refresh -> doRefresh()
         }
     }
@@ -99,11 +116,13 @@ class TodayViewModel @Inject constructor(
     fun refresh() {
         onAction(TodayAction.Refresh)
         refreshAgentWork()
+        fetchSuggestions()
     }
     fun toggleComplete(todoId: String) = onAction(TodayAction.ToggleComplete(todoId))
     fun deleteTask(todoId: String) = onAction(TodayAction.Delete(todoId))
     fun setDueToday(todoId: String) = onAction(TodayAction.SetDueToday(todoId))
     fun createTask(input: TodoCreate) = onAction(TodayAction.Create(input))
+    fun answerSuggestion(id: String, answer: String) = onAction(TodayAction.AnswerSuggestion(id, answer))
 
     private fun doRefresh() {
         // A reconnect emits both todo and event invalidations. Cancel the
@@ -291,6 +310,40 @@ class TodayViewModel @Inject constructor(
         }
     }
 
+    private var suggestionJob: Job? = null
+
+    private fun fetchSuggestions() {
+        suggestionJob?.cancel()
+        suggestionJob = viewModelScope.launch {
+            when (val result = todayRepository.getSuggestions()) {
+                is ApiResult.Success -> _uiState.update { it.copy(suggestions = result.data.suggestions) }
+                is ApiResult.Error -> Log.w(TAG, "Suggestions fetch failed: ${result.message}")
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    /** Dismissing hides the row at once; adding or undoing waits for what it made. */
+    private fun doAnswerSuggestion(id: String, answer: String) {
+        val before = _uiState.value.suggestions
+        if (answer == SUGGESTION_DISMISS) {
+            _uiState.update { state -> state.copy(suggestions = state.suggestions.filterNot { it.id == id }) }
+        }
+        viewModelScope.launch {
+            when (val result = todayRepository.answerSuggestion(id, answer)) {
+                is ApiResult.Success -> {
+                    fetchSuggestions()
+                    if (answer != SUGGESTION_DISMISS) doRefresh()
+                }
+                is ApiResult.Error -> {
+                    Log.w(TAG, "Answering a suggestion failed: ${result.message}")
+                    _uiState.update { it.copy(suggestions = before, error = result.message) }
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
     /** Counts for the one agent line; a device-only workspace has no agents to count. */
     private fun refreshAgentWork() {
         agentJob?.cancel()
@@ -330,3 +383,7 @@ class TodayViewModel @Inject constructor(
 }
 
 private const val DELETE_UNDO_WINDOW_MS = 5_000L
+
+const val SUGGESTION_ACCEPT = "accept"
+const val SUGGESTION_DISMISS = "dismiss"
+const val SUGGESTION_UNDO = "undo"

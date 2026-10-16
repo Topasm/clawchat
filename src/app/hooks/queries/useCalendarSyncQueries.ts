@@ -38,6 +38,7 @@ function useSyncMutation<TVariables, TResult>(
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.calendarAccounts });
       void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.todaySuggestions });
     },
   });
 }
@@ -61,6 +62,18 @@ export function useConnectCalendarAccount() {
       ),
     translateUi('Could not connect the calendar account.'),
     translateUi('Calendar account connected'),
+  );
+}
+
+/** A calendar's secret address in iCal format (Google's), read only. */
+export function useConnectCalendarFeed() {
+  return useSyncMutation(
+    async (input: { label: string; url: string }) =>
+      CalendarAccountResponseSchema.parse(
+        (await apiClient.post('/calendar-sync/feeds', input)).data,
+      ),
+    translateUi('Could not read that calendar address.'),
+    translateUi('Calendar added'),
   );
 }
 
@@ -91,7 +104,11 @@ export function useUpdateCalendarSource() {
       changes,
     }: {
       id: string;
-      changes: { import_enabled?: boolean; is_write_target?: boolean };
+      changes: {
+        import_enabled?: boolean;
+        is_write_target?: boolean;
+        suggestions_enabled?: boolean;
+      };
     }) =>
       CalendarSourceResponseSchema.parse(
         (await apiClient.patch(`/calendar-sync/calendars/${id}`, changes)).data,

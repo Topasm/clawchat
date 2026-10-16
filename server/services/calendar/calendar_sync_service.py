@@ -5,19 +5,23 @@
 - Events made in ClawChat are written to the one calendar the user picks, and
   edits or deletions made to them elsewhere flow back. When both sides changed
   the same event, the later change wins.
+- A secret iCal address (Google's "secret address in iCal format") is one more
+  imported calendar, read only: no OAuth app to register, nothing written back.
 """
 
 import asyncio
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 from icalendar import Calendar
 
 from exceptions import ConflictError, NotFoundError, ValidationError
 from models.calendar_sync import CalendarAccount, CalendarPush, CalendarSource
 from models.event import Event
-from services.calendar import caldav_client
+from services.calendar import caldav_client, feed_url_secret
 from services.calendar.caldav_client import CalDavClient, CalDavError, PreconditionFailed
 from services.calendar.ical_import import Occurrence, master_fields, occurrences
 from sqlalchemy import delete, select, update
@@ -34,8 +38,23 @@ SYNC_INTERVAL_SECONDS = 15 * 60.0
 PUSH_DEBOUNCE_SECONDS = 3.0
 ORIGIN_LOCAL = "local"
 ORIGIN_REMOTE = "remote"
+KIND_CALDAV = "caldav"
+KIND_ICS_URL = "ics_url"
+FEED_MAX_BYTES = 20 * 1024 * 1024
+FEED_TIMEOUT_SECONDS = 30.0
+# Shared calendars whose events never call for work of their own.
+_NO_SUGGESTION_HINTS = (
+    "holiday",
+    "birthday",
+    "contacts@group.v.calendar.google.com",
+    "contacts%40group.v.calendar.google.com",
+    "공휴일",
+    "생일",
+)
 
 client_factory = CalDavClient
+# Tests swap in an httpx.MockTransport.
+feed_transport: httpx.AsyncBaseTransport | None = None
 _changed: asyncio.Event | None = None
 
 
@@ -65,11 +84,14 @@ def wake_sync() -> None:
 
 async def sync_loop(session_factory: Any) -> None:
     """Sync every account periodically and soon after a local change."""
+    from services.calendar import event_suggestion_service
+
     while True:
         watch = watch_changes()
         try:
             async with session_factory() as db:
                 await sync_all(db)
+                await event_suggestion_service.refresh(db)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -166,8 +188,81 @@ async def connect_account(
                 display_name=calendar.display_name,
                 color=calendar.color,
                 import_enabled=True,
+                suggestions_enabled=_suggests(calendar.display_name, calendar.href),
             )
         )
+    await db.commit()
+    wake_sync()
+    return account
+
+
+def _suggests(*names: str) -> bool:
+    text = " ".join(names).lower()
+    return not any(hint in text for hint in _NO_SUGGESTION_HINTS)
+
+
+async def fetch_feed(url: str) -> str:
+    """Read a secret iCal address. Errors never repeat the address."""
+    try:
+        async with httpx.AsyncClient(
+            transport=feed_transport,
+            timeout=FEED_TIMEOUT_SECONDS,
+            follow_redirects=True,
+            headers={"Accept": "text/calendar"},
+        ) as http:
+            async with http.stream("GET", url) as response:
+                if response.status_code in (401, 403, 404):
+                    raise CalDavError(
+                        "The calendar address no longer works. Copy it from the calendar again."
+                    )
+                if response.status_code >= 400:
+                    raise CalDavError(f"The calendar answered {response.status_code}")
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    body.extend(chunk)
+                    if len(body) > FEED_MAX_BYTES:
+                        raise CalDavError("The calendar is too large to read")
+    except httpx.HTTPError as exc:
+        raise CalDavError(f"Could not reach the calendar ({type(exc).__name__})") from None
+    text = bytes(body).decode("utf-8", errors="replace")
+    if "BEGIN:VCALENDAR" not in text:
+        raise CalDavError("That address does not lead to a calendar in iCal format")
+    return text
+
+
+async def connect_feed(db: AsyncSession, *, label: str, url: str) -> CalendarAccount:
+    try:
+        address = feed_url_secret.normalize(url)
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
+    try:
+        ics = await fetch_feed(address)
+    except CalDavError as exc:
+        raise ValidationError(str(exc)) from exc
+    try:
+        name = str(Calendar.from_ical(ics).get("X-WR-CALNAME") or "").strip()
+    except ValueError:
+        name = ""
+    title = label.strip() or name or "Calendar"
+    account = CalendarAccount(
+        kind=KIND_ICS_URL,
+        label=title,
+        server_url=feed_url_secret.mask(address),
+        username="",
+        password="",
+        feed_url=feed_url_secret.seal(address),
+    )
+    db.add(account)
+    await db.flush()
+    db.add(
+        CalendarSource(
+            account_id=account.id,
+            href="",
+            display_name=title,
+            import_enabled=True,
+            suggestions_enabled=_suggests(title, name, address),
+        )
+    )
     await db.commit()
     wake_sync()
     return account
@@ -223,10 +318,17 @@ async def update_source(
     *,
     import_enabled: bool | None = None,
     is_write_target: bool | None = None,
+    suggestions_enabled: bool | None = None,
 ) -> CalendarSource:
     source = await db.get(CalendarSource, source_id)
     if source is None:
         raise NotFoundError("Calendar not found")
+    if suggestions_enabled is not None:
+        source.suggestions_enabled = suggestions_enabled
+    if is_write_target:
+        account = await db.get(CalendarAccount, source.account_id)
+        if account is not None and account.kind == KIND_ICS_URL:
+            raise ValidationError("A calendar added by its iCal address can only be read")
     if import_enabled is not None:
         source.import_enabled = import_enabled
         if not import_enabled:
@@ -274,11 +376,16 @@ async def sync_all(db: AsyncSession) -> None:
 async def sync_account(db: AsyncSession, account: CalendarAccount) -> None:
     account_id = account.id
     try:
-        async with client_factory(account.server_url, account.username, account.password) as client:
-            for source in await sources_for(db, account_id):
-                await _push(db, client, source)
-                if source.import_enabled or source.is_write_target:
-                    await _import(db, client, source)
+        if account.kind == KIND_ICS_URL:
+            await _import_feed(db, account)
+        else:
+            async with client_factory(
+                account.server_url, account.username, account.password
+            ) as client:
+                for source in await sources_for(db, account_id):
+                    await _push(db, client, source)
+                    if source.import_enabled or source.is_write_target:
+                        await _import(db, client, source)
     except CalDavError as exc:
         await db.rollback()
         account = await db.get(CalendarAccount, account_id)
@@ -455,6 +562,18 @@ async def _import(db: AsyncSession, client: CalDavClient, source: CalendarSource
         if uid not in seen_own and event.id not in pending and window_start <= start < window_end:
             await db.delete(event)
 
+    await _store_remote(db, source, wanted)
+    source.ctag = ctag
+    source.last_synced_at = now
+    await db.commit()
+
+
+async def _store_remote(
+    db: AsyncSession,
+    source: CalendarSource,
+    wanted: dict[tuple[str, str | None], tuple[Occurrence, str | None, str | None]],
+) -> None:
+    """Make the calendar's imported events exactly ``wanted``."""
     existing = {
         (event.external_uid, event.external_recurrence_id): event
         for event in (
@@ -498,7 +617,32 @@ async def _import(db: AsyncSession, client: CalDavClient, source: CalendarSource
     for event in existing.values():
         await db.delete(event)
 
-    source.ctag = ctag
+
+async def _import_feed(db: AsyncSession, account: CalendarAccount) -> None:
+    sources = await sources_for(db, account.id)
+    if not sources or account.feed_url is None:
+        return
+    source = sources[0]
+    if not source.import_enabled:
+        return
+    try:
+        address = feed_url_secret.reveal(account.feed_url)
+    except ValueError as exc:
+        raise CalDavError(str(exc)) from None
+    ics = await fetch_feed(address)
+    now = _now()
+    digest = hashlib.sha256(ics.encode("utf-8")).hexdigest()
+    fresh = source.last_synced_at and now - _utc(source.last_synced_at) < FULL_IMPORT_EVERY
+    if digest == source.ctag and fresh:
+        return
+    window_start, window_end = now - WINDOW_PAST, now + WINDOW_FUTURE
+    try:
+        items = occurrences(ics, window_start, window_end)
+    except (ValueError, TypeError) as exc:
+        raise CalDavError("The calendar could not be read") from exc
+    wanted = {(item.uid, item.recurrence_id): (item, None, None) for item in items}
+    await _store_remote(db, source, wanted)
+    source.ctag = digest
     source.last_synced_at = now
     await db.commit()
 
@@ -510,6 +654,7 @@ def source_summary(source: CalendarSource) -> dict:
         "color": source.color,
         "import_enabled": source.import_enabled,
         "is_write_target": source.is_write_target,
+        "suggestions_enabled": source.suggestions_enabled,
         "last_synced_at": _utc(source.last_synced_at),
     }
 
