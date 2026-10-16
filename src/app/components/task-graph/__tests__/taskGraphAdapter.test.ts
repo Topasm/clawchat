@@ -278,7 +278,10 @@ describe('expandTaskGraphContext', () => {
 
 describe('insight snapshot pagination recovery', () => {
   it('hydrates every missing snapshot node when external filters are inactive', () => {
-    const metadataOnly = todo('metadata-only', { title: 'Canonical metadata task' });
+    const metadataOnly = todo('metadata-only', {
+      title: 'Canonical metadata task',
+      inbox_state: 'none',
+    });
     const result = augmentTaskGraphTodos(
       [todo('loaded')],
       [todo('loaded'), metadataOnly],
@@ -296,8 +299,21 @@ describe('insight snapshot pagination recovery', () => {
       title: 'Task beyond Todo pagination',
       status: 'in_progress',
       source: 'graph_insight',
-      project_label: 'Graph snapshot',
     });
+    expect(result[2].project_label).toBeUndefined();
+  });
+
+  it('never restores an open Inbox capture as a snapshot node', () => {
+    const capture = todo('capture', { inbox_state: 'captured' });
+    const result = augmentTaskGraphTodos(
+      [todo('loaded')],
+      [todo('loaded'), capture],
+      [insight('capture')],
+      '2026-08-27T12:00:00Z',
+      { includeAllMissing: true, includeContextMissing: true },
+    );
+
+    expect(result.map((item) => item.id)).toEqual(['loaded']);
   });
 
   it('preserves external filter meaning while restoring prerequisite context', () => {

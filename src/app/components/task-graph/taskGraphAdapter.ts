@@ -3,6 +3,8 @@ import type { TaskGraphInsightNode, TodoResponse } from '../../types/api';
 import { buildExecutionGraphLayout, buildStructureGraphLayout } from './taskGraphLayout';
 import type { GraphRelationshipLike } from './taskGraphLayout';
 import type { TaskFlowNode, TaskGraphMode } from './taskGraphTypes';
+import { isInboxTodo } from '../../utils/inboxState';
+import { translateUi } from '../../i18n';
 
 export interface TaskGraphElements {
   nodes: TaskFlowNode[];
@@ -78,7 +80,8 @@ export function todoFromGraphInsight(
     tags: [],
     parent_id: insight.parent_id,
     source: 'graph_insight',
-    project_label: insight.scope_role === 'context' ? 'External prerequisite' : 'Graph snapshot',
+    project_label:
+      insight.scope_role === 'context' ? translateUi('External prerequisite') : undefined,
     estimated_minutes: insight.estimated_minutes,
     created_at: generatedAt,
     updated_at: generatedAt,
@@ -87,7 +90,8 @@ export function todoFromGraphInsight(
 
 /**
  * Fill client pagination gaps from the authoritative insight snapshot. When
- * external filters are active, only prerequisite context is restored.
+ * external filters are active, only prerequisite context is restored. Inbox
+ * captures are not tasks, so they never come back as snapshot nodes.
  */
 export function augmentTaskGraphTodos(
   todos: readonly TodoResponse[],
@@ -108,7 +112,9 @@ export function augmentTaskGraphTodos(
     ) {
       return;
     }
-    result.push(metadataById.get(insight.task_id) ?? todoFromGraphInsight(insight, generatedAt));
+    const metadata = metadataById.get(insight.task_id);
+    if (metadata && isInboxTodo(metadata)) return;
+    result.push(metadata ?? todoFromGraphInsight(insight, generatedAt));
     includedIds.add(insight.task_id);
   });
   return result;
