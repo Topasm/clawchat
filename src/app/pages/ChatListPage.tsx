@@ -255,15 +255,6 @@ export default function ChatListPage() {
         />
       )}
 
-      {/* A chat is not a project, so starting one sits below the list. */}
-      {!isMobile && (
-        <div className="cc-quick-chats__new">
-          <button type="button" className="cc-btn cc-btn--ghost" onClick={handleNewChat}>
-            {translateUi('+ Quick Chat')}
-          </button>
-        </div>
-      )}
-
       {/* Conversations outside any project: quick chats, then unscoped agent runs.
           They used to have a page of their own that no nav item reached. */}
       {quickChats.length > 0 && (
