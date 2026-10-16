@@ -421,3 +421,35 @@ async def test_policy_changes_prune_the_index(client, auth_headers):
     assert response.status_code == 200, response.text
     assert response.json()["indexed_files"] == 1
     assert response.json()["exclude_folders"] == ["01_Projects/E65"]
+
+
+# -- project folders a shared vault already has ---------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_shared_vaults_project_folders_are_offered_as_projects(client, auth_headers):
+    source_id = await _register(client, auth_headers)
+    files = [
+        {"path": "00_Inbox/TODO.md"},
+        {"path": "01_Projects/FreqMotion/plan.md"},
+        {"path": "01_Projects/iclr_2027/TODO.md"},
+        {"path": "01_Projects/postech_coursework_2/GPU_Computing/hw1.md"},
+        {"path": "01_Projects/개인서류/passport.md"},
+        {"path": "01_Projects/.trash/old.md"},
+    ]
+    response = await client.put(
+        f"/api/data-sources/{source_id}/index", json={"files": files}, headers=auth_headers
+    )
+    assert response.status_code == 204, response.text
+    await client.post("/api/projects", json={"title": "FreqMotion"}, headers=auth_headers)
+
+    candidates = (
+        await client.get("/api/inbox/project-candidates", headers=auth_headers)
+    ).json()
+    # Excluded folders and the vault's inbox stay out, and a folder a project
+    # already has is not offered.
+    assert [(item["name"], item["folder"], item["has_todo"]) for item in candidates] == [
+        ("iclr_2027", "01_Projects/iclr_2027", True),
+        ("postech_coursework_2", "01_Projects/postech_coursework_2", False),
+    ]
+    assert {item["source_name"] for item in candidates} == {"workspace"}

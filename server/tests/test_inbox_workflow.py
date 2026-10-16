@@ -20,6 +20,11 @@ from tests.test_inbox_triage import FakeTriageAI
 async def test_capture_preview_defer_restore_approve_follow_up_and_undo(
     client, auth_headers, db_session, device_zone
 ):
+    # The manual preview-and-place flow, with the Inbox not filing by itself.
+    settings = await client.put(
+        "/api/settings", headers=auth_headers, json={"inboxAutoOrganize": False}
+    )
+    assert settings.status_code == 200
     project = await project_service.create_project(db_session, title="논문 작성")
     branch = Todo(
         title="논문 준비", project_id=project.id, parent_id=project.root_task_id

@@ -277,6 +277,34 @@ export const NoteResponseSchema = z.object({
   updated_at: z.string(),
 });
 
+/** Where the Inbox sent a capture: by itself (`auto`) or because the user chose. */
+export const InboxRoutingResponseSchema = z.object({
+  id: z.string(),
+  origin: z.enum(['auto', 'user']),
+  kind: z.enum(['task', 'note']),
+  todo_id: z.string().nullable(),
+  note_id: z.string().nullable(),
+  title: z.string(),
+  original_title: z.string(),
+  due_date: z.string().nullable(),
+  project_folder: z.string().nullable(),
+  created_at: z.string(),
+  reverted_at: z.string().nullable(),
+});
+
+export const InboxRoutingListResponseSchema = z.object({
+  items: z.array(InboxRoutingResponseSchema),
+  auto_organize: z.boolean(),
+});
+
+/** A vault project folder no project is named after yet. */
+export const ProjectFolderCandidateSchema = z.object({
+  name: z.string(),
+  folder: z.string(),
+  source_name: z.string(),
+  has_todo: z.boolean(),
+});
+
 export const ProjectStatusSchema = z.enum(['planned', 'active', 'completed', 'archived']);
 
 export const ProjectResponseSchema = z.object({
@@ -765,6 +793,7 @@ export const SettingsPayloadSchema = z.object({
   reminderSound: z.boolean().optional(),
   saveHistory: z.boolean().optional(),
   analyticsEnabled: z.boolean().optional(),
+  inboxAutoOrganize: z.boolean().optional(),
 });
 
 export const SettingsResponseSchema = z.object({
@@ -856,6 +885,8 @@ export type TokenResponse = z.infer<typeof TokenResponseSchema>;
 export type RefreshRequest = z.infer<typeof RefreshRequestSchema>;
 
 export type TodoResponse = z.infer<typeof TodoResponseSchema>;
+export type InboxRouting = z.infer<typeof InboxRoutingResponseSchema>;
+export type ProjectFolderCandidate = z.infer<typeof ProjectFolderCandidateSchema>;
 export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
 export type TaskPlacementRequest = z.infer<typeof TaskPlacementRequestSchema>;

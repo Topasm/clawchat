@@ -5634,6 +5634,149 @@
         "title": "InboxReviewUpdate",
         "type": "object"
       },
+      "InboxRoutingAcknowledgeResponse": {
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "acknowledged"
+        ],
+        "title": "InboxRoutingAcknowledgeResponse",
+        "type": "object"
+      },
+      "InboxRoutingListResponse": {
+        "properties": {
+          "auto_organize": {
+            "title": "Auto Organize",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InboxRoutingResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "auto_organize"
+        ],
+        "title": "InboxRoutingListResponse",
+        "type": "object"
+      },
+      "InboxRoutingResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "task",
+              "note"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Id"
+          },
+          "origin": {
+            "enum": [
+              "auto",
+              "user"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "original_title": {
+            "title": "Original Title",
+            "type": "string"
+          },
+          "project_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Folder"
+          },
+          "reverted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverted At"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "todo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Todo Id"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "kind",
+          "todo_id",
+          "note_id",
+          "title",
+          "original_title",
+          "due_date",
+          "project_folder",
+          "created_at",
+          "reverted_at"
+        ],
+        "title": "InboxRoutingResponse",
+        "type": "object"
+      },
       "InboxTriagePreviewRequest": {
         "properties": {
           "expected_graph_revision": {
@@ -7579,6 +7722,34 @@
           "host_id"
         ],
         "title": "ProjectExecutionHostSelect",
+        "type": "object"
+      },
+      "ProjectFolderCandidate": {
+        "properties": {
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "has_todo": {
+            "title": "Has Todo",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_name": {
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "folder",
+          "source_name",
+          "has_todo"
+        ],
+        "title": "ProjectFolderCandidate",
         "type": "object"
       },
       "ProjectHostPathResponse": {
@@ -9845,6 +10016,17 @@
               }
             ],
             "title": "Fontsize"
+          },
+          "inboxAutoOrganize": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inboxautoorganize"
           },
           "llmModel": {
             "anyOf": [
@@ -16211,6 +16393,138 @@
         "summary": "Health"
       }
     },
+    "/api/inbox/project-candidates": {
+      "get": {
+        "description": "Vault project folders (``01_Projects/*``, folders with a ``TODO.md``) that\nno project is named after yet, from the server's vault and shared devices.",
+        "operationId": "list_project_candidates_api_inbox_project_candidates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectFolderCandidate"
+                  },
+                  "title": "Response List Project Candidates Api Inbox Project Candidates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Project Candidates",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/inbox/routings": {
+      "get": {
+        "description": "Moves from the last 24 hours that the user has neither cleared nor undone.",
+        "operationId": "list_recent_routings_api_inbox_routings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Recent Routings",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/inbox/routings/acknowledge": {
+      "post": {
+        "operationId": "acknowledge_routings_api_inbox_routings_acknowledge_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingAcknowledgeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Acknowledge Routings",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
+    "/api/inbox/routings/{routing_id}/undo": {
+      "post": {
+        "description": "Put the item back exactly as it was before this move, under its old id.",
+        "operationId": "undo_routing_api_inbox_routings__routing_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "routing_id",
+            "required": true,
+            "schema": {
+              "title": "Routing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Undo Routing",
+        "tags": [
+          "inbox"
+        ]
+      }
+    },
     "/api/notes": {
       "get": {
         "operationId": "list_notes_api_notes_get",
@@ -16375,6 +16689,54 @@
           }
         ],
         "summary": "Update Note",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/api/notes/{note_id}/to-task": {
+      "post": {
+        "description": "Turn a note into a task (first line the title); undo restores the note.",
+        "operationId": "convert_note_to_task_api_notes__note_id__to_task_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Convert Note To Task",
         "tags": [
           "notes"
         ]
@@ -20928,6 +21290,54 @@
         ]
       }
     },
+    "/api/todos/{todo_id}/file-as-task": {
+      "post": {
+        "description": "Take an Inbox capture out as a task, with the deadline its title names.",
+        "operationId": "file_todo_as_task_api_todos__todo_id__file_as_task_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "File Todo As Task",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
     "/api/todos/{todo_id}/inbox-review": {
       "patch": {
         "operationId": "save_inbox_review_api_todos__todo_id__inbox_review_patch",
@@ -21484,6 +21894,54 @@
           }
         ],
         "summary": "Skip Questions",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/to-note": {
+      "post": {
+        "description": "Turn a task with nothing attached into a note; undo restores the task.",
+        "operationId": "convert_todo_to_note_api_todos__todo_id__to_note_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Convert Todo To Note",
         "tags": [
           "todos"
         ]

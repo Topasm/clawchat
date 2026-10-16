@@ -167,7 +167,7 @@ async def create_todo(
         depends_on=None,
         # Legacy clients may still send recurrence fields. New tasks are one-off.
     )
-    if captured_at is not None and inbox_state == "captured":
+    if captured_at is not None and inbox_state in ("captured", "classifying"):
         # Offline Inbox captures retain their original date anchor after sync.
         todo.created_at = min(captured_at.astimezone(timezone.utc), datetime.now(timezone.utc))
     db.add(todo)

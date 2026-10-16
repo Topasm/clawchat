@@ -24,6 +24,8 @@ class SettingsPayload(BaseModel):
     reminderSound: bool | None = None
     saveHistory: bool | None = None
     analyticsEnabled: bool | None = None
+    # Files Inbox captures as tasks or notes on arrival; on unless set false.
+    inboxAutoOrganize: bool | None = None
 
 
 class SettingsResponse(BaseModel):

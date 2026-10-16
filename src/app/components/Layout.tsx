@@ -239,6 +239,9 @@ export default function Layout() {
   }, [attentionBadgeCount, agentAttentionCount]);
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
+  // The Inbox has its own bottom bar that adds to the Inbox, so the chat bar steps aside.
+  const onInboxPage = location.pathname === '/inbox';
+  const chatBarHidden = onChatPage || onInboxPage;
   const activeMobileTabIndex = useMemo(
     () =>
       availableMobileTabs.findIndex(
@@ -379,7 +382,7 @@ export default function Layout() {
     },
     [setChatPanelSize],
   );
-  const showChatPanel = !onChatPage && chatPanel.isOpen;
+  const showChatPanel = !chatBarHidden && chatPanel.isOpen;
   const mobileMainContent = (
     <>
       <div className="cc-content" ref={contentRef}>
@@ -388,7 +391,7 @@ export default function Layout() {
         </ErrorBoundary>
       </div>
       <PullToRefresh contentRef={contentRef} onRefresh={handleRefresh} disabled={onChatPage} />
-      {!onChatPage && (
+      {!chatBarHidden && (
         <ChatPanel
           isOpen={chatPanel.isOpen}
           conversationId={chatPanel.conversationId}
@@ -441,7 +444,9 @@ export default function Layout() {
             </div>
             {/* The chat bar sits between the page and the tabs on every page but
                 chat; the button rides above it and steps aside while it is open. */}
-            {!chatPanel.isOpen && <FloatingActionButton aboveChatBar={!onChatPage} />}
+            {!chatPanel.isOpen && !onInboxPage && (
+              <FloatingActionButton aboveChatBar={!onChatPage} />
+            )}
             <BottomNav
               tabs={availableMobileTabs}
               badges={{
@@ -472,7 +477,7 @@ export default function Layout() {
                     <AnimatedOutlet />
                   </ErrorBoundary>
                 </div>
-                {!onChatPage && !chatPanel.isOpen && (
+                {!chatBarHidden && !chatPanel.isOpen && (
                   <ChatPanel
                     isOpen={false}
                     conversationId={chatPanel.conversationId}

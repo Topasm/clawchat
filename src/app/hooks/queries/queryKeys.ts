@@ -19,6 +19,8 @@ export const queryKeys = {
   executionProviders: ['execution-providers'] as const,
   executionHosts: ['execution-hosts'] as const,
   dataSources: ['data-sources'] as const,
+  inboxRoutings: ['inbox-routings'] as const,
+  inboxProjectCandidates: ['inbox-project-candidates'] as const,
   dataSourceQuery: (sourceId: string, op: string, path: string, query = '') =>
     ['data-sources', sourceId, op, path, query] as const,
   dataSourceLog: (sourceId: string) => ['data-sources', sourceId, 'log'] as const,
