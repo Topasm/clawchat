@@ -118,6 +118,24 @@ class SyncManagerTest {
     }
 
     @Test
+    fun `note module changes and reconnects invalidate the notes widget`() = runTest {
+        val fixture = fixture()
+        var noteChanges = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            fixture.manager.noteChanged.collect { noteChanges++ }
+        }
+
+        fixture.manager.start()
+        assertTrue(fixture.events.tryEmit(SyncEvent.ModuleChanged("notes")))
+        advanceUntilIdle()
+        assertTrue(fixture.events.tryEmit(SyncEvent.Connected))
+        advanceUntilIdle()
+
+        assertEquals(2, noteChanges)
+        fixture.manager.stop()
+    }
+
+    @Test
     fun `reconnect invalidates review and run state missed while offline`() = runTest {
         val fixture = fixture()
         var reviewChanges = 0
