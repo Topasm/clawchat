@@ -1787,4 +1787,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Due {{date}} · this time is free': '{{date}} 마감 · 이 시간이 비어 있음',
   'Added automatically': '바로 추가됨',
   'Dismiss {{title}}': '{{title}} 무시',
+  'https://calendar.google.com/calendar/ical/…/basic.ics':
+    'https://calendar.google.com/calendar/ical/…/basic.ics',
 };
