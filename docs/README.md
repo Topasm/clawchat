@@ -34,7 +34,7 @@ Model selection and upgrades: [AI model updates](./ai-models.md).
 | [ADR 015: AI-Proposed Workstreams](./adr/015-ai-proposed-workstreams.md)                       | Dashed structural proposals, preview-local references, atomic creation/placement, and creation-aware Undo |
 | [ADR 016: Task Execution Telemetry](./adr/016-task-execution-telemetry-overlay.md)             | Derived Task-level Run, Review, and Artifact overlays without duplicating canonical execution state       |
 | [ADR 017: Approved Agent Execution](./adr/017-ready-only-approved-agent-execution.md)          | Ready-only, provider-aware, single-Run execution with an explicit user confirmation gate                  |
-| [ADR 018: Agent Review Handoff](./adr/018-agent-review-ready-handoff.md)                        | CAS review decisions, downstream Ready handoff, and explicit unsuccessful-Run recovery                    |
+| [ADR 018: Agent Review Handoff](./adr/018-agent-review-ready-handoff.md)                       | CAS review decisions, downstream Ready handoff, and explicit unsuccessful-Run recovery                    |
 
 ## Key Features
 
@@ -44,8 +44,8 @@ Model selection and upgrades: [AI model updates](./ai-models.md).
 - **Inbox Triage Canvas** — Place captured Tasks into a Project hierarchy, approve AI suggestions, connect dependencies, and inspect live Run, Review, and Artifact overlays
 - **Approved Agent Execution** — Start one provider-aware Run from a Ready leaf Task after reviewing its Skill and lifecycle impact
 - **Review-to-Ready Handoff** — Preview downstream unlocks, approve one Agent result, and continue directly with newly Ready Tasks
-- **Command Palette (Ctrl+K)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
-- **Keyboard Shortcuts** — Global and scoped hotkeys (?, N, /, Ctrl+Shift+C, G+T/I/C/A/S) using react-hotkeys-hook
+- **Command Palette (Ctrl+P)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
+- **Keyboard Shortcuts** — Global and scoped hotkeys (?, Ctrl+N new item, Ctrl+K AI panel, N, /, G+T/I/C/A/S) using react-hotkeys-hook
 - **Toast Notifications** — User feedback on task moves, completions, and creation with auto-dismiss
 - **Resizable Panels** — Adjustable sidebar width via react-resizable-panels (fixed layout on mobile)
 - **Priority Icons** — Arrow-based SVG icons for priority badges (urgent/high/medium/low)
@@ -71,26 +71,26 @@ Model selection and upgrades: [AI model updates](./ai-models.md).
 
 ## Tech Stack
 
-| Layer              | Technology                                   | Purpose                                                                    |
-| ------------------ | -------------------------------------------- | -------------------------------------------------------------------------- |
-| Desktop App        | Tauri 2 + Rust                               | Native desktop shell, server lifecycle, secure storage, and signed updates |
-| Web App            | Vite + React 18                              | Fast dev server and optimized production builds                            |
-| Language           | TypeScript                                   | Type-safe codebase                                                         |
-| Routing            | React Router v7                              | Client-side navigation and lazy route splitting                            |
-| Client State       | Zustand + TanStack Query                     | Local preferences/session state plus cached server state and mutations     |
-| HTTP Client        | Axios                                        | REST API communication with token refresh                                  |
-| Real-time          | SSE + WebSocket                              | Streaming AI responses and cross-client change notifications               |
-| Drag & Drop        | @hello-pangea/dnd                            | Kanban board drag-and-drop with animations                                 |
-| Dialogs            | @radix-ui/react-dialog                       | Accessible modal/dialog primitives                                         |
-| Command Palette    | cmdk                                         | Headless command menu                                                      |
-| Keyboard Shortcuts | react-hotkeys-hook                           | Global and scoped hotkey management                                        |
-| Resizable Panels   | react-resizable-panels                       | Adjustable sidebar/panel layout                                            |
-| Code Editor        | @uiw/react-codemirror                        | Syntax-highlighted editor for system prompt                                |
-| Styling            | CSS with custom properties                   | BEM naming (`.cc-` prefix), theme-aware via CSS variables                  |
-| Backend            | Python FastAPI                               | Async API server with AI orchestration                                     |
-| Database           | SQLite                                       | Single-file, zero-config persistent storage                                |
-| AI Layer           | Ollama / OpenAI-compatible / Claude Code / Codex API | Local-first LLM with optional external backends                      |
-| Deployment         | Docker Compose                               | One-command server setup                                                   |
+| Layer              | Technology                                           | Purpose                                                                    |
+| ------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| Desktop App        | Tauri 2 + Rust                                       | Native desktop shell, server lifecycle, secure storage, and signed updates |
+| Web App            | Vite + React 18                                      | Fast dev server and optimized production builds                            |
+| Language           | TypeScript                                           | Type-safe codebase                                                         |
+| Routing            | React Router v7                                      | Client-side navigation and lazy route splitting                            |
+| Client State       | Zustand + TanStack Query                             | Local preferences/session state plus cached server state and mutations     |
+| HTTP Client        | Axios                                                | REST API communication with token refresh                                  |
+| Real-time          | SSE + WebSocket                                      | Streaming AI responses and cross-client change notifications               |
+| Drag & Drop        | @hello-pangea/dnd                                    | Kanban board drag-and-drop with animations                                 |
+| Dialogs            | @radix-ui/react-dialog                               | Accessible modal/dialog primitives                                         |
+| Command Palette    | cmdk                                                 | Headless command menu                                                      |
+| Keyboard Shortcuts | react-hotkeys-hook                                   | Global and scoped hotkey management                                        |
+| Resizable Panels   | react-resizable-panels                               | Adjustable sidebar/panel layout                                            |
+| Code Editor        | @uiw/react-codemirror                                | Syntax-highlighted editor for system prompt                                |
+| Styling            | CSS with custom properties                           | BEM naming (`.cc-` prefix), theme-aware via CSS variables                  |
+| Backend            | Python FastAPI                                       | Async API server with AI orchestration                                     |
+| Database           | SQLite                                               | Single-file, zero-config persistent storage                                |
+| AI Layer           | Ollama / OpenAI-compatible / Claude Code / Codex API | Local-first LLM with optional external backends                            |
+| Deployment         | Docker Compose                                       | One-command server setup                                                   |
 
 ## Quick Start
 

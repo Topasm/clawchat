@@ -14,6 +14,7 @@ import ChatPanel from './chat-panel/ChatPanel';
 import { ChatPanelControllerProvider } from './chat-panel/ChatPanelControllerContext';
 import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
+import { useToggleContextChat } from '../hooks/useContextChat';
 import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
@@ -32,7 +33,7 @@ import QuickCaptureModal from './shared/QuickCaptureModal';
 import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
-import { ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
+import { ChatBubbleIcon, ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import {
   useCapabilitiesQuery,
@@ -131,7 +132,6 @@ export default function Layout() {
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const quickCaptureOpen = useQuickCaptureStore((state) => state.isOpen);
-  const quickCapturePlaceholder = useQuickCaptureStore((state) => state.placeholder);
   const quickCaptureParentId = useQuickCaptureStore((state) => state.defaultParentId);
   const openQuickCapture = useQuickCaptureStore((state) => state.open);
   const closeQuickCapture = useQuickCaptureStore((state) => state.close);
@@ -211,8 +211,15 @@ export default function Layout() {
   // WebSocket connection for real-time updates
   useWebSocket();
   // Wire global keyboard shortcuts
+  const toggleContextChat = useToggleContextChat(chatPanel);
   useGlobalShortcuts({
-    onToggleChat: chatPanel.toggle,
+    onToggleChat: toggleContextChat,
+    onNewItem: () => {
+      // The Inbox has the input on the page; elsewhere the same input opens.
+      const inboxInput = document.querySelector<HTMLInputElement>('.cc-inbox-capture__input');
+      if (inboxInput) inboxInput.focus();
+      else openQuickCapture();
+    },
     onShowHelp: () => setShowShortcuts(true),
   });
   useNavigationShortcuts();
@@ -244,11 +251,9 @@ export default function Layout() {
   useEffect(() => {
     void setAppBadge(attentionBadgeCount + agentAttentionCount);
   }, [attentionBadgeCount, agentAttentionCount]);
-  // Hide ChatPanel when on full ChatPage
+  // The full chat page is the conversation itself; the panel steps aside there.
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
-  // The Inbox has its own bottom bar that adds to the Inbox, so the chat bar steps aside.
   const onInboxPage = location.pathname === '/inbox';
-  const chatBarHidden = onChatPage || onInboxPage;
   const activeMobileTabIndex = useMemo(
     () =>
       availableMobileTabs.findIndex(
@@ -392,7 +397,20 @@ export default function Layout() {
     },
     [setChatPanelSize, setSidebarSize, sidebarPanelRef],
   );
-  const showChatPanel = !chatBarHidden && chatPanel.isOpen;
+  // No chat bar waits at the foot of the page: the panel opens on ⌘K or the
+  // top-right button, about the task or project on screen.
+  const showChatPanel = !onChatPage && chatPanel.isOpen;
+  const aiToggle = !onChatPage && !chatPanel.isOpen && (
+    <button
+      type="button"
+      className="cc-ai-toggle"
+      onClick={toggleContextChat}
+      aria-label={translateUi('Talk with AI')}
+      title={translateUi('Talk with AI (⌘K)')}
+    >
+      <ChatBubbleIcon size={16} />
+    </button>
+  );
   const mobileMainContent = (
     <>
       <div className="cc-content" ref={contentRef}>
@@ -401,9 +419,10 @@ export default function Layout() {
         </ErrorBoundary>
       </div>
       <PullToRefresh contentRef={contentRef} onRefresh={handleRefresh} disabled={onChatPage} />
-      {!chatBarHidden && (
+      {aiToggle}
+      {showChatPanel && (
         <ChatPanel
-          isOpen={chatPanel.isOpen}
+          isOpen
           conversationId={chatPanel.conversationId}
           onToggle={chatPanel.toggle}
           onSetConversationId={chatPanel.setConversationId}
@@ -428,7 +447,6 @@ export default function Layout() {
           <QuickCaptureModal
             isOpen={quickCaptureOpen}
             onClose={closeQuickCapture}
-            placeholder={quickCapturePlaceholder || undefined}
             defaultParentId={quickCaptureParentId}
           />
 
@@ -453,11 +471,7 @@ export default function Layout() {
               <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 {mobileMainContent}
               </div>
-              {/* The chat bar sits between the page and the tabs on every page but
-                chat; the button rides above it and steps aside while it is open. */}
-              {!chatPanel.isOpen && !onInboxPage && (
-                <FloatingActionButton aboveChatBar={!onChatPage} />
-              )}
+              {!chatPanel.isOpen && !onInboxPage && <FloatingActionButton />}
               <BottomNav
                 tabs={availableMobileTabs}
                 badges={{
@@ -486,22 +500,13 @@ export default function Layout() {
               </Panel>
               <PanelResizeHandle className="cc-resize-handle" />
               <Panel id="content" minSize="30%">
-                <div className="cc-main">
+                <div className={`cc-main${aiToggle ? ' cc-main--ai-toggle' : ''}`}>
+                  {aiToggle}
                   <div className="cc-content" ref={contentRef}>
                     <ErrorBoundary name="PageContent">
                       <AnimatedOutlet />
                     </ErrorBoundary>
                   </div>
-                  {!chatBarHidden && !chatPanel.isOpen && (
-                    <ChatPanel
-                      isOpen={false}
-                      conversationId={chatPanel.conversationId}
-                      onToggle={chatPanel.toggle}
-                      onSetConversationId={chatPanel.setConversationId}
-                      title={chatPanel.presentation.title}
-                      subtitle={chatPanel.presentation.subtitle}
-                    />
-                  )}
                 </div>
               </Panel>
               {showChatPanel && (

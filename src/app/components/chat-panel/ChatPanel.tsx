@@ -15,7 +15,7 @@ import {
 } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
-import { CloseIcon, ExternalLinkIcon, MinusIcon, SendIcon } from '../shared/Icons';
+import { CloseIcon, ExternalLinkIcon, MinusIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 interface ChatPanelProps {
   isOpen: boolean;
@@ -248,45 +248,20 @@ export default function ChatPanel({
       />
     </>
   );
-  const closedContent = (
-    <div className="cc-chat-input" onClick={onToggle} style={{ cursor: 'pointer' }}>
-      <div
-        className="cc-chat-input__textarea"
-        style={{
-          pointerEvents: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          color: 'var(--cc-text-tertiary)',
-        }}
-      >
-        {translateUi('Ask ClawChat anything...')}
-      </div>
-      <button
-        type="button"
-        className="cc-chat-input__btn cc-chat-input__btn--send"
-        disabled
-        aria-label={translateUi('Send message')}
-      >
-        <SendIcon size={16} />
-      </button>
-    </div>
-  );
   // Side variant: full-height panel, no motion animation
   if (variant === 'side') {
-    return (
-      <div className="cc-chat-panel cc-chat-panel--side">
-        {isOpen ? openContent : closedContent}
-      </div>
-    );
+    return <div className="cc-chat-panel cc-chat-panel--side">{isOpen ? openContent : null}</div>;
   }
-  // Bottom variant (default): motion-animated height
+  // Bottom variant (phones): rises from the foot of the page when opened.
+  if (!isOpen) return null;
   return (
     <m.div
-      className={`cc-chat-panel${isOpen ? '' : ' cc-chat-panel--collapsed'}`}
-      animate={{ height: isOpen ? 360 : 58 }}
+      className="cc-chat-panel"
+      initial={{ height: 0 }}
+      animate={{ height: 360 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
-      {isOpen ? openContent : closedContent}
+      {openContent}
     </m.div>
   );
 }

@@ -9,13 +9,7 @@ import {
   useTodosQuery,
   useUpdateProject,
 } from '../hooks/queries';
-import {
-  ChatBubbleIcon,
-  ChevronLeftIcon,
-  EditIcon,
-  SettingsIcon,
-  TrashIcon,
-} from '../components/shared/Icons';
+import { ChevronLeftIcon, EditIcon, SettingsIcon, TrashIcon } from '../components/shared/Icons';
 import Dialog from '../components/shared/Dialog';
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
@@ -27,6 +21,7 @@ import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
 import ProjectMachineLine from '../components/shared/ProjectMachineLine';
 import { useChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
+import { useChatContextStore } from '../hooks/useContextChat';
 import usePlatform from '../hooks/usePlatform';
 import { useToastStore } from '../stores/useToastStore';
 import { translateUi } from '../i18n';
@@ -58,8 +53,7 @@ export default function ProjectWorkspacePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [], isLoading: areTodosLoading } = useTodosQuery();
-  const { mutateAsync: getOrCreateConversation, isPending: isOpeningConversation } =
-    useGetOrCreateProjectConversation();
+  const { mutateAsync: getOrCreateConversation } = useGetOrCreateProjectConversation();
   const deleteProject = useDeleteProject();
   const {
     open: openChatPanel,
@@ -132,6 +126,11 @@ export default function ProjectWorkspacePage() {
     },
     [addToast, getOrCreateConversation, openChatPanel, project, beginSelection],
   );
+  // ⌘K and the top-right button open this project's agent while it is on screen.
+  useEffect(() => {
+    useChatContextStore.getState().setOpenHere(() => void openProjectAgent());
+    return () => useChatContextStore.getState().setOpenHere(null);
+  }, [openProjectAgent]);
   // Restore the thread the user last had open for this project. A project with
   // no remembered thread opens with the plan alone; the agent is a click away.
   useEffect(() => {
@@ -247,15 +246,6 @@ export default function ProjectWorkspacePage() {
           <ProjectIdentity project={project} />
           <ProjectMachineLine project={project} onChange={revealWhereItRuns} />
         </div>
-        <button
-          type="button"
-          className="cc-btn cc-btn--primary"
-          onClick={() => void openProjectAgent()}
-          disabled={!project.root_task_id || isOpeningConversation}
-        >
-          <ChatBubbleIcon size={15} />
-          {translateUi(' Project Agent')}
-        </button>
         <button
           type="button"
           className="cc-icon-button"

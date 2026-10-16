@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProjectWorkspacePage from '../ProjectWorkspacePage';
 import { useChatStore } from '../../stores/useChatStore';
+import { useChatContextStore } from '../../hooks/useContextChat';
 
 const mocks = vi.hoisted(() => ({
   openPanel: vi.fn(),
@@ -120,7 +121,7 @@ describe('ProjectWorkspacePage', () => {
     project.description = null;
   });
 
-  it('opens Project Agent only when asked and keeps the root out of the plan', async () => {
+  it('opens Project Agent only when asked (⌘K) and keeps the root out of the plan', async () => {
     renderPage();
 
     expect(screen.getByText('Project plan content')).toBeInTheDocument();
@@ -128,7 +129,9 @@ describe('ProjectWorkspacePage', () => {
     await waitFor(() => expect(mocks.get).not.toHaveBeenCalled());
     expect(mocks.openPanel).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Project Agent' }));
+    // The page has no agent button of its own; the shell's ⌘K asks it.
+    expect(screen.queryByRole('button', { name: 'Project Agent' })).toBeNull();
+    act(() => useChatContextStore.getState().openHere?.());
     await waitFor(() =>
       expect(mocks.openPanel).toHaveBeenCalledWith('conv-project', {
         projectId: project.id,

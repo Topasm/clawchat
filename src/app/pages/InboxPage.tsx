@@ -5,7 +5,6 @@ import { useToastStore } from '../stores/useToastStore';
 import {
   queryKeys,
   useCreateProject,
-  useCreateTodo,
   useInboxMove,
   useInboxProjectCandidatesQuery,
   useInboxRoutingsQuery,
@@ -24,7 +23,7 @@ import useInboxPlacement from '../hooks/useInboxPlacement';
 import useInboxSections from '../hooks/useInboxSections';
 import type { ProjectFolderCandidate } from '../types/schemas';
 import { translateUi } from '../i18n';
-import { formatMonthDay } from '../utils/formatters';
+import useInboxCapture from '../hooks/useInboxCapture';
 
 /**
  * The Inbox files captures by itself. What it just filed shows for a day with
@@ -51,7 +50,7 @@ export default function InboxPage() {
   const sections = useInboxSections(todos);
   const move = useInboxMove();
   const noteAction = useNoteAction();
-  const createTodo = useCreateTodo();
+  const { capture, busy: capturing } = useInboxCapture();
   const createProject = useCreateProject();
 
   const review = useMemo(
@@ -76,26 +75,6 @@ export default function InboxPage() {
   const runMoves = async (moves: InboxMove[]) => {
     for (const next of moves) await runMove(next);
   };
-
-  const capture = (title: string) =>
-    createTodo
-      .mutateAsync({ title, source: 'quick_capture', inbox_state: 'classifying' })
-      .then((todo) => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
-        if (todo?.inbox_state === 'none' && todo.due_date) {
-          addToast(
-            'success',
-            translateUi('Added to tasks, due {{date}}', {
-              date: formatMonthDay(todo.due_date),
-            }),
-          );
-        }
-        return todo;
-      })
-      .catch((error: unknown) => {
-        addToast('error', inboxErrorMessage(error, translateUi('Could not add to the Inbox')));
-        throw error;
-      });
 
   const importCandidate = (candidate: ProjectFolderCandidate) => {
     createProject.mutate(
@@ -139,7 +118,7 @@ export default function InboxPage() {
           onImport={importCandidate}
         />
       </div>
-      <InboxCaptureBar busy={createTodo.isPending} onCapture={capture} />
+      <InboxCaptureBar busy={capturing} onCapture={capture} />
     </div>
   );
 }
