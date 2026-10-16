@@ -9,25 +9,43 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+/** What the tracking widget can be showing: open tasks or recent notes. */
+internal sealed interface TrackingWidgetData
+
 /** Small, deterministic projection used by the Glance UI. */
 internal data class TodoWidgetUiModel(
-    val items: List<TodoWidgetItem>,
-) {
+    /** Overdue work and everything due within the horizon, soonest first. */
+    val deadlines: List<TodoWidgetItem>,
+    /** In-progress work and undated tasks, which have no runway to draw. */
+    val others: List<TodoWidgetItem> = emptyList(),
+    /** The first deadline past the horizon that no row already shows. */
+    val nextDeadline: NextDeadline? = null,
+) : TrackingWidgetData {
+    val items: List<TodoWidgetItem>
+        get() = deadlines + others
+
     val itemCount: Int
-        get() = items.size
+        get() = deadlines.size + others.size
 
     val isEmpty: Boolean
-        get() = items.isEmpty()
+        get() = itemCount == 0
 
     companion object {
+        /**
+         * Undated work can be a whole backlog; the widget stays a glance
+         * surface by showing only the most recently touched of it.
+         */
+        const val MAX_OTHER_ROWS = 20
+
         /**
          * Project tasks onto the widget's runway: everything already overdue,
          * plus everything due within [horizonDays], soonest deadline first.
          *
-         * Ordering by deadline is what lets the list be read without headings.
-         * A task appears while there is still room to work towards it rather
-         * than on the morning it is due, which is the point at which nothing
-         * can be rearranged any more.
+         * Below the runway come the tasks a deadline list would hide: work
+         * already in progress whatever its due date, then undated tasks. An
+         * empty widget read as broken when the only open task was due a few
+         * weeks out, so a pending deadline past the horizon is kept as
+         * [nextDeadline] for the widget to name.
          */
         fun from(
             todos: List<Todo>,
@@ -37,34 +55,69 @@ internal data class TodoWidgetUiModel(
         ): TodoWidgetUiModel {
             val horizonEnd = today.plusDays(horizonDays.toLong())
             val seenIds = mutableSetOf<String>()
+            val deadlines = mutableListOf<TodoWidgetItem>()
+            val others = mutableListOf<Pair<TodoWidgetItem, String>>()
+            var nextDeadline: NextDeadline? = null
 
-            val items = todos.asSequence()
+            todos.asSequence()
                 .filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS }
                 // Inbox captures have not been triaged into work yet.
                 .filter { it.inboxState == null || it.inboxState == "none" }
                 .filter { seenIds.add(it.id) }
-                .mapNotNull { todo ->
-                    val due = widgetDueDate(todo.dueDate, deviceZone) ?: return@mapNotNull null
-                    if (due.isAfter(horizonEnd)) return@mapNotNull null
-                    val daysRemaining = ChronoUnit.DAYS.between(today, due).toInt()
-                    TodoWidgetItem(
-                        id = todo.id,
-                        title = todo.title,
-                        daysRemaining = daysRemaining,
-                        // Nothing is left of an overdue task's runway, so its
-                        // line is drawn full rather than empty: past the line,
-                        // not approaching it.
-                        runwayFraction = if (daysRemaining < 0) {
-                            1f
-                        } else {
-                            (daysRemaining.toFloat() / horizonDays.coerceAtLeast(1)).coerceIn(0f, 1f)
-                        },
-                    )
+                .forEach { todo ->
+                    val inProgress = todo.status == TaskStatus.IN_PROGRESS
+                    val due = widgetDueDate(todo.dueDate, deviceZone)
+                    val daysRemaining = due?.let { ChronoUnit.DAYS.between(today, it).toInt() }
+                    when {
+                        due != null && daysRemaining != null && !due.isAfter(horizonEnd) ->
+                            deadlines += TodoWidgetItem(
+                                id = todo.id,
+                                title = todo.title,
+                                daysRemaining = daysRemaining,
+                                // Nothing is left of an overdue task's runway, so its
+                                // line is drawn full rather than empty: past the line,
+                                // not approaching it.
+                                runwayFraction = if (daysRemaining < 0) {
+                                    1f
+                                } else {
+                                    (daysRemaining.toFloat() / horizonDays.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                },
+                                inProgress = inProgress,
+                            )
+                        inProgress || due == null ->
+                            others += TodoWidgetItem(
+                                id = todo.id,
+                                title = todo.title,
+                                daysRemaining = daysRemaining,
+                                runwayFraction = null,
+                                inProgress = inProgress,
+                            ) to todo.updatedAt
+                        due != null && daysRemaining != null -> {
+                            val current = nextDeadline
+                            if (current == null ||
+                                daysRemaining < current.daysRemaining ||
+                                (daysRemaining == current.daysRemaining && todo.title < current.title)
+                            ) {
+                                nextDeadline = NextDeadline(todo.title, due, daysRemaining)
+                            }
+                        }
+                    }
                 }
-                .sortedWith(compareBy({ it.daysRemaining }, { it.title }))
-                .toList()
 
-            return TodoWidgetUiModel(items = items)
+            return TodoWidgetUiModel(
+                deadlines = deadlines.sortedWith(compareBy({ it.daysRemaining }, { it.title })),
+                others = others
+                    .sortedWith(
+                        compareBy<Pair<TodoWidgetItem, String>> { !it.first.inProgress }
+                            .thenBy { it.first.daysRemaining ?: Int.MAX_VALUE }
+                            // ISO timestamps order as strings; newest first.
+                            .thenByDescending { it.second }
+                            .thenBy { it.first.title },
+                    )
+                    .take(MAX_OTHER_ROWS)
+                    .map { it.first },
+                nextDeadline = nextDeadline,
+            )
         }
     }
 }
@@ -72,14 +125,21 @@ internal data class TodoWidgetUiModel(
 internal data class TodoWidgetItem(
     val id: String,
     val title: String,
-    /** Negative once the deadline has passed, 0 on the day it is due. */
-    val daysRemaining: Int,
-    /** How much of the horizon is left, 0f..1f. */
-    val runwayFraction: Float,
+    /** Negative once the deadline has passed, 0 on the day it is due, null when undated. */
+    val daysRemaining: Int?,
+    /** How much of the horizon is left, 0f..1f; null for rows outside the runway. */
+    val runwayFraction: Float?,
+    val inProgress: Boolean = false,
 ) {
     val isOverdue: Boolean
-        get() = daysRemaining < 0
+        get() = daysRemaining != null && daysRemaining < 0
 }
+
+internal data class NextDeadline(
+    val title: String,
+    val dueDate: LocalDate,
+    val daysRemaining: Int,
+)
 
 /** Reads a stored deadline as the day it falls on, or null when unreadable. */
 internal fun widgetDueDate(raw: String?, deviceZone: ZoneId): LocalDate? {

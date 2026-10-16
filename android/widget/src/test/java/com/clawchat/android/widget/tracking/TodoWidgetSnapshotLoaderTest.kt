@@ -2,6 +2,7 @@ package com.clawchat.android.widget.tracking
 
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.Note
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
@@ -27,7 +28,7 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { runtime(WorkspaceMode.UNCONFIGURED, null) },
-            loadDeadlines = {
+            loadOpenTodos = {
                 fetches++
                 ApiResult.Success(page(emptyList()))
             },
@@ -45,7 +46,7 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { state },
-            loadDeadlines = {
+            loadOpenTodos = {
                 ApiResult.Success(page(listOf(Todo("todo-1", "Write", dueDate = dueIn(1)))))
             },
         )
@@ -62,7 +63,7 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { state },
-            loadDeadlines = { ApiResult.Error("offline") },
+            loadOpenTodos = { ApiResult.Error("offline") },
             loadCachedTodos = { listOf(Todo("cached", "Cached task", dueDate = dueIn(2))) },
         )
 
@@ -81,12 +82,14 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { state },
-            loadDeadlines = { ApiResult.Error("offline") },
+            loadOpenTodos = { ApiResult.Error("offline") },
             loadCachedTodos = { listOf(Todo("far", "Next month", dueDate = dueIn(40))) },
         )
 
         val success = snapshot.state as WidgetState.Success
         assertTrue(success.data.isEmpty)
+        // The widget can still say when the next deadline is.
+        assertEquals("Next month", success.data.nextDeadline?.title)
     }
 
     // With nothing cached at all there is no answer to show, so the widget
@@ -98,7 +101,7 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { state },
-            loadDeadlines = { ApiResult.Error("offline") },
+            loadOpenTodos = { ApiResult.Error("offline") },
             loadCachedTodos = { emptyList() },
         )
 
@@ -117,7 +120,7 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { states.removeFirst() },
-            loadDeadlines = {
+            loadOpenTodos = {
                 ApiResult.Success(page(listOf(Todo("private-a", "A", dueDate = dueIn(0)))))
             },
         )
@@ -138,11 +141,38 @@ class TodoWidgetSnapshotLoaderTest {
         val snapshot = loadTodoWidgetSnapshot(
             horizonDays = horizonDays,
             runtimeState = { states.removeFirst() },
-            loadDeadlines = { ApiResult.Success(page(emptyList())) },
+            loadOpenTodos = { ApiResult.Success(page(emptyList())) },
         )
 
         assertTrue(snapshot.state is WidgetState.NotLoggedIn)
         assertEquals(null, snapshot.workspaceKey)
+    }
+
+    @Test
+    fun `notes load against the workspace they were asked for`() = runTest {
+        var askedFor: String? = null
+
+        val snapshot = loadNoteWidgetSnapshot(
+            runtimeState = { runtime(WorkspaceMode.SERVER, "server:a") },
+            loadNotes = { workspace ->
+                askedFor = workspace
+                ApiResult.Success(listOf(Note("n1", "Idea\nmore", createdAt = "2026-10-15T09:00:00Z", updatedAt = "2026-10-15T09:00:00Z")))
+            },
+        )
+
+        assertEquals("server:a", askedFor)
+        val success = snapshot.state as WidgetState.Success
+        assertEquals(listOf("Idea"), success.data.items.map { it.headline })
+    }
+
+    @Test
+    fun `a failed notes load is an error, not an empty notebook`() = runTest {
+        val snapshot = loadNoteWidgetSnapshot(
+            runtimeState = { runtime(WorkspaceMode.SERVER, "server:a") },
+            loadNotes = { ApiResult.Error("offline") },
+        )
+
+        assertTrue(snapshot.state is WidgetState.Error)
     }
 
     private fun runtime(mode: WorkspaceMode, workspaceKey: String?) = AppRuntimeState(

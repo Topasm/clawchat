@@ -13,24 +13,24 @@ internal val WidgetCompletionErrorWorkspaceKey = stringPreferencesKey("completio
 
 /** Reload inside the active composition; update() alone does not rerun provideGlance. */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal fun observeTodoWidgetSnapshots(
+internal fun <T> observeTodoWidgetSnapshots(
     runtime: Flow<AppRuntimeState>,
     changes: Flow<Unit> = emptyFlow(),
-    load: suspend () -> TodoWidgetSnapshot,
-): Flow<TodoWidgetSnapshot> = runtime
+    load: suspend () -> WidgetSnapshot<T>,
+): Flow<WidgetSnapshot<T>> = runtime
     .map { it.mode to it.workspaceKey }
     .distinctUntilChanged()
     .flatMapLatest { (mode, workspaceKey) ->
         if (mode == WorkspaceMode.UNCONFIGURED || workspaceKey.isNullOrBlank()) {
-            flowOf(TodoWidgetSnapshot(WidgetState.NotLoggedIn, workspaceKey))
+            flowOf(WidgetSnapshot<T>(WidgetState.NotLoggedIn, workspaceKey))
         } else changes.onStart { emit(Unit) }.transformLatest {
-            emit(TodoWidgetSnapshot(WidgetState.Loading, workspaceKey))
+            emit(WidgetSnapshot(WidgetState.Loading, workspaceKey))
             val snapshot = try {
                 load()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                TodoWidgetSnapshot(WidgetState.Error("Unable to load tasks"), workspaceKey)
+                WidgetSnapshot<T>(WidgetState.Error("Unable to load widget"), workspaceKey)
             }
             // Also guard a loader that ignores cancellation during a workspace switch.
             if (snapshot.workspaceKey == workspaceKey) emit(snapshot)

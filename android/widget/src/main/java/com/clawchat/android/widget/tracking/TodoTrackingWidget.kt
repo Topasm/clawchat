@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.datastore.preferences.core.Preferences
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -55,7 +56,6 @@ import com.clawchat.android.widget.quickadd.QuickAddActivity
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 class TodoTrackingWidget : GlanceAppWidget() {
@@ -69,6 +69,7 @@ class TodoTrackingWidget : GlanceAppWidget() {
         val sessionStore = entryPoint.sessionStore()
         val initialRuntime = sessionStore.runtimeState.first()
         val todoRepository = entryPoint.todoRepository()
+        val noteRepository = entryPoint.noteRepository()
 
         val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
@@ -76,27 +77,37 @@ class TodoTrackingWidget : GlanceAppWidget() {
             val preferences = currentState<Preferences>()
             val appearance = WidgetAppearance.from(preferences)
             val horizonDays = widgetHorizonDays(preferences)
+            val contentMode = widgetContentMode(preferences)
             val refreshToken = preferences[WidgetRefreshKey]
             val runtime by sessionStore.runtimeState.collectAsState(initialRuntime)
-            val snapshots = remember(horizonDays, refreshToken) {
-                observeTodoWidgetSnapshots(sessionStore.runtimeState) {
-                    loadTodoWidgetSnapshot(
-                        horizonDays = horizonDays,
-                        runtimeState = { sessionStore.runtimeState.first() },
-                        loadDeadlines = { loadOpenWidgetTodos(deadlineQuery(horizonDays), todoRepository::listTodos) },
-                        loadCachedTodos = { todoRepository.getCachedTodosFlow().first() },
-                    )
+            val snapshots = remember(contentMode, horizonDays, refreshToken) {
+                observeTodoWidgetSnapshots<TrackingWidgetData>(sessionStore.runtimeState) {
+                    when (contentMode) {
+                        WidgetContentMode.TASKS -> loadTodoWidgetSnapshot(
+                            horizonDays = horizonDays,
+                            runtimeState = { sessionStore.runtimeState.first() },
+                            loadOpenTodos = { loadOpenWidgetTodos(openTodosQuery(), todoRepository::listTodos) },
+                            loadCachedTodos = { todoRepository.getCachedTodosFlow().first() },
+                        )
+                        WidgetContentMode.NOTES -> loadNoteWidgetSnapshot(
+                            runtimeState = { sessionStore.runtimeState.first() },
+                            loadNotes = noteRepository::list,
+                        )
+                    }
                 }
             }
-            val snapshot by snapshots.collectAsState(TodoWidgetSnapshot(WidgetState.Loading, null))
+            val snapshot by snapshots.collectAsState(WidgetSnapshot(WidgetState.Loading, null))
             val currentWorkspace = snapshot.workspaceKey == runtime.workspaceKey
             GlanceTheme {
                 TodoTrackingContent(
                     state = if (currentWorkspace) snapshot.state else WidgetState.Loading,
+                    contentMode = contentMode,
+                    horizonDays = horizonDays,
                     mainActivity = mainActivity,
                     workspaceKey = if (currentWorkspace) snapshot.workspaceKey else null,
                     backgroundOpacity = appearance.backgroundOpacity,
-                    completionFailed = currentWorkspace && runtime.workspaceKey != null &&
+                    completionFailed = contentMode == WidgetContentMode.TASKS &&
+                        currentWorkspace && runtime.workspaceKey != null &&
                         preferences[WidgetCompletionErrorWorkspaceKey] == runtime.workspaceKey,
                 )
             }
@@ -110,26 +121,22 @@ class TodoTrackingWidget : GlanceAppWidget() {
 }
 
 /**
- * Asks the server for everything due up to the end of the horizon, deadline
- * first. Overdue work has a due date in the past, so the same window carries
- * it without a second request.
+ * Asks the server for every open task, deadline first. The projection splits
+ * them into the runway, the undated and in-progress rows, and the next
+ * deadline past the horizon, so one window answers all three. The limit is
+ * generous because undated tasks sort ahead of dated ones on the server.
  */
-internal fun deadlineQuery(
-    horizonDays: Int,
-    today: LocalDate = LocalDate.now(),
-): Map<String, String> = mapOf(
-    // Inclusive of the last day: the server compares against the timestamp.
-    "due_before" to today.plusDays(horizonDays.toLong())
-        .atTime(LocalTime.of(23, 59, 59))
-        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+internal fun openTodosQuery(): Map<String, String> = mapOf(
     "order_by" to "due_date",
     "order_dir" to "asc",
-    "limit" to "50",
+    "limit" to "200",
 )
 
 @Composable
 private fun TodoTrackingContent(
-    state: WidgetState<TodoWidgetUiModel>,
+    state: WidgetState<TrackingWidgetData>,
+    contentMode: WidgetContentMode,
+    horizonDays: Int,
     mainActivity: ComponentName,
     workspaceKey: String?,
     backgroundOpacity: Float,
@@ -140,7 +147,12 @@ private fun TodoTrackingContent(
     val isLoggedIn = state !is WidgetState.NotLoggedIn
     val isCompactHeight = size.height <= WidgetSize.Height2
     val quickAddIntent = QuickAddActivity.createIntent(context)
-    val taskCount = (state as? WidgetState.Success)?.data?.itemCount
+    val count = when (val data = (state as? WidgetState.Success)?.data) {
+        is TodoWidgetUiModel -> data.itemCount
+        is NoteWidgetUiModel -> data.items.size
+        null -> null
+    }
+    val titleSize = if (size.width >= WidgetSize.Width4) 16.sp else 14.sp
 
     Column(
         modifier = GlanceModifier
@@ -154,21 +166,17 @@ private fun TodoTrackingContent(
                 .padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = if (taskCount == null) {
-                    context.getString(R.string.widget_tasks_title)
-                } else {
-                    context.getString(R.string.widget_tasks_title_with_count, taskCount)
-                },
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = if (size.width >= WidgetSize.Width4) 16.sp else 14.sp,
-                ),
-                modifier = GlanceModifier
-                    .defaultWeight()
-                    .clickable(actionStartActivityByComponent(mainActivity)),
-            )
+            WidgetContentMode.entries.forEachIndexed { index, mode ->
+                if (index > 0) Spacer(GlanceModifier.width(12.dp))
+                HeaderTab(
+                    mode = mode,
+                    active = mode == contentMode,
+                    count = count.takeIf { mode == contentMode },
+                    fontSize = titleSize,
+                    mainActivity = mainActivity,
+                )
+            }
+            Spacer(GlanceModifier.defaultWeight())
             if (isLoggedIn && isCompactHeight) {
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_add),
@@ -216,11 +224,31 @@ private fun TodoTrackingContent(
                     .clickable(actionRunCallback<RefreshTodosAction>()),
                 maxLines = 4,
             )
-            is WidgetState.Success -> {
-                if (state.data.isEmpty) {
+            is WidgetState.Success -> when (val data = state.data) {
+                is NoteWidgetUiModel -> if (data.isEmpty) {
                     CenterMessage(
-                        context.getString(R.string.widget_empty),
+                        context.getString(R.string.widget_notes_empty),
                         GlanceModifier.defaultWeight(),
+                    )
+                } else {
+                    NoteList(
+                        model = data,
+                        mainActivity = mainActivity,
+                        modifier = GlanceModifier.defaultWeight(),
+                    )
+                }
+                is TodoWidgetUiModel -> if (data.isEmpty) {
+                    // Saying why the list is empty, and what comes next, is
+                    // what keeps an empty runway from reading as a broken widget.
+                    CenterMessage(
+                        data.nextDeadline?.let {
+                            context.getString(R.string.widget_no_deadlines_within, horizonDays) +
+                                "\n" + nextDeadlineText(context, it)
+                        } ?: context.getString(R.string.widget_empty),
+                        GlanceModifier
+                            .defaultWeight()
+                            .clickable(actionStartActivityByComponent(mainActivity)),
+                        maxLines = 3,
                     )
                 } else if (workspaceKey == null) {
                     CenterMessage(
@@ -229,7 +257,8 @@ private fun TodoTrackingContent(
                     )
                 } else {
                     TodoList(
-                        model = state.data,
+                        model = data,
+                        horizonDays = horizonDays,
                         mainActivity = mainActivity,
                         workspaceKey = workspaceKey,
                         compact = isCompactHeight,
@@ -245,14 +274,50 @@ private fun TodoTrackingContent(
     }
 }
 
+/** The active tab opens the app, as the title always did; the other switches to it. */
+@Composable
+private fun HeaderTab(
+    mode: WidgetContentMode,
+    active: Boolean,
+    count: Int?,
+    fontSize: TextUnit,
+    mainActivity: ComponentName,
+) {
+    val context = LocalContext.current
+    val (title, titleWithCount) = when (mode) {
+        WidgetContentMode.TASKS -> R.string.widget_tasks_title to R.string.widget_tasks_title_with_count
+        WidgetContentMode.NOTES -> R.string.widget_notes_title to R.string.widget_notes_title_with_count
+    }
+    Text(
+        text = if (count == null) context.getString(title) else context.getString(titleWithCount, count),
+        style = TextStyle(
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant,
+            fontSize = fontSize,
+        ),
+        maxLines = 1,
+        modifier = GlanceModifier.clickable(
+            if (active) {
+                actionStartActivityByComponent(mainActivity)
+            } else {
+                actionRunCallback<SwitchWidgetContentAction>(
+                    actionParametersOf(SwitchWidgetContentAction.MODE_KEY to mode.name),
+                )
+            },
+        ),
+    )
+}
+
 @Composable
 private fun TodoList(
     model: TodoWidgetUiModel,
+    horizonDays: Int,
     mainActivity: ComponentName,
     workspaceKey: String,
     compact: Boolean,
     modifier: GlanceModifier,
 ) {
+    val context = LocalContext.current
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
@@ -261,7 +326,7 @@ private fun TodoList(
     ) {
         // Sorted by deadline, so the order alone carries the urgency that
         // section headings used to spell out.
-        items(model.items, itemId = { it.id.hashCode().toLong() }) { todo ->
+        items(model.deadlines, itemId = { it.id.hashCode().toLong() }) { todo ->
             TodoRow(
                 todo = todo,
                 mainActivity = mainActivity,
@@ -269,8 +334,48 @@ private fun TodoList(
                 compact = compact,
             )
         }
+        if (model.deadlines.isEmpty()) {
+            item {
+                ListNote(
+                    text = context.getString(R.string.widget_no_deadlines_within, horizonDays) +
+                        (model.nextDeadline?.let { " · " + nextDeadlineText(context, it) } ?: ""),
+                    mainActivity = mainActivity,
+                )
+            }
+        }
+        if (model.others.isNotEmpty()) {
+            // The one heading left: below it the rows stop being a runway.
+            if (model.deadlines.isNotEmpty()) {
+                item { ListNote(context.getString(R.string.widget_other_tasks), mainActivity) }
+            }
+            items(model.others, itemId = { it.id.hashCode().toLong() }) { todo ->
+                TodoRow(
+                    todo = todo,
+                    mainActivity = mainActivity,
+                    workspaceKey = workspaceKey,
+                    compact = compact,
+                )
+            }
+        }
         item { Spacer(GlanceModifier.height(2.dp)) }
     }
+}
+
+@Composable
+private fun ListNote(text: String, mainActivity: ComponentName) {
+    Text(
+        text = text,
+        style = TextStyle(
+            color = GlanceTheme.colors.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        ),
+        maxLines = 1,
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+            .clickable(actionStartActivityByComponent(mainActivity)),
+    )
 }
 
 @Composable
@@ -324,21 +429,26 @@ private fun TodoRow(
             maxLines = 1,
         )
 
-        if (!compact) {
+        val runway = todo.runwayFraction
+        if (!compact && runway != null) {
             Spacer(GlanceModifier.width(8.dp))
-            RunwayBar(todo = todo)
+            RunwayBar(fraction = runway, overdue = todo.isOverdue)
         }
-        Spacer(GlanceModifier.width(8.dp))
-        Text(
-            text = deadlineLabel(context, todo.daysRemaining),
-            style = TextStyle(
-                color = if (todo.isOverdue) GlanceTheme.colors.error
-                else GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-            ),
-            maxLines = 1,
-        )
+        val label = todo.daysRemaining?.let { deadlineLabel(context, it) }
+            ?: context.getString(R.string.widget_in_progress).takeIf { todo.inProgress }
+        if (label != null) {
+            Spacer(GlanceModifier.width(8.dp))
+            Text(
+                text = label,
+                style = TextStyle(
+                    color = if (todo.isOverdue) GlanceTheme.colors.error
+                    else GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                maxLines = 1,
+            )
+        }
         Spacer(GlanceModifier.width(8.dp))
     }
 }
@@ -347,8 +457,8 @@ private fun TodoRow(
 private val RunwayTrackWidth = 40.dp
 
 @Composable
-private fun RunwayBar(todo: TodoWidgetItem) {
-    val filled = (RunwayTrackWidth.value * todo.runwayFraction).dp
+private fun RunwayBar(fraction: Float, overdue: Boolean) {
+    val filled = (RunwayTrackWidth.value * fraction).dp
     Box(
         modifier = GlanceModifier.width(RunwayTrackWidth).height(3.dp),
         contentAlignment = Alignment.CenterStart,
@@ -366,7 +476,7 @@ private fun RunwayBar(todo: TodoWidgetItem) {
                     .width(filled)
                     .height(3.dp)
                     .background(
-                        if (todo.isOverdue) GlanceTheme.colors.error
+                        if (overdue) GlanceTheme.colors.error
                         else GlanceTheme.colors.primary
                     ),
                 content = {},
@@ -375,11 +485,75 @@ private fun RunwayBar(todo: TodoWidgetItem) {
     }
 }
 
+@Composable
+private fun NoteList(
+    model: NoteWidgetUiModel,
+    mainActivity: ComponentName,
+    modifier: GlanceModifier,
+) {
+    val context = LocalContext.current
+    val today = LocalDate.now()
+    LazyColumn(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        items(model.items, itemId = { it.id.hashCode().toLong() }) { note ->
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .padding(horizontal = 8.dp)
+                    .clickable(actionStartActivityByComponent(mainActivity)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = note.headline,
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight(),
+                )
+                note.updatedOn?.let { day ->
+                    Spacer(GlanceModifier.width(8.dp))
+                    Text(
+                        text = if (day == today) {
+                            context.getString(R.string.widget_today)
+                        } else {
+                            shortDate(context, day)
+                        },
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        item { Spacer(GlanceModifier.height(2.dp)) }
+    }
+}
+
 private fun deadlineLabel(context: Context, daysRemaining: Int): String = when {
     daysRemaining < 0 -> context.getString(R.string.widget_days_overdue, -daysRemaining)
     daysRemaining == 0 -> context.getString(R.string.widget_due_today)
     else -> context.getString(R.string.widget_days_remaining, daysRemaining)
 }
+
+private fun shortDate(context: Context, day: LocalDate): String =
+    DateTimeFormatter
+        .ofPattern(context.getString(R.string.widget_short_date_pattern), context.resources.configuration.locales[0])
+        .format(day)
+
+private fun nextDeadlineText(context: Context, next: NextDeadline): String =
+    context.getString(
+        R.string.widget_next_deadline,
+        shortDate(context, next.dueDate),
+        deadlineLabel(context, next.daysRemaining),
+        next.title,
+    )
 
 @Composable
 private fun AddTaskAction() {
