@@ -206,7 +206,7 @@ function ConnectForm({ onDone }: { onDone: () => void }) {
         }
         placeholder={
           isFeed
-            ? 'https://calendar.google.com/calendar/ical/…/basic.ics'
+            ? translateUi('https://calendar.google.com/calendar/ical/…/basic.ics')
             : translateUi('https://caldav.example.com/')
         }
         onChange={(event) => setUrl(event.target.value)}

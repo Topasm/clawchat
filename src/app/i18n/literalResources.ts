@@ -1719,4 +1719,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Do it myself': '직접 하기',
   'Delegated to AI': 'AI에게 맡김',
   'Back to you': '내 작업으로 돌림',
+  'https://calendar.google.com/calendar/ical/…/basic.ics':
+    'https://calendar.google.com/calendar/ical/…/basic.ics',
 };
