@@ -30,7 +30,7 @@ class Message(Base):
     conversation = relationship("Conversation", back_populates="messages")
 
     __table_args__ = (
-        Index("idx_messages_conversation_id", "conversation_id"),
+        Index("idx_messages_conversation_created", "conversation_id", "created_at"),
         Index("idx_messages_created_at", "created_at"),
         Index(
             "uq_messages_conversation_idempotency_key",

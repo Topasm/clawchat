@@ -39,6 +39,9 @@ _QUESTION_ANSWERED = {
     "permission_denied",
     "running",
 }
+_COLLABORATION_EVENT_TYPES = (
+    _HUMAN_WAIT_STARTED | _HUMAN_WAIT_ENDED | _QUESTION_STARTED | _QUESTION_ANSWERED
+)
 
 
 def _aware(value: datetime) -> datetime:
@@ -138,7 +141,12 @@ async def list_task_execution_telemetry(
         )
         .join(AgentRun, AgentRun.id == AgentRunEvent.run_id)
         .join(AgentTask, AgentTask.id == AgentRun.agent_task_id)
-        .where(AgentTask.todo_id.is_not(None))
+        .where(
+            AgentTask.todo_id.is_not(None),
+            # Progress and log events outnumber handoffs by far and the fold
+            # below ignores them, so never load them.
+            AgentRunEvent.event_type.in_(sorted(_COLLABORATION_EVENT_TYPES)),
+        )
         .order_by(AgentRunEvent.run_id, AgentRunEvent.sequence)
     )
     if project_id is not None:

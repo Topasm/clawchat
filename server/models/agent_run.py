@@ -119,7 +119,12 @@ class AgentRun(Base):
         Index("idx_agent_runs_project_status", "project_id", "status"),
         Index("idx_agent_runs_task_created", "agent_task_id", "created_at"),
         Index("idx_agent_runs_external_run_id", "external_run_id"),
-        Index("idx_agent_runs_execution_host_id", "execution_host_id"),
+        Index(
+            "idx_agent_runs_host_status_created",
+            "execution_host_id",
+            "status",
+            "created_at",
+        ),
     )
 
 

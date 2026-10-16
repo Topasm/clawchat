@@ -74,4 +74,7 @@ class CalendarPush(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now)
 
-    __table_args__ = (Index("ix_calendar_pushes_source_id", "source_id"),)
+    __table_args__ = (
+        Index("ix_calendar_pushes_source_id", "source_id"),
+        Index("ix_calendar_pushes_event_id", "event_id"),
+    )

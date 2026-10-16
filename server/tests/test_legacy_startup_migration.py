@@ -30,7 +30,7 @@ _REVISION_CHAIN = (
     "d6f8a1c3e520",
     "e2b7c4d81a35",
 )
-_HEAD_REVISION = "e3a7c5f19b28"
+_HEAD_REVISION = "5e0a7c3d9b14"
 
 # The correction list exactly as the pre-Alembic startup path ran it. Frozen
 # here on purpose: this test only means something if it reproduces the schema
@@ -471,3 +471,90 @@ def test_invalid_legacy_task_status_is_normalized_by_the_migration(
         assert connection.execute(
             "SELECT status, completed_at FROM todos WHERE id = 'todo_bad_status'"
         ).fetchone() == ("pending", None)
+
+
+# What the release before 5e0a7c3d9b14 installed at startup for todos.
+_LEGACY_TODO_FTS = (
+    "CREATE VIRTUAL TABLE todos_fts USING fts5(id UNINDEXED, title, description)",
+    """CREATE TRIGGER todos_ai AFTER INSERT ON todos BEGIN
+        INSERT INTO todos_fts(id, title, description)
+        VALUES (new.id, new.title, COALESCE(new.description, ''));
+    END""",
+    """CREATE TRIGGER todos_au AFTER UPDATE ON todos BEGIN
+        DELETE FROM todos_fts WHERE id = old.id;
+        INSERT INTO todos_fts(id, title, description)
+        VALUES (new.id, new.title, COALESCE(new.description, ''));
+    END""",
+    """CREATE TRIGGER todos_ad AFTER DELETE ON todos BEGIN
+        DELETE FROM todos_fts WHERE id = old.id;
+    END""",
+)
+
+
+def _index_names(connection: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in connection.execute(f"PRAGMA index_list('{table}')")}
+
+
+def test_id_keyed_search_index_is_rebuilt_on_rowids_by_the_upgrade(
+    tmp_path: Path,
+):
+    database_path = tmp_path / "legacy-fts.db"
+    _run_alembic(database_path, "upgrade", "e3a7c5f19b28")
+    with sqlite3.connect(database_path) as connection:
+        for statement in _LEGACY_TODO_FTS:
+            connection.execute(statement)
+        _insert_todo(connection, "todo_first")
+        _insert_todo(connection, "todo_second")
+        connection.execute("DELETE FROM todos WHERE id = 'todo_first'")
+        connection.commit()
+
+    _run_init_db(database_path)
+
+    assert _current_revision(database_path) == _HEAD_REVISION
+    with sqlite3.connect(database_path) as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone() == ("wal",)
+        triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'trigger' "
+                "AND tbl_name = 'todos' AND name LIKE 'todos%'"
+            )
+        }
+        assert {"todos_ai", "todos_au", "todos_ad"}.isdisjoint(triggers)
+        assert {"todos_fts_ai", "todos_fts_au", "todos_fts_ad"} <= triggers
+        assert connection.execute(
+            "SELECT f.id FROM todos_fts f JOIN todos t ON t.rowid = f.rowid "
+            "WHERE todos_fts MATCH 'second'"
+        ).fetchall() == [("todo_second",)]
+
+        connection.execute(
+            "UPDATE todos SET title = 'renamed' WHERE id = 'todo_second'"
+        )
+        connection.commit()
+        assert connection.execute(
+            "SELECT id FROM todos_fts WHERE todos_fts MATCH 'renamed'"
+        ).fetchall() == [("todo_second",)]
+
+        assert "idx_messages_conversation_created" in _index_names(
+            connection, "messages"
+        )
+        assert "idx_messages_conversation_id" not in _index_names(
+            connection, "messages"
+        )
+        assert "idx_agent_runs_host_status_created" in _index_names(
+            connection, "agent_runs"
+        )
+
+
+def test_query_index_revision_downgrades_cleanly(tmp_path: Path):
+    database_path = tmp_path / "downgrade.db"
+    _run_alembic(database_path, "upgrade", "head")
+    _run_alembic(database_path, "downgrade", "e3a7c5f19b28")
+
+    with sqlite3.connect(database_path) as connection:
+        assert "idx_messages_conversation_id" in _index_names(
+            connection, "messages"
+        )
+        assert "idx_todos_created_at" not in _index_names(connection, "todos")
+
+    _run_alembic(database_path, "upgrade", "head")

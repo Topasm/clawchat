@@ -46,4 +46,6 @@ class AgentTask(Base):
         Index("idx_agent_tasks_status", "status"),
         Index("idx_agent_tasks_conversation_id", "conversation_id"),
         Index("idx_agent_tasks_parent", "parent_task_id"),
+        Index("idx_agent_tasks_todo_id", "todo_id"),
+        Index("idx_agent_tasks_message_id", "message_id"),
     )

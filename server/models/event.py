@@ -65,4 +65,6 @@ class Event(Base):
         Index("idx_events_end_time", "end_time"),
         Index("idx_events_conversation_id", "conversation_id"),
         Index("idx_events_calendar_source_id", "calendar_source_id"),
+        Index("idx_events_message_id", "message_id"),
+        Index("idx_events_recurring_event_id", "recurring_event_id"),
     )
