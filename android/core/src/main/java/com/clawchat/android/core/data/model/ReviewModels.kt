@@ -65,6 +65,7 @@ enum class ReviewSubjectType {
     @SerialName("code_diff") CODE_DIFF,
     @SerialName("schedule_change") SCHEDULE_CHANGE,
     @SerialName("sync_conflict") SYNC_CONFLICT,
+    @SerialName("data_source_write") DATA_SOURCE_WRITE,
     @SerialName("unknown") UNKNOWN,
 }
 

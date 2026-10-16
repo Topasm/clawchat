@@ -36,7 +36,7 @@ export interface DataSourceSharerOptions {
 interface ClaimedDataQuery {
   query_id: string;
   source_id: string;
-  op: 'list' | 'read' | 'search';
+  op: 'list' | 'read' | 'search' | 'append_todo';
   path: string;
   query?: string | null;
   include_folders: string[];
@@ -149,6 +149,8 @@ export class DataSourceSharer {
         capabilities: ['list', 'read', 'search'],
         include_folders: source.includeFolders,
         exclude_folders: source.excludeFolders,
+        ai_access: source.aiAccess ?? false,
+        allow_writes: source.allowWrites ?? false,
       });
       this.bySourceId.set(response.data.id, source);
       this.hostId = response.data.host_id;
@@ -215,6 +217,8 @@ export class DataSourceSharer {
           // this machine holds back is held back regardless.
           includeFolders: job.include_folders,
           excludeFolders: [...new Set([...job.exclude_folders, ...source.excludeFolders])],
+          // Whether this folder takes changes is decided here, not by Home.
+          allowWrites: source.allowWrites ?? false,
         });
       } catch (error) {
         logger.warn('Could not read the shared folder', error);

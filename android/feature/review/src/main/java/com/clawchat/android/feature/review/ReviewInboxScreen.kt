@@ -433,12 +433,15 @@ private fun ReviewDetail(
                         }
                         Text(stringResource(R.string.review_approve))
                     }
-                    OutlinedButton(
-                        onClick = { requestDecision(ReviewDecision.CHANGES_REQUESTED) },
-                        enabled = !isSubmitting,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.review_request_changes))
+                    // A change to a shared file is approved or rejected as it stands.
+                    if (item.subjectType != ReviewSubjectType.DATA_SOURCE_WRITE) {
+                        OutlinedButton(
+                            onClick = { requestDecision(ReviewDecision.CHANGES_REQUESTED) },
+                            enabled = !isSubmitting,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.review_request_changes))
+                        }
                     }
                     TextButton(
                         onClick = { requestDecision(ReviewDecision.REJECTED) },
@@ -671,6 +674,7 @@ private fun ReviewSubjectType.localizedLabel(): String = stringResource(
         ReviewSubjectType.CODE_DIFF -> R.string.review_subject_code_diff
         ReviewSubjectType.SCHEDULE_CHANGE -> R.string.review_subject_schedule
         ReviewSubjectType.SYNC_CONFLICT -> R.string.review_subject_sync_conflict
+        ReviewSubjectType.DATA_SOURCE_WRITE -> R.string.review_subject_data_source_write
         ReviewSubjectType.UNKNOWN -> R.string.review_subject_unknown
     },
 )

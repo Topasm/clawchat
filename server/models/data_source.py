@@ -15,6 +15,7 @@ never reads.
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -32,11 +33,17 @@ from utils import make_id
 #: What kind of data a source holds. Obsidian is the first; a plain folder
 #: covers anything else that is files on a disk.
 DATA_SOURCE_KINDS = ("obsidian_vault", "folder")
-#: Read-only operations. Writing is a later phase and goes through review.
+#: Read-only operations, the ones a source offers through ``capabilities``.
 DATA_SOURCE_OPERATIONS = ("list", "read", "search")
+#: Changes to a source. Each waits for the user's approval in review before
+#: it reaches the machine, and only a source that allows writes takes one.
+DATA_SOURCE_WRITE_OPERATIONS = ("append_todo",)
 #: queued -> claimed -> done | failed. ``denied`` never reaches the device;
-#: ``expired`` means the asker stopped waiting before an answer came.
-DATA_QUERY_STATUSES = ("queued", "claimed", "done", "failed", "denied", "expired")
+#: ``expired`` means the asker stopped waiting before an answer came. A write
+#: starts as ``awaiting_approval`` and is queued only once it is approved.
+DATA_QUERY_STATUSES = (
+    "awaiting_approval", "queued", "claimed", "done", "failed", "denied", "expired"
+)
 
 
 def _now() -> datetime:
@@ -64,6 +71,17 @@ class DataSource(Base):
     include_folders: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     #: JSON list of folders that may never be read, even inside an included one.
     exclude_folders: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    #: Whether chat and agents may search and read the source. Off unless the
+    #: machine's owner turned it on there: a source shared with the user's
+    #: own devices is not thereby shared with a model.
+    ai_access: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    #: Whether the source takes changes at all. Every change still waits for
+    #: approval, and the machine refuses one when its own setting is off.
+    allow_writes: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     #: When the machine last asked for requests. Kept apart from the host's own
     #: ``last_seen_at``: offering a folder for reading must not make the
     #: machine look ready to run delegated work.
@@ -138,9 +156,11 @@ class DataSourceQuery(Base):
     host_id: Mapped[str] = mapped_column(String, nullable=False)
     op: Mapped[str] = mapped_column(String, nullable=False)
     path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: What to search for; for ``append_todo``, the task line to add.
     query: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="queued")
-    #: Who asked: a paired device id, or ``user`` for a PIN session.
+    #: Who asked: a paired device id, ``user`` for a PIN session,
+    #: ``chat:<conversation id>`` or ``run:<run id>`` for the AI.
     requested_by: Mapped[str] = mapped_column(Text, nullable=False)
     #: Why the request was refused or failed, in a word the clients can match.
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -151,6 +171,10 @@ class DataSourceQuery(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_now
     )
+    #: When the user approved a write, which is when it was queued.
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     claimed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -160,11 +184,12 @@ class DataSourceQuery(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('queued', 'claimed', 'done', 'failed', 'denied', 'expired')",
+            "status IN ('awaiting_approval', 'queued', 'claimed', 'done', 'failed', "
+            "'denied', 'expired')",
             name="ck_data_source_queries_status_valid",
         ),
         CheckConstraint(
-            "op IN ('list', 'read', 'search')",
+            "op IN ('list', 'read', 'search', 'append_todo')",
             name="ck_data_source_queries_op_valid",
         ),
         Index("idx_data_source_queries_host_status", "host_id", "status", "created_at"),

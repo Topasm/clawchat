@@ -29,10 +29,19 @@ def pending_call_for_run(run_id: str) -> str | None:
     return None
 
 
+_BUILT_IN_LABELS = {
+    "vault_search": "search shared notes",
+    "vault_read": "read a shared note",
+    "vault_add_task": "propose a task for a shared TODO.md",
+}
+
+
 def describe_tool(tool_name: str) -> str:
     """"notes__read_file" -> "read file from notes"; built-ins by name."""
     if tool_name == "web_search":
         return "web search"
+    if tool_name in _BUILT_IN_LABELS:
+        return _BUILT_IN_LABELS[tool_name]
     server, _, tool = tool_name.partition("__")
     if not tool:
         return tool_name.replace("_", " ")

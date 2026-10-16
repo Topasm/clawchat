@@ -1576,8 +1576,23 @@ export const koreanUiTranslations: Record<string, string> = {
   'Could not open the folder picker.': '폴더 선택 창을 열지 못했습니다.',
   'A folder named {{name}} is already shared.': '{{name}} 폴더는 이미 공개되어 있습니다.',
   "Share this machine's data": '이 기기의 데이터 공개',
-  'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. Read-only.':
-    '이 앱이 열려 있는 동안 다른 기기에서 이 작업 공간을 통해 아래 폴더의 목록 보기, 읽기, 검색을 할 수 있습니다. 파일은 이 기기에 그대로 있고 작업 공간에는 파일 이름과 날짜만 저장됩니다. 읽기 전용입니다.',
+  'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. The AI cannot see them, and nothing is changed, unless you turn that on below.':
+    '이 앱이 열려 있는 동안 다른 기기에서 이 작업 공간을 통해 아래 폴더의 목록 보기, 읽기, 검색을 할 수 있습니다. 파일은 이 기기에 그대로 있고 작업 공간에는 파일 이름과 날짜만 저장됩니다. 아래에서 켜지 않는 한 AI는 이 폴더를 볼 수 없고 아무것도 바뀌지 않습니다.',
+  'AI access': 'AI 접근',
+  'Chat and agents may search and read the shared folders. Every read is in the access log.':
+    '채팅과 에이전트가 공개된 폴더를 검색하고 읽을 수 있습니다. 모든 읽기는 접근 기록에 남습니다.',
+  'AI access to {{name}}': '{{name}}에 대한 AI 접근',
+  'Allow adding tasks': '할 일 추가 허용',
+  'A task may be added to a TODO.md in a shared folder, only after you approve it in Attention. Nothing else is ever changed.':
+    '공개된 폴더의 TODO.md에 할 일을 추가할 수 있으며, 확인 필요 화면에서 승인한 뒤에만 추가됩니다. 그 밖의 내용은 바뀌지 않습니다.',
+  'Allow adding tasks to {{name}}': '{{name}}에 할 일 추가 허용',
+  'Awaiting approval': '승인 대기',
+  Added: '추가됨',
+  'Not added': '추가되지 않음',
+  'AI in a chat': '채팅의 AI',
+  'AI in a run': '실행 중인 AI',
+  'add task to {{path}}': '{{path}}에 할 일 추가',
+  'Change to a shared file': '공개된 파일 변경',
   'Name this machine above before sharing a folder.':
     '폴더를 공개하려면 먼저 위에서 이 기기의 이름을 정하세요.',
   'Share a folder': '폴더 공개',

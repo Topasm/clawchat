@@ -12,6 +12,7 @@ import { formatDateTime } from '../../utils/formatters';
 import SegmentedControl from '../shared/SegmentedControl';
 import SettingsRow from '../shared/SettingsRow';
 import SettingsSection from '../shared/SettingsSection';
+import Toggle from '../shared/Toggle';
 
 /** Anchor of the section, so first-run setup can open it directly. */
 export const DATA_SHARING_SECTION_ID = 'share-this-machine';
@@ -38,6 +39,7 @@ function parseFolders(text: string): string[] {
 }
 
 const LOG_STATUS_LABELS: Record<DataSourceQueryLog['status'], string> = {
+  awaiting_approval: 'Awaiting approval',
   queued: 'Waiting',
   claimed: 'Reading',
   done: 'Read',
@@ -45,6 +47,29 @@ const LOG_STATUS_LABELS: Record<DataSourceQueryLog['status'], string> = {
   denied: 'Refused',
   expired: 'Timed out',
 };
+
+function statusLabel(row: DataSourceQueryLog): string {
+  if (row.op === 'append_todo' && row.status === 'done') return translateUi('Added');
+  if (row.op === 'append_todo' && row.status === 'failed') return translateUi('Not added');
+  return translateUi(LOG_STATUS_LABELS[row.status]);
+}
+
+/** Who asked: a paired device, this workspace's sign-in, or the AI on behalf of a chat or run. */
+export function requesterLabel(row: Pick<DataSourceQueryLog, 'requested_by' | 'requester_name'>) {
+  if (row.requester_name) return row.requester_name;
+  if (row.requested_by === 'chat' || row.requested_by.startsWith('chat:')) {
+    return translateUi('AI in a chat');
+  }
+  if (row.requested_by.startsWith('run:')) return translateUi('AI in a run');
+  return translateUi('Signed-in session');
+}
+
+function operationLabel(row: DataSourceQueryLog): string {
+  if (row.op === 'append_todo') {
+    return translateUi('add task to {{path}}', { path: row.path || '' });
+  }
+  return `${row.op} ${row.path || row.query || '/'}`;
+}
 
 function AccessLog({ remoteId }: { remoteId: string }) {
   const [open, setOpen] = useState(false);
@@ -64,12 +89,10 @@ function AccessLog({ remoteId }: { remoteId: string }) {
             {rows.map((row) => (
               <li key={row.id} className={`cc-data-sharing__log-row is-${row.status}`}>
                 <span>{formatDateTime(row.created_at)}</span>
-                <span>{row.requester_name ?? translateUi('Signed-in session')}</span>
+                <span>{requesterLabel(row)}</span>
+                <span>{operationLabel(row)}</span>
                 <span>
-                  {row.op} {row.path || row.query || '/'}
-                </span>
-                <span>
-                  {translateUi(LOG_STATUS_LABELS[row.status])}
+                  {statusLabel(row)}
                   {row.error ? ` · ${row.error}` : ''}
                 </span>
               </li>
@@ -137,6 +160,30 @@ function SharedSourceCard({ source }: { source: SharedSourceSetting }) {
           onBlur={() => update(source.id, { excludeFolders: parseFolders(exclude) })}
         />
       </label>
+      <SettingsRow
+        label={translateUi('AI access')}
+        sublabel={translateUi(
+          'Chat and agents may search and read the shared folders. Every read is in the access log.',
+        )}
+      >
+        <Toggle
+          checked={source.aiAccess ?? false}
+          label={translateUi('AI access to {{name}}', { name: source.name })}
+          onChange={(checked) => update(source.id, { aiAccess: checked })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label={translateUi('Allow adding tasks')}
+        sublabel={translateUi(
+          'A task may be added to a TODO.md in a shared folder, only after you approve it in Attention. Nothing else is ever changed.',
+        )}
+      >
+        <Toggle
+          checked={source.allowWrites ?? false}
+          label={translateUi('Allow adding tasks to {{name}}', { name: source.name })}
+          onChange={(checked) => update(source.id, { allowWrites: checked })}
+        />
+      </SettingsRow>
       {source.remoteId && <AccessLog remoteId={source.remoteId} />}
     </div>
   );
@@ -144,7 +191,9 @@ function SharedSourceCard({ source }: { source: SharedSourceSetting }) {
 
 /**
  * Folders on this machine that other devices may read through the current
- * workspace. Read-only: nothing here lets another device change a file.
+ * workspace. Read-only unless a folder allows adding tasks, and then only a
+ * task line in a `TODO.md`, each one approved in review. The AI sees a folder
+ * only when its AI access is on.
  */
 export default function DataSharingSettings() {
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -187,7 +236,7 @@ export default function DataSharingSettings() {
     <SettingsSection id={DATA_SHARING_SECTION_ID} title={translateUi("Share this machine's data")}>
       <p className="cc-data-sharing__hint">
         {translateUi(
-          'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. Read-only.',
+          'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. The AI cannot see them, and nothing is changed, unless you turn that on below.',
         )}
       </p>
       {!label ? (

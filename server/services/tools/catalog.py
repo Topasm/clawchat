@@ -131,7 +131,22 @@ async def tools_for_skill(db: AsyncSession, skill_id: str) -> list[ToolSpec]:
         _extend_unique(
             specs, [spec for spec in server_specs(server) if _allowed(server, spec, allowed)]
         )
+    _extend_unique(specs, await _vault_specs(db, allowed))
     return specs
+
+
+async def _vault_specs(db: AsyncSession, allowed: tuple[str, ...] | None) -> list[ToolSpec]:
+    """Shared device folders, for sources whose owner turned on AI access.
+
+    A skill's ``mcp-servers`` names them as the server ``vault``.
+    """
+    from services.tools import vault_tools
+
+    return [
+        spec
+        for spec in await vault_tools.specs(db)
+        if allowed is None or vault_tools.VAULT_SERVER_NAME in allowed or spec.name in allowed
+    ]
 
 
 async def tools_for_chat(db: AsyncSession) -> list[ToolSpec]:
@@ -147,4 +162,6 @@ async def tools_for_chat(db: AsyncSession) -> list[ToolSpec]:
     for server in await _enabled_servers(db):
         if server.trust == ToolTrust.READ_ONLY:
             _extend_unique(specs, server_specs(server))
+    # Reading a shared folder runs without asking; adding a task only proposes it.
+    _extend_unique(specs, await _vault_specs(db, None))
     return specs

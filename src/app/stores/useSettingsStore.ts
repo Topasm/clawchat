@@ -4,9 +4,10 @@ import apiClient from '../services/apiClient';
 import type { SettingsPayload } from '../types/api';
 
 /**
- * A folder on this machine offered to one workspace as a read-only data
- * source. The path stays here: the server only ever learns the source's name
- * and the relative paths inside it.
+ * A folder on this machine offered to one workspace as a data source. The
+ * path stays here: the server only ever learns the source's name and the
+ * relative paths inside it. Read-only unless `allowWrites` is on, and then
+ * only for approved tasks added to a `TODO.md`.
  */
 export interface SharedSourceSetting {
   /** Local identity; the server's source id is learned on registration. */
@@ -21,6 +22,13 @@ export interface SharedSourceSetting {
   includeFolders: string[];
   /** Folders never read, even inside an included one. */
   excludeFolders: string[];
+  /** Chat and agents may search and read the shared folders. Off by default. */
+  aiAccess?: boolean;
+  /**
+   * Approved tasks may be added to a `TODO.md` here. Off by default; this
+   * machine refuses a write without it whatever the server says.
+   */
+  allowWrites?: boolean;
   /** The server's id for this source, once it has been registered. */
   remoteId?: string;
 }

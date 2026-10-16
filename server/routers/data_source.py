@@ -1,4 +1,8 @@
-"""Folders a device offers for reading, and requests relayed to them."""
+"""Folders a device offers for reading, and requests relayed to them.
+
+Reads are answered at once. A change -- adding a task to a ``TODO.md`` -- is
+only proposed here: it waits in review and reaches the machine once approved.
+"""
 
 from auth.dependencies import AuthPrincipal, get_current_principal, get_current_user
 from database import get_db
@@ -14,12 +18,15 @@ from schemas.data_source import (
     DataSourceRegister,
     DataSourceResponse,
     DataSourceUpdate,
+    DataSourceWriteProposal,
+    DataSourceWriteRequest,
 )
 from services.agents import execution_host_service
 from services.data_sources import service
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from ws.notifications import notify_module_data_changed
 
 router = APIRouter()
 
@@ -81,6 +88,9 @@ async def register_data_source(
         capabilities=list(body.capabilities),
         include_folders=body.include_folders,
         exclude_folders=body.exclude_folders,
+        # Both switches live on the machine; every registration restates them.
+        ai_access=body.ai_access,
+        allow_writes=body.allow_writes,
     )
     await db.commit()
     await db.refresh(source)
@@ -168,6 +178,32 @@ async def query_data_source(
         text=body.query,
         requested_by=principal.subject,
     )
+
+
+@router.post("/{source_id}/writes", response_model=DataSourceWriteProposal)
+async def propose_data_source_write(
+    source_id: str,
+    body: DataSourceWriteRequest,
+    db: AsyncSession = Depends(get_db),
+    principal: AuthPrincipal = Depends(get_current_principal),
+):
+    """Propose adding a task to a ``TODO.md`` in the source.
+
+    Nothing changes yet: the proposal becomes a review item, and the machine
+    receives it only after it is approved there. Refused with
+    ``writes_not_allowed`` unless the machine's owner allowed changes.
+    """
+    source = await _get_source(db, source_id)
+    proposal = await service.propose_write(
+        db,
+        source,
+        op=body.op,
+        raw_path=body.path,
+        text=body.text,
+        requested_by=principal.subject,
+    )
+    await notify_module_data_changed("reviews")
+    return proposal
 
 
 @router.put("/{source_id}/index", status_code=204)

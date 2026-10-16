@@ -2654,7 +2654,8 @@
             "enum": [
               "list",
               "read",
-              "search"
+              "search",
+              "append_todo"
             ],
             "title": "Op",
             "type": "string"
@@ -3366,7 +3367,8 @@
             "enum": [
               "list",
               "read",
-              "search"
+              "search",
+              "append_todo"
             ],
             "title": "Op",
             "type": "string"
@@ -3421,6 +3423,7 @@
           },
           "status": {
             "enum": [
+              "awaiting_approval",
               "queued",
               "claimed",
               "done",
@@ -3597,6 +3600,16 @@
       "DataSourceRegister": {
         "description": "A desktop app offering a folder on its machine for reading.",
         "properties": {
+          "ai_access": {
+            "default": false,
+            "title": "Ai Access",
+            "type": "boolean"
+          },
+          "allow_writes": {
+            "default": false,
+            "title": "Allow Writes",
+            "type": "boolean"
+          },
           "capabilities": {
             "items": {
               "enum": [
@@ -3675,6 +3688,16 @@
       },
       "DataSourceResponse": {
         "properties": {
+          "ai_access": {
+            "default": false,
+            "title": "Ai Access",
+            "type": "boolean"
+          },
+          "allow_writes": {
+            "default": false,
+            "title": "Allow Writes",
+            "type": "boolean"
+          },
           "capabilities": {
             "items": {
               "enum": [
@@ -3935,6 +3958,89 @@
           }
         },
         "title": "DataSourceUpdate",
+        "type": "object"
+      },
+      "DataSourceWriteProposal": {
+        "description": "A proposed change and the review item that holds it.",
+        "properties": {
+          "line": {
+            "title": "Line",
+            "type": "string"
+          },
+          "op": {
+            "const": "append_todo",
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "query_id": {
+            "title": "Query Id",
+            "type": "string"
+          },
+          "review_id": {
+            "title": "Review Id",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "awaiting_approval",
+              "queued",
+              "claimed",
+              "done",
+              "failed",
+              "denied",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "review_id",
+          "source_id",
+          "op",
+          "path",
+          "line",
+          "status"
+        ],
+        "title": "DataSourceWriteProposal",
+        "type": "object"
+      },
+      "DataSourceWriteRequest": {
+        "description": "A change to propose. It waits in review until the user approves it.",
+        "properties": {
+          "op": {
+            "const": "append_todo",
+            "default": "append_todo",
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "DataSourceWriteRequest",
         "type": "object"
       },
       "DelegateRequest": {
@@ -9139,7 +9245,8 @@
           "agent_run",
           "code_diff",
           "schedule_change",
-          "sync_conflict"
+          "sync_conflict",
+          "data_source_write"
         ],
         "title": "ReviewSubjectType",
         "type": "string"
@@ -15301,6 +15408,64 @@
           }
         ],
         "summary": "Query Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}/writes": {
+      "post": {
+        "description": "Propose adding a task to a ``TODO.md`` in the source.\n\nNothing changes yet: the proposal becomes a review item, and the machine\nreceives it only after it is approved there. Refused with\n``writes_not_allowed`` unless the machine's owner allowed changes.",
+        "operationId": "propose_data_source_write_api_data_sources__source_id__writes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSourceWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceWriteProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Propose Data Source Write",
         "tags": [
           "data-sources"
         ]
