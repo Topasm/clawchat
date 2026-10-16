@@ -31,7 +31,7 @@ const PRESETS: Preset[] = [
     id: GOOGLE,
     label: 'Google Calendar',
     url: '',
-    hint: 'In Google Calendar open Settings, choose the calendar, and copy "Secret address in iCal format". Anyone with it can read the calendar, so ClawChat keeps it encrypted and only reads.',
+    hint: 'In Google Calendar settings, choose the calendar and copy "Secret address in iCal format". ClawChat keeps it encrypted and only reads.',
   },
   {
     id: 'icloud',
@@ -298,7 +298,7 @@ export default function CalendarSyncSettings() {
         <SettingsRow
           label={translateUi('Add exam and deadline tasks without asking')}
           sublabel={translateUi(
-            'Other events, such as talks and meetings, are only suggested on Today. Anything added can be undone there.',
+            'Talks and meetings are only suggested on Today, where anything added can be undone.',
           )}
         >
           <Toggle

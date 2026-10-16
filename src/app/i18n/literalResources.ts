@@ -1764,16 +1764,16 @@ export const koreanUiTranslations: Record<string, string> = {
     '날짜가 있으면 그날 마감인 작업으로, 아이디어는 메모로 옮깁니다. 확신이 낮아도 일단 옮기고 표시해 두니, 목적지를 눌러 고치면 됩니다.',
   'Filed with low confidence. Check where it went.': '확신이 낮게 분류됨. 목적지를 확인하세요.',
   'Google Calendar': 'Google 캘린더',
-  'In Google Calendar open Settings, choose the calendar, and copy "Secret address in iCal format". Anyone with it can read the calendar, so ClawChat keeps it encrypted and only reads.':
-    'Google 캘린더 설정에서 캘린더를 고른 뒤 "iCal 형식의 비공개 주소"를 복사해 붙여 넣으세요. 이 주소만 있으면 누구나 일정을 볼 수 있으므로 ClawChat은 암호화해 보관하고 읽기만 합니다.',
+  'In Google Calendar settings, choose the calendar and copy "Secret address in iCal format". ClawChat keeps it encrypted and only reads.':
+    'Google 캘린더 설정에서 캘린더를 고르고 "iCal 형식의 비공개 주소"를 복사하세요. ClawChat은 암호화해 보관하고 읽기만 합니다.',
   'Secret address in iCal format': 'iCal 형식의 비공개 주소',
   'Could not read that calendar address.': '그 캘린더 주소를 읽지 못했습니다.',
   'Calendar added': '캘린더를 추가했습니다',
   '{{host}} · read only': '{{host}} · 읽기 전용',
   'Suggest tasks from its events': '일정에서 작업 제안',
   'Add exam and deadline tasks without asking': '시험·마감 준비 작업은 바로 추가',
-  'Other events, such as talks and meetings, are only suggested on Today. Anything added can be undone there.':
-    '발표나 면담 같은 다른 일정은 오늘 화면에 제안만 합니다. 추가된 항목은 그곳에서 되돌릴 수 있습니다.',
+  'Talks and meetings are only suggested on Today, where anything added can be undone.':
+    '발표·면담은 오늘 화면에 제안만 하고, 추가한 항목은 그곳에서 되돌릴 수 있습니다.',
   'Could not save the setting.': '설정을 저장하지 못했습니다.',
   'Could not update the suggestion.': '제안을 처리하지 못했습니다.',
   Suggestions: '제안',
