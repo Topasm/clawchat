@@ -4,6 +4,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.CompositionLocalProvider
+import com.clawchat.android.core.data.model.BriefingResponse
+import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
@@ -39,7 +41,6 @@ class TodayScreenshotTest {
         "src/test/screenshots/today_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
     private val state = TodayUiState(
-        greeting = "Good morning",
         overdueTodos = listOf(Todo(id = "o1", title = "Send the invoice", dueDate = "2026-10-01", syncStatus = "synced")),
         todayTodos = listOf(
             Todo(id = "t1", title = "Draft the quarterly report", dueDate = "2026-10-03", syncStatus = "synced"),
@@ -48,10 +49,13 @@ class TodayScreenshotTest {
         todayEvents = listOf(
             Event(id = "e1", title = "Design review", startTime = "2026-10-03T14:00:00Z", endTime = "2026-10-03T15:00:00Z"),
         ),
-        inboxCount = 2,
-        inboxPreview = listOf(
-            Todo(id = "i1", title = "Ideas for the offsite", inboxState = "captured", syncStatus = "synced"),
-            Todo(id = "i2", title = "Reply to Mina", inboxState = "plan_ready", planSummary = "Two steps, about 20 minutes", syncStatus = "synced"),
+        reviewCount = 2,
+        runCount = 1,
+        briefing = BriefingResponse(
+            summary = "A full morning, then a lighter afternoon.",
+            loadAssessment = "moderate",
+            highlights = listOf("Design review at 14:00"),
+            suggestions = listOf(BriefingSuggestion(action = "start_with", title = "Send the invoice")),
         ),
     )
 
@@ -65,7 +69,10 @@ class TodayScreenshotTest {
     @Test
     fun todayLargeFont() = capture("light", "large", largeFont = true)
 
-    private fun capture(theme: String, locale: String?, largeFont: Boolean = false) {
+    @Test
+    fun todayAgentLineOpen() = capture("light", "agents", agentLineOpen = true)
+
+    private fun capture(theme: String, locale: String?, largeFont: Boolean = false, agentLineOpen: Boolean = false) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
                 val density = LocalDensity.current
@@ -74,7 +81,6 @@ class TodayScreenshotTest {
                         state = state,
                         showAgentFeatures = true,
                         snackbarHostState = SnackbarHostState(),
-                        onNavigateToInbox = {},
                         onNavigateToReview = {},
                         onNavigateToRuns = {},
                         onNavigateToSearch = {},
@@ -84,6 +90,7 @@ class TodayScreenshotTest {
                         onDelete = {},
                         onSetDueToday = {},
                         onQuickAdd = {},
+                        agentLineOpen = agentLineOpen,
                     )
                 }
             }

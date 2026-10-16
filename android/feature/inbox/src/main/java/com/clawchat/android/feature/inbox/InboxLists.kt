@@ -1,6 +1,9 @@
 package com.clawchat.android.feature.inbox
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,15 +22,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -45,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.data.model.InboxRouting
 import com.clawchat.android.core.data.model.ProjectFolderCandidate
+import com.clawchat.android.core.data.model.ProjectPlan
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
@@ -57,6 +69,8 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 /**
  * What the Inbox just organized, each with its destination and an undo, then
@@ -73,8 +87,19 @@ internal fun InboxLists(
 ) {
     val selection = state.selection
     val locale = LocalConfiguration.current.locales[0]
+    var choosing by remember { mutableStateOf<InboxRouting?>(null) }
+    val listState = rememberLazyListState()
+    // Scrolling near the end reads the next page of todos; there are no page buttons.
+    LaunchedEffect(listState, state.snapshot.hasMoreTodos) {
+        if (!state.snapshot.hasMoreTodos) return@LaunchedEffect
+        snapshotFlow {
+            val info = listState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 3
+        }.distinctUntilChanged().filter { it }.collect { onAction(InboxAction.LoadMore) }
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
     ) {
         if (state.routings.isNotEmpty()) {
@@ -85,9 +110,9 @@ internal fun InboxLists(
                 InboxRoutingRow(
                     routing = routing,
                     detail = routingDetail(routing, state, locale),
-                    currentProject = routing.todoId?.let { state.snapshot.projectOf[it] },
-                    state = state,
-                    onAction = onAction,
+                    busy = state.busy,
+                    onChoose = { choosing = routing },
+                    onUndo = { onAction(InboxAction.Undo(routing.id)) },
                     onOpen = {
                         val todoId = routing.todoId
                         if (routing.isTask && todoId != null) onOpenTask(todoId) else onOpenNotes()
@@ -133,6 +158,9 @@ internal fun InboxLists(
                     onOpen = { onOpenTask(todo.id) },
                 )
             }
+            if (state.isLoadingMore) item(key = "more") {
+                LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+            }
         }
         if (state.isEmpty) item(key = "empty") {
             ClawEmptyState(
@@ -151,6 +179,15 @@ internal fun InboxLists(
                 InboxCandidateRow(candidate, state.busy) { onAction(InboxAction.Import(candidate)) }
             }
         }
+    }
+    choosing?.let { routing ->
+        InboxDestinationSheet(
+            routing = routing,
+            currentProject = routing.todoId?.let { state.snapshot.projectOf[it] },
+            projects = state.snapshot.projects,
+            onDismiss = { choosing = null },
+            onAction = { choosing = null; onAction(it) },
+        )
     }
 }
 
@@ -184,74 +221,113 @@ private fun InboxSectionTitle(
 private fun InboxRoutingRow(
     routing: InboxRouting,
     detail: String,
-    currentProject: String?,
-    state: InboxUiState,
-    onAction: (InboxAction) -> Unit,
+    busy: Boolean,
+    onChoose: () -> Unit,
+    onUndo: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    var choosing by remember { mutableStateOf(false) }
     ClawListItemSurface(onClick = onOpen) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (routing.isLowConfidence) InboxLowConfidenceDot()
+                    Text(
+                        routing.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .heightIn(min = ClawMobileLayout.TouchTarget)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(
+                            enabled = !busy,
+                            onClickLabel = stringResource(R.string.inbox_change_destination),
+                            onClick = onChoose,
+                        ),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ClawStatusChip(
+                        stringResource(if (routing.isTask) R.string.inbox_kind_task else R.string.inbox_kind_note),
+                    )
+                    if (detail.isNotEmpty()) {
+                        Text(
+                            detail,
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            TextButton(onClick = onUndo, enabled = !busy) {
+                Text(stringResource(R.string.inbox_undo))
+            }
+        }
+    }
+}
+
+/** A small muted dot: the classifier filed this but was not sure. */
+@Composable
+private fun InboxLowConfidenceDot() {
+    val label = stringResource(R.string.inbox_low_confidence)
+    Box(
+        Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.outline)
+            .semantics { contentDescription = label },
+    )
+}
+
+/** Where a filed item should go instead: a task, a note, or a project. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InboxDestinationSheet(
+    routing: InboxRouting,
+    currentProject: String?,
+    projects: List<ProjectPlan>,
+    onDismiss: () -> Unit,
+    onAction: (InboxAction) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            item {
                 Text(
                     routing.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box {
-                    Row(
-                        modifier = Modifier
-                            .heightIn(min = ClawMobileLayout.TouchTarget)
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(
-                                enabled = !state.busy,
-                                onClickLabel = stringResource(R.string.inbox_change_destination),
-                            ) { choosing = true },
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ClawStatusChip(
-                            stringResource(if (routing.isTask) R.string.inbox_kind_task else R.string.inbox_kind_note),
-                        )
-                        if (detail.isNotEmpty()) {
-                            Text(
-                                detail,
-                                modifier = Modifier.weight(1f, fill = false),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Icon(
-                            Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
-                        InboxDestinationItem(stringResource(R.string.inbox_kind_task), routing.isTask) {
-                            choosing = false
-                            if (!routing.isTask) onAction(InboxAction.SwitchKind(routing))
-                        }
-                        InboxDestinationItem(stringResource(R.string.inbox_kind_note), !routing.isTask) {
-                            choosing = false
-                            if (routing.isTask) onAction(InboxAction.SwitchKind(routing))
-                        }
-                        state.snapshot.projects.forEach { project ->
-                            val current = routing.isTask && currentProject == project.id
-                            InboxDestinationItem(stringResource(R.string.inbox_project_option, project.title), current) {
-                                choosing = false
-                                if (!current) onAction(InboxAction.MoveToProject(routing, project.id))
-                            }
-                        }
-                    }
+            }
+            item {
+                InboxDestinationItem(stringResource(R.string.inbox_kind_task), routing.isTask) {
+                    if (routing.isTask) onDismiss() else onAction(InboxAction.SwitchKind(routing))
                 }
             }
-            TextButton(onClick = { onAction(InboxAction.Undo(routing.id)) }, enabled = !state.busy) {
-                Text(stringResource(R.string.inbox_undo))
+            item {
+                InboxDestinationItem(stringResource(R.string.inbox_kind_note), !routing.isTask) {
+                    if (!routing.isTask) onDismiss() else onAction(InboxAction.SwitchKind(routing))
+                }
+            }
+            if (projects.isNotEmpty()) item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
+            items(projects, key = { it.id }) { project ->
+                val current = routing.isTask && currentProject == project.id
+                InboxDestinationItem(stringResource(R.string.inbox_project_option, project.title), current) {
+                    if (current) onDismiss() else onAction(InboxAction.MoveToProject(routing, project.id))
+                }
             }
         }
     }
@@ -259,13 +335,15 @@ private fun InboxRoutingRow(
 
 @Composable
 private fun InboxDestinationItem(label: String, current: Boolean, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label, fontWeight = if (current) FontWeight.SemiBold else null) },
-        onClick = onClick,
-        modifier = Modifier.semantics { selected = current },
-        trailingIcon = if (current) {
+    ListItem(
+        headlineContent = { Text(label, fontWeight = if (current) FontWeight.SemiBold else null) },
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .semantics { selected = current },
+        trailingContent = if (current) {
             { Icon(Icons.Default.Check, contentDescription = null) }
         } else null,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
 

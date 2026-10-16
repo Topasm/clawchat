@@ -31,6 +31,7 @@ import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
@@ -39,6 +40,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -766,6 +769,7 @@ internal fun TaskDetailView(
     var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
     var detailsOpen by rememberSaveable(task.id) { mutableStateOf(false) }
     var confirmRun by rememberSaveable(task.id) { mutableStateOf(false) }
+    var moreOpen by remember { mutableStateOf(false) }
     if (confirmRun) {
         AlertDialog(
             onDismissRequest = { confirmRun = false },
@@ -826,12 +830,28 @@ internal fun TaskDetailView(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.tasks_cd_delete),
-                            tint = MaterialTheme.colorScheme.error,
-                        )
+                    // Only done and the due date sit on the page; the rest waits here.
+                    Box {
+                        IconButton(onClick = { moreOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.tasks_more_actions))
+                        }
+                        DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.tasks_discuss_with_agent)) },
+                                onClick = { moreOpen = false; onDiscuss() },
+                            )
+                            if (task.syncStatus != "local" && !isCompleted) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.tasks_run_with_agent)) },
+                                    onClick = { moreOpen = false; confirmRun = true },
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.tasks_cd_delete), color = MaterialTheme.colorScheme.error) },
+                                onClick = { moreOpen = false; onDelete() },
+                            )
+                        }
                     }
                 },
                 colors = ClawTopBarColors(),
@@ -884,17 +904,6 @@ internal fun TaskDetailView(
                         }
                     }
                     storageLocation?.let { location -> TaskStorageLine(location) }
-                    // The thread about this task: steps and delegated runs start there.
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = onDiscuss) {
-                            Text(stringResource(R.string.tasks_discuss_with_agent))
-                        }
-                        if (task.syncStatus != "local" && !isCompleted) {
-                            TextButton(onClick = { confirmRun = true }) {
-                                Text(stringResource(R.string.tasks_run_with_agent))
-                            }
-                        }
-                    }
                     TextButton(
                         onClick = { detailsOpen = !detailsOpen },
                         modifier = Modifier.semantics { stateDescription = detailsState },

@@ -17,6 +17,7 @@
 
     <string name="tasks_detail_title">작업 상세</string>
     <string name="tasks_cd_back">뒤로</string>
+    <string name="tasks_more_actions">더 보기</string>
     <string name="tasks_cd_delete">작업 삭제</string>
     <string name="tasks_deleted">작업을 삭제했습니다</string>
     <string name="tasks_undo">실행 취소</string>
@@ -30,8 +31,8 @@
     <string name="tasks_details_title">세부 정보</string>
     <string name="tasks_details_expanded">펼쳐짐</string>
     <string name="tasks_details_collapsed">접힘</string>
-    <string name="tasks_discuss_with_agent">에이전트와 논의</string>
-    <string name="tasks_run_with_agent">에이전트에게 맡기기</string>
+    <string name="tasks_discuss_with_agent">에이전트와 상의</string>
+    <string name="tasks_run_with_agent">에이전트로 실행</string>
     <string name="tasks_run_confirm">“%1$s”을(를) 에이전트에게 맡길까요? 계획을 세워 작업하고 결과를 작업 스레드에 보고합니다.</string>
     <string name="tasks_run_confirm_action">실행</string>
     <string name="tasks_run_cancel">취소</string>

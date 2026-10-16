@@ -4,9 +4,11 @@ import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.InboxPlacementResult
 import com.clawchat.android.core.data.model.InboxRouting
 import com.clawchat.android.core.data.model.ProjectPlan
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.repository.InboxCapturePage
 import com.clawchat.android.core.data.repository.InboxRoutingRepository
 import com.clawchat.android.core.data.repository.InboxSnapshot
 import com.clawchat.android.core.data.repository.TodoRepository
@@ -224,6 +226,96 @@ class InboxViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(listOf("c2", "c3", "c1"), vm.uiState.value.captures.map { it.id })
         assertEquals("Server error", vm.uiState.value.error)
+    }
+
+    @Test
+    fun `a move can be taken back once from its snackbar`() = runTest {
+        coEvery { repository.fileAsTask("home", "c1") } returns ApiResult.Success(filedTask.copy(id = "r9"))
+        coEvery { repository.undo("home", "r9") } returns ApiResult.Success(filedTask)
+        val vm = loaded()
+        vm.onAction(InboxAction.FileAsTask("c1"))
+        dispatcher.scheduler.advanceUntilIdle()
+        val move = requireNotNull(vm.uiState.value.lastMove)
+        assertEquals(InboxMoveKind.TASK, move.kind)
+        vm.onAction(InboxAction.UndoMove(move.token))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNull(vm.uiState.value.lastMove)
+        coVerify(exactly = 1) { repository.undo("home", "r9") }
+        vm.onAction(InboxAction.UndoMove(move.token))
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { repository.undo("home", "r9") }
+    }
+
+    @Test
+    fun `undoing a batch unwinds each capture, last first`() = runTest {
+        coEvery { repository.toNote("home", "c3") } returns ApiResult.Success(filedNote.copy(id = "r3"))
+        coEvery { repository.toNote("home", "c1") } returns ApiResult.Success(filedNote.copy(id = "r4"))
+        coEvery { repository.undo("home", any()) } returns ApiResult.Success(filedNote)
+        val vm = loaded()
+        vm.onAction(InboxAction.SelectAll)
+        vm.onAction(InboxAction.FileSelection(asTask = false))
+        dispatcher.scheduler.advanceUntilIdle()
+        val move = requireNotNull(vm.uiState.value.lastMove)
+        assertEquals(2, move.count)
+        vm.onAction(InboxAction.UndoMove(move.token))
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerifyOrder {
+            repository.undo("home", "r4")
+            repository.undo("home", "r3")
+        }
+    }
+
+    @Test
+    fun `undoing a project move takes back the placement or puts the note back`() = runTest {
+        coEvery { repository.placeTask("home", "t1", "p2") } returns
+            ApiResult.Success(InboxPlacementResult(Todo("t1", "Send the slides"), 8, "change-1"))
+        coEvery { repository.undoPlacement("home", "change-1") } returns ApiResult.Success(mockk(relaxed = true))
+        coEvery { repository.moveNote("home", "n1", any()) } returns ApiResult.Success(mockk(relaxed = true))
+        val vm = loaded()
+        vm.onAction(InboxAction.MoveToProject(filedTask, "p2"))
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.onAction(InboxAction.UndoMove(requireNotNull(vm.uiState.value.lastMove).token))
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { repository.undoPlacement("home", "change-1") }
+
+        vm.onAction(InboxAction.MoveToProject(filedNote, "p2"))
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.onAction(InboxAction.UndoMove(requireNotNull(vm.uiState.value.lastMove).token))
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerifyOrder {
+            repository.moveNote("home", "n1", "p2")
+            repository.moveNote("home", "n1", null)
+        }
+    }
+
+    @Test
+    fun `undo from a row and a failed move offer no snackbar`() = runTest {
+        coEvery { repository.undo("home", "r1") } returns ApiResult.Success(filedTask)
+        coEvery { repository.toNote("home", "t1") } returns ApiResult.Error("Cannot move", 409)
+        val vm = loaded()
+        vm.onAction(InboxAction.Undo("r1"))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNull(vm.uiState.value.lastMove)
+        vm.onAction(InboxAction.SwitchKind(filedTask))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNull(vm.uiState.value.lastMove)
+    }
+
+    @Test
+    fun `scrolling to the end reads the next page once`() = runTest {
+        coEvery { repository.load("home") } returns ApiResult.Success(snapshot.copy(hasMoreTodos = true))
+        coEvery { repository.loadMoreCaptures("home", 2) } returns ApiResult.Success(
+            InboxCapturePage(listOf(Todo("c9", "Old capture", inboxState = "captured"), unsure), mapOf("t9" to "p2"), 2, false),
+        )
+        val vm = loaded()
+        vm.onAction(InboxAction.LoadMore)
+        vm.onAction(InboxAction.LoadMore)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf("c2", "c3", "c1", "c9"), vm.uiState.value.captures.map { it.id })
+        assertFalse(vm.uiState.value.snapshot.hasMoreTodos)
+        vm.onAction(InboxAction.LoadMore)
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { repository.loadMoreCaptures(any(), any()) }
     }
 
     @Test

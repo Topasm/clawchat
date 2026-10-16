@@ -18,8 +18,17 @@ data class InboxRouting(
     @SerialName("project_folder") val projectFolder: String? = null,
     @SerialName("created_at") val createdAt: String,
     @SerialName("reverted_at") val revertedAt: String? = null,
+    /** How sure the classifier was; null when a rule or the user filed it. */
+    @SerialName("kind_confidence") val kindConfidence: Double? = null,
 ) {
     val isTask: Boolean get() = kind == "task"
+
+    /** Filed anyway, but the classifier was unsure; the user may want to fix it. */
+    val isLowConfidence: Boolean get() = kindConfidence?.let { it < LOW_CONFIDENCE } ?: false
+
+    companion object {
+        const val LOW_CONFIDENCE = 0.8
+    }
 }
 
 @Serializable

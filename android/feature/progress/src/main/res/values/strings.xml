@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="progress_search">Search all</string>
-    <string name="progress_title">Attention</string>
+    <string name="progress_title">Progress</string>
     <plurals name="progress_summary">
         <item quantity="one">%1$d needs you</item>
         <item quantity="other">%1$d need you</item>
