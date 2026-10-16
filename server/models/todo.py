@@ -110,4 +110,8 @@ class Todo(Base):
             postgresql_where=text("idempotency_key IS NOT NULL"),
         ),
         Index("idx_todos_recurrence_rule", "recurrence_rule"),
+        Index("idx_todos_created_at", "created_at"),
+        Index("idx_todos_updated_at", "updated_at"),
+        Index("idx_todos_message_id", "message_id"),
+        Index("idx_todos_recurring_source_id", "recurring_source_id"),
     )

@@ -61,4 +61,6 @@ class ScheduledJob(Base):
     __table_args__ = (
         Index("ix_scheduled_jobs_due", "enabled", "next_run_at"),
         Index("ix_scheduled_jobs_project_id", "project_id"),
+        Index("ix_scheduled_jobs_conversation_id", "conversation_id"),
+        Index("ix_scheduled_jobs_last_run_id", "last_run_id"),
     )

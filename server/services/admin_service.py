@@ -1,15 +1,17 @@
 """Admin dashboard service functions."""
 
+import asyncio
 import os
-import shutil
+import sqlite3
 import time
 import logging
 from datetime import datetime, timezone, timedelta
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from database import rebuild_fts
 from domain.task import TaskStatus
 from models.conversation import Conversation
 from models.message import Message
@@ -202,19 +204,7 @@ async def purge_old_data(db: AsyncSession, target: str, older_than_days: int) ->
 
 async def reindex_fts(db: AsyncSession) -> list[str]:
     """Drop and rebuild FTS5 content."""
-    tables = ["messages_fts", "todos_fts", "events_fts"]
-    for table in tables:
-        await db.execute(text(f"DELETE FROM {table}"))
-
-    backfill = [
-        "INSERT INTO messages_fts(id, content) SELECT id, content FROM messages",
-        "INSERT INTO todos_fts(id, title, description) SELECT id, title, COALESCE(description, '') FROM todos",
-        "INSERT INTO events_fts(id, title, description, location) SELECT id, title, COALESCE(description, ''), COALESCE(location, '') FROM events",
-    ]
-    for stmt in backfill:
-        await db.execute(text(stmt))
-    await db.commit()
-    return tables
+    return await rebuild_fts(db)
 
 
 async def backup_database() -> tuple[str, int]:
@@ -225,6 +215,33 @@ async def backup_database() -> tuple[str, int]:
     backup_dir = os.path.join(os.path.dirname(db_path), "backups")
     os.makedirs(backup_dir, exist_ok=True)
     backup_path = os.path.join(backup_dir, backup_filename)
-    shutil.copy2(db_path, backup_path)
+    await asyncio.to_thread(_copy_sqlite_database, db_path, backup_path)
     size = os.path.getsize(backup_path)
     return backup_filename, size
+
+
+def _copy_sqlite_database(source_path: str, backup_path: str) -> None:
+    """Snapshot a live database with SQLite's online backup API.
+
+    Under WAL the recent commits live in ``-wal`` until a checkpoint, so a
+    plain file copy can miss them or catch a page mid-write. The backup API
+    copies one consistent read snapshot without blocking writers. The copy is
+    switched back to a rollback journal so it is a single self-contained file,
+    and only renamed into place once complete.
+    """
+    partial_path = f"{backup_path}.partial"
+    source = sqlite3.connect(source_path, timeout=30)
+    try:
+        destination = sqlite3.connect(partial_path)
+        try:
+            source.backup(destination)
+            destination.execute("PRAGMA journal_mode=DELETE")
+        finally:
+            destination.close()
+    except BaseException:
+        if os.path.exists(partial_path):
+            os.remove(partial_path)
+        raise
+    finally:
+        source.close()
+    os.replace(partial_path, backup_path)

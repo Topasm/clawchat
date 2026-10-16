@@ -24,14 +24,32 @@ from domain.task_relationship import TASK_RELATIONSHIP_MIGRATION_MARKER
 logger = logging.getLogger(__name__)
 
 
+_SQLITE_CONNECTION_PRAGMAS = (
+    # Make SQLite enforce the same FK cascades as production databases.
+    "PRAGMA foreign_keys=ON",
+    # Readers no longer block the writer, and a commit appends to the WAL
+    # instead of rewriting the rollback journal. The file grows -wal and -shm
+    # siblings, so copy the database with the backup API, never file by file.
+    "PRAGMA journal_mode=WAL",
+    # Under WAL, NORMAL only fsyncs at checkpoints: a power cut can lose the
+    # last commits but never corrupts the file.
+    "PRAGMA synchronous=NORMAL",
+    # The scheduler, the request handlers and the workers share one file;
+    # wait for a competing writer instead of failing with "database is locked".
+    "PRAGMA busy_timeout=5000",
+    "PRAGMA temp_store=MEMORY",
+)
+
+
 @event.listens_for(Engine, "connect")
-def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
-    """Make SQLite enforce the same FK cascades as production databases."""
+def _configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
+    """Apply the per-connection SQLite settings every engine relies on."""
     if "sqlite" not in type(dbapi_connection).__module__:
         return
     cursor = dbapi_connection.cursor()
     try:
-        cursor.execute("PRAGMA foreign_keys=ON")
+        for pragma in _SQLITE_CONNECTION_PRAGMAS:
+            cursor.execute(pragma)
     finally:
         cursor.close()
 
@@ -46,65 +64,117 @@ async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_o
 # ---------------------------------------------------------------------------
 # FTS5 setup: individual DDL statements (triggers contain nested semicolons
 # so we store them as a list rather than splitting on ";")
+#
+# Each FTS row shares the rowid of the row it indexes, so the sync triggers
+# find it through the rowid B-tree instead of scanning the UNINDEXED ``id``
+# column. ``id`` stays in the index so search can still join on the primary
+# key. Source rowids are not aliased by an INTEGER PRIMARY KEY and a dump or a
+# VACUUM may renumber them, so ``_setup_fts`` checks the pairing at startup and
+# rebuilds any index that drifted.
 # ---------------------------------------------------------------------------
 
-_FTS5_VIRTUAL_TABLES = [
-    "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(id UNINDEXED, content)",
-    "CREATE VIRTUAL TABLE IF NOT EXISTS todos_fts USING fts5(id UNINDEXED, title, description)",
-    "CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(id UNINDEXED, title, description, location)",
-]
 
-_FTS5_TRIGGERS = [
-    # -- Messages triggers
-    """CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
-        INSERT INTO messages_fts(id, content) VALUES (new.id, new.content);
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
-        DELETE FROM messages_fts WHERE id = old.id;
-        INSERT INTO messages_fts(id, content) VALUES (new.id, new.content);
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
-        DELETE FROM messages_fts WHERE id = old.id;
-    END""",
-    # -- Todos triggers
-    """CREATE TRIGGER IF NOT EXISTS todos_ai AFTER INSERT ON todos BEGIN
-        INSERT INTO todos_fts(id, title, description)
-        VALUES (new.id, new.title, COALESCE(new.description, ''));
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS todos_au AFTER UPDATE ON todos BEGIN
-        DELETE FROM todos_fts WHERE id = old.id;
-        INSERT INTO todos_fts(id, title, description)
-        VALUES (new.id, new.title, COALESCE(new.description, ''));
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS todos_ad AFTER DELETE ON todos BEGIN
-        DELETE FROM todos_fts WHERE id = old.id;
-    END""",
-    # -- Events triggers
-    """CREATE TRIGGER IF NOT EXISTS events_ai AFTER INSERT ON events BEGIN
-        INSERT INTO events_fts(id, title, description, location)
-        VALUES (new.id, new.title, COALESCE(new.description, ''), COALESCE(new.location, ''));
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS events_au AFTER UPDATE ON events BEGIN
-        DELETE FROM events_fts WHERE id = old.id;
-        INSERT INTO events_fts(id, title, description, location)
-        VALUES (new.id, new.title, COALESCE(new.description, ''), COALESCE(new.location, ''));
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS events_ad AFTER DELETE ON events BEGIN
-        DELETE FROM events_fts WHERE id = old.id;
-    END""",
-]
+@dataclass(frozen=True)
+class _FtsIndex:
+    source: str
+    columns: tuple[str, ...]
+    #: Source expressions in ``columns`` order for the given row alias.
+    values: Callable[[str], str]
 
-_FTS5_BACKFILL = [
-    """INSERT INTO messages_fts(id, content)
-        SELECT id, content FROM messages
-        WHERE id NOT IN (SELECT id FROM messages_fts)""",
-    """INSERT INTO todos_fts(id, title, description)
-        SELECT id, title, COALESCE(description, '') FROM todos
-        WHERE id NOT IN (SELECT id FROM todos_fts)""",
-    """INSERT INTO events_fts(id, title, description, location)
-        SELECT id, title, COALESCE(description, ''), COALESCE(location, '') FROM events
-        WHERE id NOT IN (SELECT id FROM events_fts)""",
-]
+    @property
+    def table(self) -> str:
+        return f"{self.source}_fts"
+
+
+_FTS_INDEXES = (
+    _FtsIndex(
+        source="messages",
+        columns=("content",),
+        values=lambda row: f"{row}.content",
+    ),
+    _FtsIndex(
+        source="todos",
+        columns=("title", "description"),
+        values=lambda row: f"{row}.title, COALESCE({row}.description, '')",
+    ),
+    _FtsIndex(
+        source="events",
+        columns=("title", "description", "location"),
+        values=lambda row: (
+            f"{row}.title, COALESCE({row}.description, ''), "
+            f"COALESCE({row}.location, '')"
+        ),
+    ),
+)
+
+# Trigger names the id-keyed FTS sync used before revision 5e0a7c3d9b14.
+_LEGACY_FTS5_TRIGGERS = tuple(
+    f"{index.source}_{suffix}"
+    for index in _FTS_INDEXES
+    for suffix in ("ai", "au", "ad")
+)
+
+
+def _fts_insert_sql(index: _FtsIndex, row: str) -> str:
+    columns = ", ".join(index.columns)
+    return (
+        f"INSERT INTO {index.table}(rowid, id, {columns}) "
+        f"VALUES ({row}.rowid, {row}.id, {index.values(row)});"
+    )
+
+
+def _fts_triggers(index: _FtsIndex) -> list[str]:
+    columns = ", ".join(index.columns)
+    return [
+        # Clear the rowid first: SQLite hands a deleted maximum rowid to the
+        # next insert, and a leftover entry would make the insert fail.
+        f"""CREATE TRIGGER IF NOT EXISTS {index.table}_ai
+        AFTER INSERT ON {index.source} BEGIN
+            DELETE FROM {index.table} WHERE rowid = new.rowid;
+            {_fts_insert_sql(index, "new")}
+        END""",
+        f"""CREATE TRIGGER IF NOT EXISTS {index.table}_au
+        AFTER UPDATE OF {columns} ON {index.source} BEGIN
+            DELETE FROM {index.table} WHERE rowid = old.rowid;
+            {_fts_insert_sql(index, "new")}
+        END""",
+        f"""CREATE TRIGGER IF NOT EXISTS {index.table}_ad
+        AFTER DELETE ON {index.source} BEGIN
+            DELETE FROM {index.table} WHERE rowid = old.rowid;
+        END""",
+    ]
+
+
+def _fts_virtual_table_sql(index: _FtsIndex) -> str:
+    columns = ", ".join(index.columns)
+    return (
+        f"CREATE VIRTUAL TABLE IF NOT EXISTS {index.table} "
+        f"USING fts5(id UNINDEXED, {columns})"
+    )
+
+
+def _fts_drift_sql(index: _FtsIndex) -> str:
+    """True when the index is not exactly one entry per source row."""
+    return f"""
+        SELECT
+            (SELECT count(*) FROM {index.table})
+                != (SELECT count(*) FROM {index.source})
+            OR EXISTS (
+                SELECT 1 FROM {index.table} AS f
+                LEFT JOIN {index.source} AS s ON s.rowid = f.rowid
+                WHERE s.id IS NULL OR s.id != f.id
+            )
+    """
+
+
+def _fts_rebuild_sql(index: _FtsIndex) -> list[str]:
+    columns = ", ".join(index.columns)
+    return [
+        f"DELETE FROM {index.table}",
+        f"""INSERT INTO {index.table}(rowid, id, {columns})
+            SELECT s.rowid, s.id, {index.values("s")} FROM {index.source} AS s""",
+    ]
+
 
 _TASK_RELATIONSHIP_CYCLE_TRIGGERS = [
     """
@@ -1170,14 +1240,30 @@ async def _setup_task_graph_revision(session: AsyncSession) -> None:
 
 
 async def _setup_fts(session: AsyncSession):
-    """Create FTS5 virtual tables, sync triggers, and backfill missing rows."""
-    for stmt in _FTS5_VIRTUAL_TABLES:
-        await session.execute(text(stmt))
-    for stmt in _FTS5_TRIGGERS:
-        await session.execute(text(stmt))
-    for stmt in _FTS5_BACKFILL:
-        await session.execute(text(stmt))
+    """Create FTS5 tables and sync triggers, and rebuild any index that drifted."""
+    for name in _LEGACY_FTS5_TRIGGERS:
+        await session.execute(text(f"DROP TRIGGER IF EXISTS {name}"))
+    for index in _FTS_INDEXES:
+        await session.execute(text(_fts_virtual_table_sql(index)))
+        for statement in _fts_triggers(index):
+            await session.execute(text(statement))
+        if (await session.execute(text(_fts_drift_sql(index)))).scalar():
+            await rebuild_fts_index(session, index)
     await session.commit()
+
+
+async def rebuild_fts_index(session: AsyncSession, index: _FtsIndex) -> None:
+    """Refill one FTS index from its source table, without committing."""
+    for statement in _fts_rebuild_sql(index):
+        await session.execute(text(statement))
+
+
+async def rebuild_fts(session: AsyncSession) -> list[str]:
+    """Refill every FTS index from its source table and commit."""
+    for index in _FTS_INDEXES:
+        await rebuild_fts_index(session, index)
+    await session.commit()
+    return [index.table for index in _FTS_INDEXES]
 
 
 async def init_db():

@@ -98,6 +98,14 @@ async def test_execution_telemetry_aggregates_latest_run_reviews_and_artifacts(
                 event_type="waiting_input",
                 created_at=now - timedelta(minutes=10),
             ),
+            # Not a handoff: the metrics query never loads it.
+            AgentRunEvent(
+                id="event_progress",
+                run_id=latest_run.id,
+                sequence=7,
+                event_type="progress",
+                created_at=now - timedelta(minutes=9),
+            ),
             AgentRunEvent(
                 id="event_resuming",
                 run_id=latest_run.id,
