@@ -26,6 +26,9 @@ interface InboxQueueProps {
   onOpenNotes: () => void;
 }
 
+/** Below this the Inbox filed the item anyway and marks it for a look. */
+const LOW_CONFIDENCE = 0.8;
+
 function shortDay(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
@@ -142,7 +145,16 @@ export default function InboxQueue({
                 <li key={routing.id} className="cc-inbox-row">
                   <button
                     type="button"
-                    className="cc-inbox-row__title"
+                    className={`cc-inbox-row__title${
+                      routing.kind_confidence != null && routing.kind_confidence < LOW_CONFIDENCE
+                        ? ' cc-inbox-row__title--unsure'
+                        : ''
+                    }`}
+                    title={
+                      routing.kind_confidence != null && routing.kind_confidence < LOW_CONFIDENCE
+                        ? translateUi('Filed with low confidence. Check where it went.')
+                        : undefined
+                    }
                     onClick={() =>
                       routing.kind === 'task' && routing.todo_id
                         ? onOpenTask(routing.todo_id)

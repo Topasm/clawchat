@@ -133,10 +133,12 @@ def record_task_move(
     due_date: datetime | None,
     origin: str,
     project_folder: str | None = None,
+    kind_confidence: float | None = None,
 ) -> InboxRouting:
     return _record(
         db,
         origin=origin,
+        kind_confidence=kind_confidence,
         kind="task",
         todo_id=todo_id,
         title=title,
@@ -233,7 +235,13 @@ def _note_content(todo: Todo) -> str:
     return todo.title
 
 
-async def task_to_note(db: AsyncSession, todo: Todo, *, origin: str) -> InboxRouting:
+async def task_to_note(
+    db: AsyncSession,
+    todo: Todo,
+    *,
+    origin: str,
+    kind_confidence: float | None = None,
+) -> InboxRouting:
     await _require_plain_capture(db, todo)
     before = _todo_row(todo)
     note = Note(content=_note_content(todo), project_id=todo.project_id)
@@ -244,6 +252,7 @@ async def task_to_note(db: AsyncSession, todo: Todo, *, origin: str) -> InboxRou
         db,
         origin=origin,
         kind="note",
+        kind_confidence=kind_confidence,
         todo_id=str(before["id"]),
         note_id=note.id,
         title=note.content.split("\n", 1)[0],

@@ -28,8 +28,9 @@ from services.data_sources.project_candidates import known_project_folders
 
 logger = logging.getLogger(__name__)
 
-# A capture moves on its own only when the classifier is at least this sure.
-AUTO_ROUTE_CONFIDENCE = 0.8
+# Below this the capture is still filed, but its row carries a mark so the
+# user can check it (file first, fix later).
+LOW_CONFIDENCE = 0.8
 _MAX_TAGS = 2
 
 _STALE_CLASSIFICATION_ERROR = (
@@ -76,6 +77,8 @@ class _Route:
     kind: str
     deadline: ParsedDeadline | None = None
     fallback_due: datetime | None = None
+    # The classifier's certainty; None when a rule decided.
+    confidence: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +168,7 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
                 title=str(updates.get("title", snapshot.title)),
                 due_date=updates.get("due_date", snapshot.due_date),  # type: ignore[arg-type]
                 origin="auto",
+                kind_confidence=route.confidence,
                 project_folder=(
                     updates["source_id"]  # type: ignore[arg-type]
                     if updates.get("source") == "obsidian_project"
@@ -176,7 +180,7 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
         if todo is None:
             return
         if route is not None and route.kind == "note" and todo.inbox_state == "captured":
-            await _file_as_note(db, todo)
+            await _file_as_note(db, todo, route.confidence)
             return
         await notify_module_data_changed("todos")
 
@@ -223,10 +227,12 @@ async def _project_folders(db: AsyncSession) -> list[str]:
         return []
 
 
-async def _file_as_note(db: AsyncSession, todo: Todo) -> None:
-    """Replace a capture the classifier is sure is a thought with a note."""
+async def _file_as_note(db: AsyncSession, todo: Todo, confidence: float | None) -> None:
+    """Replace a capture the classifier takes for a thought with a note."""
     try:
-        await inbox_routing_service.task_to_note(db, todo, origin="auto")
+        await inbox_routing_service.task_to_note(
+            db, todo, origin="auto", kind_confidence=confidence
+        )
         await db.commit()
     except AppError:
         # Something now hangs off the task (a step, a link, a file): leave it
@@ -265,23 +271,30 @@ def _route_for(
     zone: Zone,
     now: datetime | None = None,
 ) -> _Route | None:
-    """Rules first: one clear date makes a task. The classifier decides the rest
-    only when it is sure; anything else waits in the Inbox for the user."""
+    """Rules first: one clear upcoming date makes a task. Otherwise the
+    classifier's best guess files it, however sure it is: an unsure one is only
+    marked on its row. Only a capture the classifier could not read at all (no
+    AI, an error) waits in the Inbox for the user."""
     today = (now or datetime.now(timezone.utc)).astimezone(as_zone(zone)).date()
     deadline = parse_deadline(snapshot.title, capture_day(snapshot.created_at, zone))
-    if deadline is not None:
-        # A date already behind us is more likely misread than missed.
-        return _Route("task", deadline=deadline) if deadline.local_date >= today else None
+    # A date already behind us is more likely misread than missed: leave it to
+    # the classifier, without a deadline.
+    if deadline is not None and deadline.local_date >= today:
+        return _Route("task", deadline=deadline)
     kind = classification.get("kind")
+    if kind not in ("task", "note"):
+        return None
     try:
-        confidence = float(classification.get("kind_confidence") or 0)
+        confidence = min(max(float(classification.get("kind_confidence") or 0), 0.0), 1.0)
     except (TypeError, ValueError):
         confidence = 0.0
-    if kind not in ("task", "note") or confidence < AUTO_ROUTE_CONFIDENCE:
-        return None
     if kind == "note":
-        return _Route("note")
-    return _Route("task", fallback_due=_ai_due(classification.get("due_date"), zone, today))
+        return _Route("note", confidence=confidence)
+    return _Route(
+        "task",
+        fallback_due=_ai_due(classification.get("due_date"), zone, today),
+        confidence=confidence,
+    )
 
 
 def _classification_updates(

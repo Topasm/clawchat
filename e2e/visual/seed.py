@@ -129,6 +129,7 @@ async def seed() -> None:
             InboxRouting(
                 origin="auto",
                 kind="note",
+                kind_confidence=0.6,
                 note_id=note.id,
                 title=note.content,
                 original_title=note.content,
