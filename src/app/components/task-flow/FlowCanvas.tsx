@@ -52,13 +52,57 @@ interface FlowCanvasProps {
   focusId?: string | null;
 }
 
-const W = 168;
-const H = 56;
-const COL_GAP = 40;
+const W = 136;
+const H = 48;
+const COL_GAP = 28;
 const ROW_GAP = 12;
 
 const left = (column: number) => column * (W + COL_GAP);
 const top = (row: number) => row * (H + ROW_GAP);
+
+/**
+ * The line from a step to the one that waits on it: straight along a row,
+ * and where the flow forks or joins, out, around two quarter-turns and on.
+ * Drawn with bordered boxes so the flow needs no drawing surface.
+ */
+function FlowLine({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) {
+  const end = x2 - 5;
+  if (y1 === y2) {
+    return (
+      <span aria-hidden="true">
+        <i className="cc-flow__line" style={{ left: x1, top: y1, width: end - x1 }} />
+        <i className="cc-flow__arrow" style={{ left: end - 1, top: y2 }} />
+      </span>
+    );
+  }
+  const down = y2 > y1;
+  const dy = Math.abs(y2 - y1);
+  const r = Math.min(10, dy / 2, (end - x1) / 2);
+  const mid = x1 + (end - x1) / 2;
+  const turnTop = down ? y1 : y1 - r;
+  const turnBottom = down ? y2 - r : y2;
+  return (
+    <span aria-hidden="true">
+      <i className="cc-flow__line" style={{ left: x1, top: y1, width: mid - r - x1 }} />
+      <i
+        className={`cc-flow__turn cc-flow__turn--${down ? 'out-down' : 'out-up'}`}
+        style={{ left: mid - r, top: turnTop, width: r, height: r }}
+      />
+      {dy > 2 * r && (
+        <i
+          className="cc-flow__line cc-flow__line--down"
+          style={{ left: mid, top: Math.min(y1, y2) + r, height: dy - 2 * r }}
+        />
+      )}
+      <i
+        className={`cc-flow__turn cc-flow__turn--${down ? 'in-down' : 'in-up'}`}
+        style={{ left: mid, top: turnBottom, width: r, height: r }}
+      />
+      <i className="cc-flow__line" style={{ left: mid + r, top: y2, width: end - mid - r }} />
+      <i className="cc-flow__arrow" style={{ left: end - 1, top: y2 }} />
+    </span>
+  );
+}
 
 /**
  * One layer of a flow, left to right: a box per step and a line from each
@@ -200,33 +244,14 @@ export default function FlowCanvas({
               const from = place.get(edge.before);
               const to = place.get(edge.after);
               if (!from || !to) return null;
-              const x1 = left(from.column) + W;
-              const y1 = top(from.row) + H / 2;
-              const x2 = left(to.column);
-              const y2 = top(to.row) + H / 2;
-              const bend = x2 - COL_GAP / 2;
               return (
-                <span key={`${edge.before}>${edge.after}`} aria-hidden="true">
-                  {y1 === y2 ? (
-                    <i className="cc-flow__line" style={{ left: x1, top: y1, width: x2 - x1 }} />
-                  ) : (
-                    <>
-                      <i
-                        className="cc-flow__line"
-                        style={{ left: x1, top: y1, width: bend - x1 }}
-                      />
-                      <i
-                        className="cc-flow__line cc-flow__line--down"
-                        style={{ left: bend, top: Math.min(y1, y2), height: Math.abs(y2 - y1) }}
-                      />
-                      <i
-                        className="cc-flow__line"
-                        style={{ left: bend, top: y2, width: x2 - bend }}
-                      />
-                    </>
-                  )}
-                  <i className="cc-flow__arrow" style={{ left: x2 - 6, top: y2 - 4 }} />
-                </span>
+                <FlowLine
+                  key={`${edge.before}>${edge.after}`}
+                  x1={left(from.column) + W}
+                  y1={top(from.row) + H / 2}
+                  x2={left(to.column)}
+                  y2={top(to.row) + H / 2}
+                />
               );
             })}
             {layout.placements.map((p) =>

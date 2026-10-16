@@ -7,6 +7,7 @@ import RunCard, { needsRecoveryDecision } from '../components/runs/RunCard';
 import RunsLog from '../components/runs/RunsLog';
 import EmptyState from '../components/shared/EmptyState';
 import { CheckCircleIcon } from '../components/shared/Icons';
+import { ProgressIcon } from '../components/shared/NavIcons';
 import { useAgentRunsQuery, useReviewsQuery, useRunsAwaitingInputQuery } from '../hooks/queries';
 import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
 import type { ReviewStatus } from '../types/api';
@@ -82,12 +83,10 @@ export default function AttentionPage() {
     <div className="cc-review-page cc-attention-page">
       <header className="cc-page-header cc-review-page__header">
         <div>
-          <h1 className="cc-page-header__title">{translateUi('Attention')}</h1>
-          <p className="cc-page-header__subtitle">
-            {translateUi(
-              'Questions from agents, results to review, and runs that need a decision.',
-            )}
-          </p>
+          <h1 className="cc-page-header__title cc-page-header__title--icon">
+            <ProgressIcon className="cc-page-header__icon cc-page-header__icon--progress" />
+            {translateUi('Progress')}
+          </h1>
         </div>
         {projectId && (
           <div className="cc-page-header__actions">

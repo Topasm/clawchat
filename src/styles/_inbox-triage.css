@@ -33,9 +33,9 @@
   align-items: baseline;
   gap: var(--cc-space-2);
   margin: 0;
-  padding-bottom: var(--cc-space-1);
-  border-bottom: 1px solid var(--cc-border-subtle);
-  color: var(--cc-text);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--cc-border);
+  color: var(--cc-link);
   font-size: 13px;
   font-weight: 600;
 }

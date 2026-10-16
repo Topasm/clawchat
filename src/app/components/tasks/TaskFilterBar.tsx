@@ -1,16 +1,31 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useTodosQuery } from '../../hooks/queries';
-import { MagnifyingGlassIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import type { TasksStatusFilter } from '../../utils/taskStatus';
+
 const SORT_OPTIONS = [
   { value: 'due_date-asc', label: () => translateUi('Due date') },
   { value: 'created_at-desc', label: () => translateUi('Newest') },
   { value: 'updated_at-desc', label: () => translateUi('Recently updated') },
   { value: 'title-asc', label: () => translateUi('Title') },
 ] as const;
-/** Search, tag and sort controls for the task list. */
-export default function TaskFilterBar() {
+
+const OPEN_SEARCH_EVENT = 'cc:task-search';
+
+interface TaskViewMenuProps {
+  statusFilter: TasksStatusFilter;
+  onStatusFilterChange: (filter: TasksStatusFilter) => void;
+}
+
+/**
+ * The one control over the task list: "View ▾" names the sort and opens a
+ * menu with search, sort, completed tasks, blocked tasks and tags. Nothing is
+ * removed from the old filter bar; it is folded into one place.
+ */
+export default function TaskViewMenu({ statusFilter, onStatusFilterChange }: TaskViewMenuProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);
   const setSearch = useModuleStore((s) => s.setKanbanSearchQuery);
@@ -24,82 +39,139 @@ export default function TaskFilterBar() {
     todos.forEach((t) => t.tags?.forEach((tag) => tagSet.add(tag)));
     return Array.from(tagSet).sort();
   }, [todos]);
-  const hasActiveFilters = filters.searchQuery || filters.tags.length > 0 || filters.blockedOnly;
+  const hasActiveFilters = Boolean(
+    filters.searchQuery || filters.tags.length > 0 || filters.blockedOnly,
+  );
+  const sortValue = `${filters.sortField}-${filters.sortDirection}`;
+  const sortLabel = (
+    SORT_OPTIONS.find((option) => option.value === sortValue) ?? SORT_OPTIONS[0]
+  ).label();
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  // The search shortcut opens the menu on its search field.
+  useEffect(() => {
+    const handler = () => {
+      setOpen(true);
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    };
+    window.addEventListener(OPEN_SEARCH_EVENT, handler);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, handler);
+  }, []);
+
   return (
-    <div className="cc-kanban-filter">
-      <div className="cc-kanban-filter__search">
-        <MagnifyingGlassIcon className="cc-kanban-filter__search-icon" size={14} />
-        <input
-          ref={searchInputRef}
-          className="cc-kanban-filter__search-input"
-          type="text"
-          aria-label={translateUi('Search tasks')}
-          placeholder={translateUi('Search tasks\u2026')}
-          value={filters.searchQuery}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {allTags.length > 0 && (
-        <select
-          className="cc-kanban-filter__select"
-          aria-label={translateUi('Filter tasks by tag')}
-          value=""
-          onChange={(e) => {
-            if (e.target.value) toggleTag(e.target.value);
-          }}
-        >
-          <option value="">
-            {filters.tags.length > 0
-              ? translateUi('Tags ({{count}})', { count: filters.tags.length })
-              : translateUi('Filter by tag')}
-          </option>
-          {allTags.map((tag) => (
-            <option key={tag} value={tag}>
-              {filters.tags.includes(tag) ? '✓ ' : ''}
-              {tag}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <select
-        className="cc-kanban-filter__select"
-        aria-label={translateUi('Sort tasks')}
-        value={`${filters.sortField}-${filters.sortDirection}`}
-        onChange={(e) => {
-          const [field, dir] = e.target.value.split('-') as [
-            typeof filters.sortField,
-            typeof filters.sortDirection,
-          ];
-          setSort(field, dir);
-        }}
+    <div className="cc-task-view" ref={rootRef}>
+      <button
+        type="button"
+        className={`cc-task-view__trigger${hasActiveFilters ? ' cc-task-view__trigger--filtered' : ''}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
       >
-        {SORT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label()}
-          </option>
-        ))}
-      </select>
-
-      <label className="cc-kanban-filter__toggle">
-        <input
-          type="checkbox"
-          checked={filters.blockedOnly}
-          onChange={(e) => setBlockedOnly(e.target.checked)}
-        />
-        {translateUi('Blocked only')}
-      </label>
-
-      {hasActiveFilters && (
-        <button className="cc-kanban-filter__clear" onClick={clearFilters}>
-          {translateUi('\n          Clear\n        ')}
-        </button>
+        {translateUi('View')}
+        <span className="cc-task-view__sort"> · {sortLabel}</span>
+        <span aria-hidden="true" className="cc-task-view__chevron">
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div className="cc-task-view__popover" role="dialog" aria-label={translateUi('View')}>
+          <input
+            ref={searchInputRef}
+            className="cc-task-view__search cc-kanban-filter__search-input"
+            type="search"
+            aria-label={translateUi('Search tasks')}
+            placeholder={translateUi('Search tasks…')}
+            value={filters.searchQuery}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div
+            className="cc-task-view__group"
+            role="radiogroup"
+            aria-label={translateUi('Sort tasks')}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={sortValue === opt.value}
+                className="cc-task-view__option"
+                onClick={() => {
+                  const [field, dir] = opt.value.split('-') as [
+                    typeof filters.sortField,
+                    typeof filters.sortDirection,
+                  ];
+                  setSort(field, dir);
+                }}
+              >
+                <i className="cc-task-view__mark" aria-hidden="true" />
+                {opt.label()}
+              </button>
+            ))}
+          </div>
+          <div className="cc-task-view__group">
+            <label className="cc-task-view__toggle">
+              <input
+                type="checkbox"
+                checked={statusFilter !== 'active'}
+                onChange={(event) => onStatusFilterChange(event.target.checked ? 'all' : 'active')}
+              />
+              {translateUi('Show completed')}
+            </label>
+            <label className="cc-task-view__toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.blockedOnly)}
+                onChange={(e) => setBlockedOnly(e.target.checked)}
+              />
+              {translateUi('Blocked only')}
+            </label>
+          </div>
+          {allTags.length > 0 && (
+            <div
+              className="cc-task-view__group cc-task-view__tags"
+              aria-label={translateUi('Tags')}
+            >
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={filters.tags.includes(tag)}
+                  className="cc-task-view__tag"
+                  onClick={() => toggleTag(tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
+          {hasActiveFilters && (
+            <button type="button" className="cc-task-view__clear" onClick={clearFilters}>
+              {translateUi('Clear')}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 }
+
+/** The search shortcut: opens the View menu on its search field. */
 export function focusTaskSearch() {
-  const el = document.querySelector<HTMLInputElement>('.cc-kanban-filter__search-input');
-  el?.focus();
+  window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
 }

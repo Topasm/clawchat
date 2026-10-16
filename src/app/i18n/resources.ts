@@ -6,8 +6,9 @@ export const translationResources = {
       },
       nav: {
         inbox: 'Inbox',
+        today: 'Today',
         projects: 'Projects',
-        attention: 'Attention',
+        attention: 'Progress',
         more: 'More',
         automations: 'Automations',
         devices: 'Devices',
@@ -339,8 +340,9 @@ export const translationResources = {
       },
       nav: {
         inbox: '받은함',
+        today: '오늘',
         projects: '프로젝트',
-        attention: '확인 필요',
+        attention: '진행',
         more: '더보기',
         automations: '자동화',
         devices: '기기',

@@ -1,6 +1,7 @@
 (function () {
   var mode = 'system';
-  var language = navigator.language && navigator.language.toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en';
+  var language =
+    navigator.language && navigator.language.toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en';
 
   try {
     var storedMode = window.localStorage.getItem('clawchat-theme-mode');
@@ -29,6 +30,6 @@
 
   var themeColor = document.querySelector('meta[name="theme-color"]');
   if (themeColor) {
-    themeColor.setAttribute('content', theme === 'dark' ? '#111316' : '#F7F8FA');
+    themeColor.setAttribute('content', theme === 'dark' ? '#1E1E20' : '#FFFFFF');
   }
 })();
