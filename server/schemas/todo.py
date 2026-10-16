@@ -144,6 +144,13 @@ class ProjectTodoResponse(BaseModel):
         return v  # type: ignore[return-value]
 
 
+class OpenPrerequisite(BaseModel):
+    """A prerequisite that is not completed yet, so the task waits on it."""
+
+    id: str
+    title: str
+
+
 class TodoResponse(BaseModel):
     id: str
     title: str
@@ -183,6 +190,13 @@ class TodoResponse(BaseModel):
     plan_summary: str | None = None
     sync_status: str | None = None
     project_label: str | None = None
+    open_prerequisites: list[OpenPrerequisite] = Field(
+        default_factory=list,
+        description=(
+            "Prerequisites of an active task that are not completed yet; "
+            "the task is blocked while this is non-empty"
+        ),
+    )
 
     model_config = {"from_attributes": True}
 

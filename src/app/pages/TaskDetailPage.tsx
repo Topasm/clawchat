@@ -20,8 +20,6 @@ import Badge from '../components/shared/Badge';
 import TaskFlow from '../components/task-flow/TaskFlow';
 import TaskPaths from '../components/task-detail/TaskPaths';
 import TaskMoreMenu, { type TaskMenuItem } from '../components/task-detail/TaskMoreMenu';
-import FileDropZone from '../components/shared/FileDropZone';
-import AttachmentList from '../components/shared/AttachmentList';
 import TaskAgentThreadSection from '../components/task-detail/TaskAgentThreadSection';
 import TaskStageIndicator from '../components/shared/TaskStageIndicator';
 import { getTaskStage } from '../utils/taskStage';
@@ -356,12 +354,12 @@ export default function TaskDetailPage() {
 
       <TaskAgentThreadSection taskId={task.id} />
 
-      <details className="cc-exec-panel__more">
-        <summary>
-          {translateUi('More')}
-          {task.tags?.length ? ` · ${translateUi('Tags')} ${task.tags.length}` : ''}
-        </summary>
-        {task.tags && task.tags.length > 0 && (
+      {task.tags && task.tags.length > 0 && (
+        <details className="cc-exec-panel__more">
+          <summary>
+            {translateUi('More')}
+            {` · ${translateUi('Tags')} ${task.tags.length}`}
+          </summary>
           <div className="cc-exec-panel__tags">
             {task.tags.map((tag) => (
               <Badge key={tag} variant="tag">
@@ -369,15 +367,8 @@ export default function TaskDetailPage() {
               </Badge>
             ))}
           </div>
-        )}
-        {taskId && (
-          <div className="cc-detail__section">
-            <div className="cc-detail__section-title">{translateUi('Attachments')}</div>
-            <FileDropZone todoId={taskId} />
-            <AttachmentList ownerId={taskId} />
-          </div>
-        )}
-      </details>
+        </details>
+      )}
 
       {project && (
         <Dialog

@@ -16,6 +16,7 @@ export default function TaskFilterBar() {
   const setSearch = useModuleStore((s) => s.setKanbanSearchQuery);
   const toggleTag = useModuleStore((s) => s.toggleKanbanTagFilter);
   const setSort = useModuleStore((s) => s.setKanbanSort);
+  const setBlockedOnly = useModuleStore((s) => s.setKanbanBlockedOnly);
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
   const { data: todos = [] } = useTodosQuery();
   const allTags = useMemo(() => {
@@ -23,7 +24,7 @@ export default function TaskFilterBar() {
     todos.forEach((t) => t.tags?.forEach((tag) => tagSet.add(tag)));
     return Array.from(tagSet).sort();
   }, [todos]);
-  const hasActiveFilters = filters.searchQuery || filters.tags.length > 0;
+  const hasActiveFilters = filters.searchQuery || filters.tags.length > 0 || filters.blockedOnly;
   return (
     <div className="cc-kanban-filter">
       <div className="cc-kanban-filter__search">
@@ -80,6 +81,15 @@ export default function TaskFilterBar() {
           </option>
         ))}
       </select>
+
+      <label className="cc-kanban-filter__toggle">
+        <input
+          type="checkbox"
+          checked={filters.blockedOnly}
+          onChange={(e) => setBlockedOnly(e.target.checked)}
+        />
+        {translateUi('Blocked only')}
+      </label>
 
       {hasActiveFilters && (
         <button className="cc-kanban-filter__clear" onClick={clearFilters}>

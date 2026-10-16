@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { useAddTodoPath, useDeleteTodoPath, useTodoPathsQuery } from '../../hooks/queries';
+import {
+  useAddTodoPath,
+  useAttachmentsQuery,
+  useDeleteAttachment,
+  useDeleteTodoPath,
+  useTodoPathsQuery,
+} from '../../hooks/queries';
 import type { TodoPathKind, TodoPathResponse } from '../../types/api';
+import type { AttachmentResponse } from '../../types/schemas';
 import usePlatform from '../../hooks/usePlatform';
 import { platformApi } from '../../platform';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { useWorkerStore } from '../../stores/useWorkerStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { translateUi } from '../../i18n';
+import FileDropZone, { useAttachmentUploader } from '../shared/FileDropZone';
 
 /** Decide a pasted string's kind from its shape: a URL, a vault note, or a folder. */
 export function detectPathKind(text: string): TodoPathKind {
@@ -20,6 +29,12 @@ function kindLabel(path: TodoPathResponse): string {
   if (path.kind === 'url') return translateUi('Web');
   if (path.kind === 'vault') return 'vault';
   return path.host_label || translateUi('This device');
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 async function openPath(path: TodoPathResponse) {
@@ -41,16 +56,34 @@ async function openPath(path: TodoPathResponse) {
 }
 
 /**
- * Where the task's material lives. A step shows its parent's paths dimmed,
+ * Everything a task's work refers to, in one list: folders and notes by
+ * path, web links, and files uploaded to Home (a photo from the phone's
+ * share sheet has no path anywhere). A step shows its parent's paths dimmed,
  * and a top-level task its project's folders, so they are not typed twice.
  */
 export default function TaskPaths({ taskId }: { taskId: string }) {
   const { data: paths = [] } = useTodoPathsQuery(taskId);
+  const { data: attachments = [] } = useAttachmentsQuery(taskId);
   const addPath = useAddTodoPath(taskId);
   const deletePath = useDeleteTodoPath(taskId);
+  const deleteAttachment = useDeleteAttachment();
+  const upload = useAttachmentUploader(taskId);
+  const serverUrl = useAuthStore((state) => state.serverUrl);
   const { isDesktop } = usePlatform();
   const thisHostId = useWorkerStore((state) => state.hostId);
   const [draft, setDraft] = useState('');
+
+  const openAttachment = (attachment: AttachmentResponse) => {
+    const url = serverUrl ? `${serverUrl}${attachment.url}` : attachment.url;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  const removeAttachment = async (attachment: AttachmentResponse) => {
+    try {
+      await deleteAttachment.mutateAsync({ id: attachment.id, ownerId: taskId });
+    } catch {
+      useToastStore.getState().addToast('error', translateUi('Failed to delete attachment'));
+    }
+  };
 
   const add = (value: string, kind: TodoPathKind = detectPathKind(value)) => {
     const path = value.trim();
@@ -69,9 +102,9 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
   };
 
   return (
-    <section className="cc-task-paths" aria-label={translateUi('Paths')}>
-      <div className="cc-exec-panel__section-title">{translateUi('Paths')}</div>
-      {paths.length > 0 && (
+    <section className="cc-task-paths" aria-label={translateUi('Resources')}>
+      <div className="cc-exec-panel__section-title">{translateUi('Resources')}</div>
+      {(paths.length > 0 || attachments.length > 0) && (
         <ul className="cc-task-paths__list">
           {paths.map((path) => (
             <li
@@ -99,15 +132,45 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
               )}
             </li>
           ))}
+          {attachments.map((attachment) => (
+            <li key={`file:${attachment.id}`}>
+              <span className="cc-task-paths__kind">{translateUi('File')}</span>
+              <button
+                type="button"
+                className="cc-task-paths__path"
+                title={attachment.filename}
+                onClick={() => openAttachment(attachment)}
+              >
+                {attachment.filename}
+              </button>
+              <span className="cc-task-paths__size">{formatFileSize(attachment.size_bytes)}</span>
+              <button
+                type="button"
+                className="cc-btn cc-btn--ghost cc-btn--compact"
+                aria-label={translateUi('Remove')}
+                onClick={() => void removeAttachment(attachment)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
         </ul>
       )}
       <div className="cc-task-paths__add">
         <input
           className="cc-settings-input"
           value={draft}
-          placeholder={translateUi('Paste a path or URL')}
-          aria-label={translateUi('Paste a path or URL')}
+          placeholder={translateUi('Paste a path, URL or file')}
+          aria-label={translateUi('Paste a path, URL or file')}
           onChange={(event) => setDraft(event.target.value)}
+          onPaste={(event) => {
+            // A file on the clipboard (a screenshot, a copied document) is
+            // uploaded; text falls through to the field as usual.
+            const files = Array.from(event.clipboardData.files);
+            if (files.length === 0) return;
+            event.preventDefault();
+            files.forEach((file) => void upload(file));
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -121,6 +184,7 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
           </button>
         )}
       </div>
+      <FileDropZone todoId={taskId} compact />
     </section>
   );
 }

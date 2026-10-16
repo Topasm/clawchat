@@ -62,6 +62,13 @@ data class LoginResponse(
 
 // --- Todos ---
 
+/** A prerequisite that is not completed yet, so the task waits on it. */
+@Serializable
+data class OpenPrerequisite(
+    val id: String,
+    val title: String,
+)
+
 @Serializable
 data class Todo(
     val id: String,
@@ -88,11 +95,17 @@ data class Todo(
     @SerialName("clarification_answers") val clarificationAnswers: Map<String, String>? = null,
     @SerialName("sync_status") val syncStatus: String? = null,
     @SerialName("project_label") val projectLabel: String? = null,
+    /** Non-empty while an open task waits on unfinished prerequisites; the server names them. */
+    @SerialName("open_prerequisites") val openPrerequisites: List<OpenPrerequisite> = emptyList(),
     @SerialName("is_recurring") val isRecurring: Boolean = false,
     @SerialName("recurrence_rule") val recurrenceRule: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
 )
+
+/** Prerequisites an open task still waits on; a finished task waits on nothing. */
+fun Todo.waitingOn(): List<OpenPrerequisite> =
+    if (status == TaskStatus.PENDING || status == TaskStatus.IN_PROGRESS) openPrerequisites else emptyList()
 
 @Serializable
 data class TodoCreate(

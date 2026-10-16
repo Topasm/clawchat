@@ -18,23 +18,26 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 interface FileDropZoneProps {
   todoId?: string;
   onUploadComplete?: () => void;
+  /** One line instead of a box, for a list that already has an input. */
+  compact?: boolean;
 }
-export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+
+function validateFile(file: File): string | null {
+  const ext = file.name.includes('.') ? (file.name.split('.').pop()?.toLowerCase() ?? '') : '';
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return `File type '.${ext}' is not allowed`;
+  }
+  if (file.size > MAX_SIZE_BYTES) {
+    return 'File exceeds maximum size of 10MB';
+  }
+  return null;
+}
+
+/** Checks and uploads one file for a task, reporting the outcome as a toast. */
+export function useAttachmentUploader(todoId?: string, onUploadComplete?: () => void) {
   const uploadMutation = useUploadAttachment();
   const addToast = useToastStore((s) => s.addToast);
-  const validateFile = useCallback((file: File): string | null => {
-    const ext = file.name.includes('.') ? (file.name.split('.').pop()?.toLowerCase() ?? '') : '';
-    if (!ALLOWED_EXTENSIONS.has(ext)) {
-      return `File type '.${ext}' is not allowed`;
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      return 'File exceeds maximum size of 10MB';
-    }
-    return null;
-  }, []);
-  const handleUpload = useCallback(
+  return useCallback(
     async (file: File) => {
       const error = validateFile(file);
       if (error) {
@@ -49,8 +52,14 @@ export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneP
         addToast('error', translateUi('Failed to upload file'));
       }
     },
-    [todoId, uploadMutation, addToast, onUploadComplete, validateFile],
+    [todoId, uploadMutation, addToast, onUploadComplete],
   );
+}
+
+export default function FileDropZone({ todoId, onUploadComplete, compact }: FileDropZoneProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handleUpload = useAttachmentUploader(todoId, onUploadComplete);
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -70,7 +79,7 @@ export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneP
   );
   return (
     <div
-      className={`cc-dropzone${isDragOver ? ' cc-dropzone--active' : ''}`}
+      className={`cc-dropzone${compact ? ' cc-dropzone--compact' : ''}${isDragOver ? ' cc-dropzone--active' : ''}`}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -88,11 +97,13 @@ export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneP
       />
       <div className="cc-dropzone__icon">&#128206;</div>
       <div className="cc-dropzone__text">{translateUi('Drop files here or click to browse')}</div>
-      <div className="cc-dropzone__hint">
-        {translateUi(
-          '\n        JPG, PNG, GIF, WebP, SVG, PDF, TXT, MD, ZIP &middot; Max 10MB\n      ',
-        )}
-      </div>
+      {!compact && (
+        <div className="cc-dropzone__hint">
+          {translateUi(
+            '\n        JPG, PNG, GIF, WebP, SVG, PDF, TXT, MD, ZIP &middot; Max 10MB\n      ',
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,8 @@
     <string name="tasks_deleted">작업을 삭제했습니다</string>
     <string name="tasks_undo">되돌리기</string>
     <string name="tasks_mark_complete">%1$s 완료로 표시</string>
+    <string name="tasks_waiting_on">선행 대기 중 · %1$s</string>
+    <string name="tasks_waiting_on_more">%1$s 외 %2$d개</string>
     <string name="tasks_mark_incomplete">%1$s 미완료로 표시</string>
     <string name="tasks_experiment_completion_title">실험 작업 완료</string>
     <string name="tasks_experiment_completion_question">판정을 원문 문서에 기록했나요?</string>
