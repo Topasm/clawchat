@@ -36,6 +36,12 @@ class NoteRepository @Inject constructor(
         remote = { NoteSnapshot(api.listNotes(it), api.listProjects(it)) },
     )
 
+    /** Notes alone, newest edit first, for surfaces that never show projects. */
+    suspend fun list(workspace: String) = scoped(workspace,
+        local = { notes.list().map { it.toNote() } },
+        remote = { api.listNotes(it) },
+    )
+
     suspend fun create(workspace: String, body: NoteCreate) = scoped(workspace,
         local = {
             val id = "note_${body.idempotencyKey}"

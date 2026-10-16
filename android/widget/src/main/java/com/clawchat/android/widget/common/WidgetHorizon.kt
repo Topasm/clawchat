@@ -6,11 +6,12 @@ import androidx.datastore.preferences.core.intPreferencesKey
 /**
  * How far ahead the tracking widget looks for deadlines.
  *
- * A week is the span a person can still act on: long enough that a deadline
- * appears while there is room to work towards it, short enough that the widget
- * stays a glance surface rather than a backlog.
+ * Two weeks: a deadline appears while there is still room to work towards it,
+ * and the list stays a glance surface rather than a backlog. A week left the
+ * widget empty too often for someone whose next deadline was a fortnight out.
+ * Only new widgets take this; one that saved a horizon keeps it.
  */
-internal const val DEFAULT_WIDGET_HORIZON_DAYS = 7
+internal const val DEFAULT_WIDGET_HORIZON_DAYS = 14
 
 internal const val MIN_WIDGET_HORIZON_DAYS = 1
 internal const val MAX_WIDGET_HORIZON_DAYS = 30

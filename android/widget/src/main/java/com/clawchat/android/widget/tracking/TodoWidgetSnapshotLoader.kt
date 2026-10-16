@@ -2,6 +2,7 @@ package com.clawchat.android.widget.tracking
 
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.Note
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TaskStatus
@@ -32,10 +33,14 @@ internal suspend fun loadOpenWidgetTodos(
     }
 }
 
-internal data class TodoWidgetSnapshot(
-    val state: WidgetState<TodoWidgetUiModel>,
+internal data class WidgetSnapshot<out T>(
+    val state: WidgetState<T>,
     val workspaceKey: String?,
 )
+
+internal typealias TodoWidgetSnapshot = WidgetSnapshot<TodoWidgetUiModel>
+
+internal typealias NoteWidgetSnapshot = WidgetSnapshot<NoteWidgetUiModel>
 
 /**
  * Loads widget data against one workspace, then revalidates that identity
@@ -45,17 +50,11 @@ internal data class TodoWidgetSnapshot(
 internal suspend fun loadTodoWidgetSnapshot(
     horizonDays: Int,
     runtimeState: suspend () -> AppRuntimeState,
-    loadDeadlines: suspend () -> ApiResult<PaginatedResponse<Todo>>,
+    loadOpenTodos: suspend () -> ApiResult<PaginatedResponse<Todo>>,
     loadCachedTodos: suspend () -> List<Todo> = { emptyList() },
-): TodoWidgetSnapshot {
-    val initial = runtimeState()
-    val initialWorkspaceKey = initial.workspaceKey?.takeIf(String::isNotBlank)
-    if (initial.mode == WorkspaceMode.UNCONFIGURED || initialWorkspaceKey == null) {
-        return TodoWidgetSnapshot(WidgetState.NotLoggedIn, initialWorkspaceKey)
-    }
-
-    val result = loadDeadlines()
-    val state = if (result is ApiResult.Error) {
+): TodoWidgetSnapshot = loadInWorkspace(runtimeState) {
+    val result = loadOpenTodos()
+    if (result is ApiResult.Error) {
         val cached = try {
             loadCachedTodos()
         } catch (cancelled: CancellationException) {
@@ -66,13 +65,34 @@ internal suspend fun loadTodoWidgetSnapshot(
         if (cached.isEmpty()) {
             WidgetState.Error(result.message)
         } else {
-            // The cache holds whatever was last synced, not the horizon slice,
-            // so the projection applies the same window to it.
+            // The cache holds whatever was last synced; the projection applies
+            // the same filters and window to it as to a fresh response.
             WidgetState.Success(TodoWidgetUiModel.from(cached, horizonDays))
         }
     } else {
-        result.toWidgetState(horizonDays)
+        result.toWidgetState { TodoWidgetUiModel.from(it.items, horizonDays) }
     }
+}
+
+/** The notes tab: the most recently edited notes, under the same workspace guard. */
+internal suspend fun loadNoteWidgetSnapshot(
+    runtimeState: suspend () -> AppRuntimeState,
+    loadNotes: suspend (workspaceKey: String) -> ApiResult<List<Note>>,
+): NoteWidgetSnapshot = loadInWorkspace(runtimeState) { workspaceKey ->
+    loadNotes(workspaceKey).toWidgetState { NoteWidgetUiModel.from(it) }
+}
+
+private suspend fun <T> loadInWorkspace(
+    runtimeState: suspend () -> AppRuntimeState,
+    load: suspend (workspaceKey: String) -> WidgetState<T>,
+): WidgetSnapshot<T> {
+    val initial = runtimeState()
+    val initialWorkspaceKey = initial.workspaceKey?.takeIf(String::isNotBlank)
+    if (initial.mode == WorkspaceMode.UNCONFIGURED || initialWorkspaceKey == null) {
+        return WidgetSnapshot(WidgetState.NotLoggedIn, initialWorkspaceKey)
+    }
+
+    val state = load(initialWorkspaceKey)
     val current = runtimeState()
     val currentWorkspaceKey = current.workspaceKey?.takeIf(String::isNotBlank)
     if (current.mode != initial.mode || currentWorkspaceKey != initialWorkspaceKey) {
@@ -86,16 +106,14 @@ internal suspend fun loadTodoWidgetSnapshot(
             // titles with B's completion actions.
             WidgetState.Loading
         }
-        return TodoWidgetSnapshot(state, currentWorkspaceKey)
+        return WidgetSnapshot(state, currentWorkspaceKey)
     }
 
-    return TodoWidgetSnapshot(state, initialWorkspaceKey)
+    return WidgetSnapshot(state, initialWorkspaceKey)
 }
 
-private fun ApiResult<PaginatedResponse<Todo>>.toWidgetState(
-    horizonDays: Int,
-): WidgetState<TodoWidgetUiModel> = when (this) {
-    is ApiResult.Success -> WidgetState.Success(TodoWidgetUiModel.from(data.items, horizonDays))
+private fun <R, T> ApiResult<R>.toWidgetState(project: (R) -> T): WidgetState<T> = when (this) {
+    is ApiResult.Success -> WidgetState.Success(project(data))
     is ApiResult.Error -> WidgetState.Error(message)
     is ApiResult.Loading -> WidgetState.Loading
 }

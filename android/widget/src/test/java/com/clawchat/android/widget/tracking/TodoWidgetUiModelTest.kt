@@ -4,6 +4,7 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -64,28 +65,83 @@ class TodoWidgetUiModelTest {
         )
 
         val byId = result.items.associateBy { it.id }
-        assertEquals(1f, byId.getValue("week").runwayFraction, 0.001f)
-        assertEquals(0f, byId.getValue("today").runwayFraction, 0.001f)
+        assertEquals(1f, byId.getValue("week").runwayFraction!!, 0.001f)
+        assertEquals(0f, byId.getValue("today").runwayFraction!!, 0.001f)
         // Nothing is left of an overdue task's runway; the line reads as past
         // the deadline rather than as an empty, invisible bar.
-        assertEquals(1f, byId.getValue("late").runwayFraction, 0.001f)
+        assertEquals(1f, byId.getValue("late").runwayFraction!!, 0.001f)
         assertTrue(byId.getValue("late").isOverdue)
         assertFalse(byId.getValue("today").isOverdue)
     }
 
     @Test
-    fun `finished work, undated tasks and inbox captures are not widget rows`() {
+    fun `finished work and inbox captures are not widget rows`() {
         val result = model(
             listOf(
                 todo(id = "done", status = TaskStatus.COMPLETED, dueDate = "2026-09-11T23:59:00"),
                 todo(id = "cancelled", status = TaskStatus.CANCELLED, dueDate = "2026-09-11T23:59:00"),
-                todo(id = "undated", dueDate = null),
-                todo(id = "unreadable", dueDate = "not a date"),
                 todo(id = "captured", dueDate = "2026-09-11T23:59:00", inboxState = "captured"),
+                todo(id = "captured-undated", dueDate = null, inboxState = "captured"),
             ),
         )
 
         assertTrue(result.isEmpty)
+        assertNull(result.nextDeadline)
+    }
+
+    // A deadline list alone hid every open task without a date, and the widget
+    // read as broken. Those come back below the runway, without a runway line.
+    @Test
+    fun `in progress and undated work follow the runway`() {
+        val result = model(
+            listOf(
+                todo(id = "undated-old", dueDate = null, updatedAt = "2026-09-01T00:00:00Z"),
+                todo(id = "undated-new", dueDate = null, updatedAt = "2026-09-09T00:00:00Z"),
+                todo(id = "running-far", status = TaskStatus.IN_PROGRESS, dueDate = "2026-10-01T23:59:00"),
+                todo(id = "running", status = TaskStatus.IN_PROGRESS, dueDate = null),
+                todo(id = "unreadable", dueDate = "not a date", updatedAt = "2026-08-01T00:00:00Z"),
+                todo(id = "soon", dueDate = "2026-09-12T23:59:00"),
+            ),
+        )
+
+        assertEquals(listOf("soon"), result.deadlines.map { it.id })
+        assertEquals(
+            listOf("running-far", "running", "undated-new", "undated-old", "unreadable"),
+            result.others.map { it.id },
+        )
+        val byId = result.others.associateBy { it.id }
+        assertEquals(21, byId.getValue("running-far").daysRemaining)
+        assertNull(byId.getValue("running").daysRemaining)
+        assertTrue(result.others.all { it.runwayFraction == null })
+        assertEquals(6, result.itemCount)
+    }
+
+    @Test
+    fun `the first pending deadline past the horizon is named, not listed`() {
+        val result = model(
+            listOf(
+                todo(id = "later", title = "Later", dueDate = "2026-10-20T23:59:00"),
+                todo(id = "gpu", title = "GPU homework", dueDate = "2026-09-28T23:59:00"),
+                // Already a row with its own D-day, so it is not repeated.
+                todo(id = "running", status = TaskStatus.IN_PROGRESS, dueDate = "2026-09-20T23:59:00"),
+            ),
+        )
+
+        assertEquals(listOf("running"), result.items.map { it.id })
+        val next = result.nextDeadline!!
+        assertEquals("GPU homework", next.title)
+        assertEquals(LocalDate.of(2026, 9, 28), next.dueDate)
+        assertEquals(18, next.daysRemaining)
+    }
+
+    @Test
+    fun `undated backlog is capped to the most recently touched`() {
+        val result = model(
+            (1..30).map { todo(id = "t$it", updatedAt = "2026-09-%02dT00:00:00Z".format(it)) },
+        )
+
+        assertEquals(TodoWidgetUiModel.MAX_OTHER_ROWS, result.others.size)
+        assertEquals("t30", result.others.first().id)
     }
 
     @Test
@@ -107,11 +163,13 @@ class TodoWidgetUiModelTest {
         status: TaskStatus = TaskStatus.PENDING,
         dueDate: String? = null,
         inboxState: String? = "none",
+        updatedAt: String = "",
     ) = Todo(
         id = id,
         title = title,
         status = status,
         dueDate = dueDate,
         inboxState = inboxState,
+        updatedAt = updatedAt,
     )
 }

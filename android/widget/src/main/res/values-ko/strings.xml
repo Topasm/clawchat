@@ -6,7 +6,7 @@
     <string name="widget_login_required">위젯을 사용하려면 ClawChat을 먼저 설정하세요</string>
     <string name="widget_loading">불러오는 중…</string>
     <string name="widget_load_error">불러오기 실패. 눌러서 재시도</string>
-    <string name="widget_empty">다가오는 마감 없음</string>
+    <string name="widget_empty">열린 작업 없음</string>
     <string name="widget_mark_done">%1$s 완료 처리</string>
     <string name="widget_inbox">받은함</string>
     <string name="widget_add_to_inbox">받은함에 추가…</string>
@@ -26,7 +26,7 @@
     <string name="widget_config_cancel">취소</string>
     <string name="widget_config_apply">적용</string>
     <string name="widget_config_save_failed">위젯 설정을 저장하지 못했습니다. 다시 시도하세요.</string>
-    <string name="widget_config_tasks_preview">다가오는 마감을 순서대로 보여주고 새 항목은 받은함에 추가합니다.</string>
+    <string name="widget_config_tasks_preview">다가오는 마감을 먼저, 그 아래 진행 중이거나 마감 없는 작업을 보여줍니다. 위젯 상단에서 메모로 전환할 수 있습니다.</string>
     <string name="widget_config_inbox_preview">새 항목을 받은함에 바로 수집합니다.</string>
     <string name="widget_tasks_title">작업</string>
     <string name="widget_tasks_title_with_count">작업 · %1$d</string>
@@ -35,5 +35,14 @@
     <string name="widget_days_overdue">D+%1$d</string>
     <string name="widget_config_horizon">표시 기간</string>
     <string name="widget_config_horizon_days">%1$d일</string>
-    <string name="widget_config_horizon_hint">며칠 앞의 마감까지 보여줄지 정합니다. 기한이 지난 작업은 항상 표시됩니다.</string>
+    <string name="widget_config_horizon_hint">며칠 앞의 마감까지 보여줄지 정합니다. 기한이 지난 작업은 항상 표시되고, 진행 중이거나 마감 없는 작업은 그 아래에 나옵니다.</string>
+    <string name="widget_notes_title">메모</string>
+    <string name="widget_notes_title_with_count">메모 · %1$d</string>
+    <string name="widget_notes_empty">아직 메모가 없습니다</string>
+    <string name="widget_no_deadlines_within">%1$d일 안에 마감 없음</string>
+    <string name="widget_next_deadline">다음 마감 %1$s %2$s · %3$s</string>
+    <string name="widget_other_tasks">진행 중 · 마감 없음</string>
+    <string name="widget_in_progress">진행 중</string>
+    <string name="widget_today">오늘</string>
+    <string name="widget_short_date_pattern">M월 d일</string>
 </resources>
