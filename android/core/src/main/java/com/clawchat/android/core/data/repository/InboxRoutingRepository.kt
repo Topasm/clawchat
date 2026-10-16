@@ -21,7 +21,20 @@ data class InboxSnapshot(
     val projectOf: Map<String, String> = emptyMap(),
     val projects: List<ProjectPlan> = emptyList(),
     val candidates: List<ProjectFolderCandidate> = emptyList(),
+    /** The last page of todos read; captures are picked out of each page. */
+    val todoPage: Int = 1,
+    val hasMoreTodos: Boolean = false,
 )
+
+/** One more page of todos, for scrolling further down "Needs a look". */
+data class InboxCapturePage(
+    val captures: List<Todo>,
+    val projectOf: Map<String, String>,
+    val page: Int,
+    val hasMore: Boolean,
+)
+
+private const val TODO_PAGE_SIZE = 200
 
 /** Inbox states in the order the web lists them: being read, asking, planned, failed, captured. */
 private val CAPTURE_ORDER = listOf("classifying", "planning", "questioning", "plan_ready", "error", "captured")
@@ -41,22 +54,37 @@ class InboxRoutingRepository @Inject constructor(
     suspend fun load(workspace: String) = scoped(workspace) { scope ->
         coroutineScope {
             val routings = async { api.listInboxRoutings(scope) }
-            val todos = async { api.listTodos(mapOf("limit" to "200"), scope) }
+            val todos = async { api.listTodos(todoPageQuery(1), scope) }
             val projects = async { api.listProjects(scope) }
             // Candidates only add an import shortcut; an older server without the
             // endpoint still shows the Inbox.
             val candidates = async { runCatching { api.listProjectCandidates(scope) }.getOrDefault(emptyList()) }
-            val items = todos.await().items
+            val first = capturePage(todos.await(), 1)
             InboxSnapshot(
                 routings = routings.await().items,
-                captures = items.filter { it.isInboxCapture() }
-                    .sortedBy { CAPTURE_ORDER.indexOf(it.inboxState).let { rank -> if (rank < 0) CAPTURE_ORDER.size else rank } },
-                projectOf = items.mapNotNull { todo -> todo.projectId?.let { todo.id to it } }.toMap(),
+                captures = first.captures,
+                projectOf = first.projectOf,
                 projects = projects.await(),
                 candidates = candidates.await(),
+                todoPage = first.page,
+                hasMoreTodos = first.hasMore,
             )
         }
     }
+
+    suspend fun loadMoreCaptures(workspace: String, page: Int) = scoped(workspace) { scope ->
+        capturePage(api.listTodos(todoPageQuery(page), scope), page)
+    }
+
+    private fun todoPageQuery(page: Int) = mapOf("limit" to TODO_PAGE_SIZE.toString(), "page" to page.toString())
+
+    private fun capturePage(todos: PaginatedResponse<Todo>, page: Int) = InboxCapturePage(
+        captures = todos.items.filter { it.isInboxCapture() }
+            .sortedBy { CAPTURE_ORDER.indexOf(it.inboxState).let { rank -> if (rank < 0) CAPTURE_ORDER.size else rank } },
+        projectOf = todos.items.mapNotNull { todo -> todo.projectId?.let { todo.id to it } }.toMap(),
+        page = page,
+        hasMore = page * TODO_PAGE_SIZE < todos.total && todos.items.isNotEmpty(),
+    )
 
     suspend fun undo(workspace: String, routingId: String) = scoped(workspace) { api.undoInboxRouting(routingId, it) }
 
@@ -65,6 +93,9 @@ class InboxRoutingRepository @Inject constructor(
     suspend fun fileAsTask(workspace: String, todoId: String) = scoped(workspace) { api.fileTodoAsTask(todoId, it) }
 
     suspend fun noteToTask(workspace: String, noteId: String) = scoped(workspace) { api.noteToTask(noteId, it) }
+
+    suspend fun undoPlacement(workspace: String, changeSetId: String) =
+        scoped(workspace) { api.undoInboxPlacement(changeSetId, it) }
 
     /** Put a filed task at the top of [projectId], against the graph as it is now. */
     suspend fun placeTask(workspace: String, todoId: String, projectId: String) = scoped(workspace) { scope ->
@@ -80,6 +111,6 @@ class InboxRoutingRepository @Inject constructor(
 }
 
 /** Still in the Inbox: not filed (`none`) and not finished. */
-internal fun Todo.isInboxCapture(): Boolean =
+private fun Todo.isInboxCapture(): Boolean =
     inboxState != null && inboxState != "none" &&
         status != TaskStatus.COMPLETED && status != TaskStatus.CANCELLED

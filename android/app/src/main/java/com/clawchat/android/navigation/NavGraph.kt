@@ -96,8 +96,8 @@ fun ClawChatNavGraph(
     val navController = rememberNavController()
     val startDestination = NavigationCapabilities.startRoute(workspaceMode)
     val itemsByRoute = remember { allDrawerDestinations.associateBy(DrawerDestination::route) }
-    val drawerItems = remember(workspaceMode) {
-        NavigationCapabilities.drawerRoutes(workspaceMode).mapNotNull(itemsByRoute::get)
+    val drawerGroups = remember(workspaceMode) {
+        NavigationCapabilities.drawerGroups(workspaceMode).map { group -> group.mapNotNull(itemsByRoute::get) }
     }
     var plannerPage by rememberSaveable { mutableStateOf(PlannerPage.TODAY) }
 
@@ -156,9 +156,6 @@ fun ClawChatNavGraph(
             }
         }
     }
-    val navigateToInbox: () -> Unit = {
-        navigateToPrimary(NavRoute.Inbox.route)
-    }
     val navigateToReview: (String?) -> Unit = { reviewId ->
         if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Review.route)) {
             navController.navigate(NavRoute.Review.destination(reviewId))
@@ -185,8 +182,9 @@ fun ClawChatNavGraph(
             ModalDrawerSheet {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
                     Text(stringResource(R.string.nav_menu_title), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
-                    drawerItems.forEach { item ->
-                        if (item.route == NavRoute.Search.route) HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    drawerGroups.forEachIndexed { index, group ->
+                    if (index > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    group.forEach { item ->
                         NavigationDrawerItem(
                             selected = item.route == selectedPrimaryRoute,
                             onClick = { drawerScope.launch {
@@ -215,6 +213,7 @@ fun ClawChatNavGraph(
                                 }
                             },
                         )
+                    }
                     }
                 }
             }
@@ -253,7 +252,6 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onNavigateToInbox = navigateToInbox,
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
@@ -287,7 +285,6 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onNavigateToInbox = navigateToInbox,
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,

@@ -1,6 +1,4 @@
 <resources>
-    <string name="inbox_tasks_tab">Tasks</string>
-    <string name="inbox_notes_tab">Notes</string>
     <string name="inbox_note_hint">Write a thought, reference, or idea…</string>
     <string name="inbox_note_add">Save note</string>
     <string name="inbox_note_drag_hint">Long-press a note and drop it on a project. Tap a project to see its notes.</string>

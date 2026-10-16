@@ -71,10 +71,11 @@ class InboxScreenshotTest {
                 InboxRouting(
                     id = "r3", origin = "auto", kind = "note", noteId = "n1", title = "Offsite could be in Busan",
                     originalTitle = "Offsite could be in Busan", createdAt = "2030-11-01T09:10:00Z",
+                    kindConfidence = 0.55,
                 ),
             ),
             captures = listOf(
-                Todo(id = "c1", title = "Something just captured", inboxState = "classifying", syncStatus = "synced"),
+                Todo(id = "c1", title = "Something the classifier could not read", inboxState = "error", syncStatus = "synced"),
                 Todo(id = "c2", title = "Call about the lease", inboxState = "captured", syncStatus = "synced"),
                 Todo(id = "c3", title = "Look into the new grant", inboxState = "captured", syncStatus = "synced"),
             ),

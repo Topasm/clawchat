@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_complete_failed">완료하지 못했습니다. 다시 누르거나 앱에서 확인하세요.</string>
-    <string name="widget_add_task">받은 편지함에 추가</string>
+    <string name="widget_add_task">받은함에 추가</string>
     <string name="widget_refresh">새로고침</string>
     <string name="widget_login_required">위젯을 사용하려면 ClawChat을 먼저 설정하세요</string>
     <string name="widget_loading">불러오는 중…</string>
     <string name="widget_load_error">불러오기 실패. 눌러서 재시도</string>
     <string name="widget_empty">다가오는 마감 없음</string>
     <string name="widget_mark_done">%1$s 완료 처리</string>
-    <string name="widget_inbox">받은 편지함</string>
-    <string name="widget_add_to_inbox">받은 편지함에 추가…</string>
-    <string name="quick_add_inbox_title">받은 편지함에 추가</string>
+    <string name="widget_inbox">받은함</string>
+    <string name="widget_add_to_inbox">받은함에 추가…</string>
+    <string name="quick_add_inbox_title">받은함에 추가</string>
     <string name="quick_add_hint">무엇을 해야 하나요?</string>
     <string name="quick_add_title_required">태그 외에 작업 제목도 입력하세요.</string>
     <string name="quick_add_cancel">취소</string>
     <string name="quick_add_add">추가</string>
-    <string name="quick_add_inbox_success">받은 편지함에 추가했습니다</string>
+    <string name="quick_add_inbox_success">받은함에 추가했습니다</string>
     <string name="quick_add_failed">작업을 추가하지 못했습니다. 다시 시도하세요.</string>
     <string name="widget_config_title">위젯 모양</string>
     <string name="widget_config_description">배경 화면이 위젯 배경을 얼마나 비칠지 정하세요. 지원되는 런처에서는 나중에 위젯 메뉴에서 다시 변경할 수 있습니다.</string>
@@ -26,8 +26,8 @@
     <string name="widget_config_cancel">취소</string>
     <string name="widget_config_apply">적용</string>
     <string name="widget_config_save_failed">위젯 설정을 저장하지 못했습니다. 다시 시도하세요.</string>
-    <string name="widget_config_tasks_preview">다가오는 마감을 순서대로 보여주고 새 항목은 받은 편지함에 추가합니다.</string>
-    <string name="widget_config_inbox_preview">새 항목을 받은 편지함에 바로 수집합니다.</string>
+    <string name="widget_config_tasks_preview">다가오는 마감을 순서대로 보여주고 새 항목은 받은함에 추가합니다.</string>
+    <string name="widget_config_inbox_preview">새 항목을 받은함에 바로 수집합니다.</string>
     <string name="widget_tasks_title">작업</string>
     <string name="widget_tasks_title_with_count">작업 · %1$d</string>
     <string name="widget_due_today">D-DAY</string>

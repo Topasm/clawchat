@@ -8,12 +8,23 @@ import com.clawchat.android.core.data.WorkspaceMode
  * server feature through the drawer, a search hit, or a deep link.
  */
 internal object NavigationCapabilities {
-    fun drawerRoutes(mode: WorkspaceMode): List<String> = when (mode) {
-        WorkspaceMode.SERVER -> listOf(NavRoute.Inbox.route, NavRoute.Projects.route, NavRoute.Today.route,
-            NavRoute.Tasks.route, NavRoute.Chat.route, NavRoute.Progress.route, NavRoute.Devices.route, NavRoute.Search.route, NavRoute.Settings.route)
-        WorkspaceMode.LOCAL -> listOf(NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Search.route, NavRoute.Settings.route)
+    /**
+     * The drawer in two groups split by a divider: where work comes in and gets
+     * done, then where it is organised, followed and set up.
+     */
+    fun drawerGroups(mode: WorkspaceMode): List<List<String>> = when (mode) {
+        WorkspaceMode.SERVER -> listOf(
+            listOf(NavRoute.Inbox.route, NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Chat.route),
+            listOf(NavRoute.Projects.route, NavRoute.Progress.route, NavRoute.Devices.route, NavRoute.Search.route, NavRoute.Settings.route),
+        )
+        WorkspaceMode.LOCAL -> listOf(
+            listOf(NavRoute.Tasks.route, NavRoute.Today.route),
+            listOf(NavRoute.Search.route, NavRoute.Settings.route),
+        )
         WorkspaceMode.UNCONFIGURED -> emptyList()
     }
+
+    fun drawerRoutes(mode: WorkspaceMode): List<String> = drawerGroups(mode).flatten()
     private val localPrimaryRoutes = listOf(
         NavRoute.Tasks.route,
         NavRoute.Today.route,

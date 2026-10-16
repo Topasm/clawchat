@@ -45,7 +45,6 @@ internal val PLANNER_PAGE_ORDER = listOf(
 fun PlannerScreen(
     initialPage: PlannerPage = PlannerPage.TODAY,
     showAgentFeatures: Boolean = true,
-    onNavigateToInbox: () -> Unit = {},
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
@@ -78,7 +77,6 @@ fun PlannerScreen(
             when (PLANNER_PAGE_ORDER[page]) {
                 PlannerPage.TODAY -> TodayScreen(
                     showAgentFeatures = showAgentFeatures,
-                    onNavigateToInbox = onNavigateToInbox,
                     onNavigateToReview = onNavigateToReview,
                     onNavigateToRuns = onNavigateToRuns,
                     onNavigateToSearch = onNavigateToSearch,

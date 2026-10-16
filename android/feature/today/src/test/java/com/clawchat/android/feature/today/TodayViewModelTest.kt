@@ -1,13 +1,20 @@
 package com.clawchat.android.feature.today
 
 import app.cash.turbine.test
+import com.clawchat.android.core.data.ActiveSession
+import com.clawchat.android.core.data.AppRuntimeState
+import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.TodayResponse
+import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.CachedToday
+import com.clawchat.android.core.data.repository.ReviewRepository
 import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
@@ -17,6 +24,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -37,6 +45,12 @@ class TodayViewModelTest {
     private lateinit var todoRepository: TodoRepository
     private lateinit var syncManager: SyncManager
     private lateinit var viewModel: TodayViewModel
+    private val reviewRepository = mockk<ReviewRepository>()
+    private val agentRunRepository = mockk<AgentRunRepository>()
+    private val runtime = MutableStateFlow(
+        AppRuntimeState(WorkspaceMode.SERVER, ActiveSession("token", "https://home.example", null, "manual"), true, "home"),
+    )
+    private val sessions = mockk<SessionStore> { every { runtimeState } returns runtime }
 
     private val sampleTodo = Todo(
         id = "1",
@@ -75,6 +89,16 @@ class TodayViewModelTest {
         every { syncManager.eventChanged } returns MutableSharedFlow()
         coEvery { todayRepository.getBriefing() } returns ApiResult.Error("Unavailable")
         coEvery { todayRepository.getCachedToday(any()) } returns CachedToday()
+        every { syncManager.reviewChanged } returns MutableSharedFlow()
+        every { syncManager.runChanged } returns MutableSharedFlow()
+        coEvery { reviewRepository.listPending(any()) } returns ApiResult.Success(listOf(mockk(), mockk()))
+        coEvery { agentRunRepository.listRuns(any(), any(), any()) } returns ApiResult.Success(
+            listOf(
+                mockk { every { status } returns AgentRunStatus.RUNNING },
+                mockk { every { status } returns AgentRunStatus.WAITING_REVIEW },
+                mockk { every { status } returns AgentRunStatus.COMPLETED },
+            ),
+        )
     }
 
     @After
@@ -83,7 +107,7 @@ class TodayViewModelTest {
     }
 
     private fun createViewModel(): TodayViewModel {
-        return TodayViewModel(todayRepository, todoRepository, syncManager)
+        return TodayViewModel(todayRepository, todoRepository, syncManager, reviewRepository, agentRunRepository, sessions)
     }
 
     @Test
@@ -96,11 +120,8 @@ class TodayViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals("Good morning!", state.greeting)
         assertEquals(1, state.todayTodos.size)
         assertEquals(1, state.overdueTodos.size)
-        assertEquals(1, state.needsDateTodos.size)
-        assertEquals(3, state.inboxCount)
         assertEquals(false, state.isRefreshing)
         assertNull(state.error)
     }
@@ -149,16 +170,28 @@ class TodayViewModelTest {
     }
 
     @Test
-    fun `an empty inbox skips the secondary task query`() = runTest {
-        coEvery { todayRepository.getToday() } returns ApiResult.Success(
-            sampleTodayResponse.copy(inboxCount = 0),
-        )
+    fun `agent work folds into review and running counts`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(emptyList<Todo>(), viewModel.uiState.value.inboxPreview)
+        assertEquals(2, viewModel.uiState.value.reviewCount)
+        assertEquals(1, viewModel.uiState.value.runCount)
         coVerify(exactly = 0) { todoRepository.listTodos(any()) }
+    }
+
+    @Test
+    fun `a device-only workspace never asks for agent work`() = runTest {
+        runtime.value = runtime.value.copy(mode = WorkspaceMode.LOCAL, workspaceKey = "local")
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.reviewCount)
+        coVerify(exactly = 0) { reviewRepository.listPending(any()) }
+        coVerify(exactly = 0) { agentRunRepository.listRuns(any(), any(), any()) }
     }
 
     @Test
@@ -305,25 +338,5 @@ class TodayViewModelTest {
                 TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
             )
         }
-    }
-
-    @Test
-    fun `setDueToday moves an undated todo into today list`() = runTest {
-        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
-        coEvery { todoRepository.listTodos(any()) } returns
-            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
-        coEvery { todoRepository.updateTodo("3", any()) } returns
-            ApiResult.Success(sampleUndatedTodo.copy(dueDate = java.time.LocalDate.now().toString()))
-
-        viewModel = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.setDueToday("3")
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val updated = viewModel.uiState.value
-        assertEquals(0, updated.needsDateTodos.size)
-        assertEquals(2, updated.todayTodos.size)
-        assertEquals("3", updated.todayTodos.last().id)
     }
 }

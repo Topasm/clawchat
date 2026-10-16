@@ -2,7 +2,15 @@ package com.clawchat.android.feature.today
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.stateDescription
+import com.clawchat.android.core.ui.ClawExpand
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -24,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -54,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.BriefingResponse
-import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
@@ -82,15 +88,12 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     showAgentFeatures: Boolean = true,
-    onNavigateToInbox: () -> Unit = {},
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
@@ -117,7 +120,6 @@ fun TodayScreen(
         state = state,
         showAgentFeatures = showAgentFeatures,
         snackbarHostState = snackbarHostState,
-        onNavigateToInbox = onNavigateToInbox,
         onNavigateToReview = onNavigateToReview,
         onNavigateToRuns = onNavigateToRuns,
         onNavigateToSearch = onNavigateToSearch,
@@ -141,14 +143,16 @@ fun TodayScreen(
     }
 }
 
-/** Today's screen for a given state; [TodayScreen] wires it to the ViewModel. */
+/**
+ * Today's screen for a given state; [TodayScreen] wires it to the ViewModel.
+ * Three blocks (overdue, today, events) under one folded line for agent work.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TodayContent(
     state: TodayUiState,
     showAgentFeatures: Boolean,
     snackbarHostState: SnackbarHostState,
-    onNavigateToInbox: () -> Unit,
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
     onNavigateToSearch: () -> Unit,
@@ -158,17 +162,11 @@ internal fun TodayContent(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onQuickAdd: () -> Unit,
+    agentLineOpen: Boolean = false,
 ) {
-    val totalTasks = state.todayTodos.size + state.overdueTodos.size + state.needsDateTodos.size
-    val completedTasks = (state.todayTodos + state.overdueTodos + state.needsDateTodos).count {
-        it.status == TaskStatus.COMPLETED
-    }
-    val hasContent = (showAgentFeatures && state.briefing != null) ||
-        state.overdueTodos.isNotEmpty() ||
+    val hasContent = state.overdueTodos.isNotEmpty() ||
         state.todayTodos.isNotEmpty() ||
-        state.needsDateTodos.isNotEmpty() ||
-        state.todayEvents.isNotEmpty() ||
-        (showAgentFeatures && state.inboxPreview.isNotEmpty())
+        state.todayEvents.isNotEmpty()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -232,29 +230,16 @@ internal fun TodayContent(
                     }
                 }
 
-                item {
-                    TodayHeroCard(
-                        greeting = localizedGreeting(state.greeting),
-                        completedTasks = completedTasks,
-                        totalTasks = totalTasks,
-                        eventCount = state.todayEvents.size,
-                        inboxCount = if (showAgentFeatures) state.inboxCount else 0,
-                        showInbox = showAgentFeatures,
-                    )
-                }
-
                 if (showAgentFeatures) {
                     item {
-                        AgentControlCard(
+                        AgentLine(
+                            reviewCount = state.reviewCount,
+                            runCount = state.runCount,
+                            briefing = state.briefing,
+                            initiallyOpen = agentLineOpen,
                             onNavigateToReview = onNavigateToReview,
                             onNavigateToRuns = onNavigateToRuns,
                         )
-                    }
-                }
-
-                state.briefing?.takeIf { showAgentFeatures }?.let { briefing ->
-                    item {
-                        BriefingSection(briefing = briefing)
                     }
                 }
 
@@ -262,7 +247,6 @@ internal fun TodayContent(
                     item {
                         TodoSectionCard(
                             title = stringResource(R.string.today_overdue_title),
-                            subtitle = stringResource(R.string.today_overdue_subtitle),
                             todos = state.overdueTodos,
                             tone = ClawTone.Error,
                             onToggle = onToggle,
@@ -277,24 +261,8 @@ internal fun TodayContent(
                     item {
                         TodoSectionCard(
                             title = stringResource(R.string.today_focus_title),
-                            subtitle = stringResource(R.string.today_focus_subtitle),
                             todos = state.todayTodos,
                             tone = ClawTone.Primary,
-                            onToggle = onToggle,
-                            onDelete = onDelete,
-                            onSetDueToday = onSetDueToday,
-                            onOpen = onOpenTask,
-                        )
-                    }
-                }
-
-                if (state.needsDateTodos.isNotEmpty()) {
-                    item {
-                        TodoSectionCard(
-                            title = stringResource(R.string.today_needs_date_title),
-                            subtitle = stringResource(R.string.today_needs_date_subtitle),
-                            todos = state.needsDateTodos,
-                            tone = ClawTone.Warning,
                             onToggle = onToggle,
                             onDelete = onDelete,
                             onSetDueToday = onSetDueToday,
@@ -306,17 +274,6 @@ internal fun TodayContent(
                 if (state.todayEvents.isNotEmpty()) {
                     item {
                         EventSectionCard(events = state.todayEvents)
-                    }
-                }
-
-                if (showAgentFeatures && state.inboxPreview.isNotEmpty()) {
-                    item {
-                        InboxPreviewSection(
-                            todos = state.inboxPreview,
-                            totalInboxCount = state.inboxCount,
-                            onNavigateToInbox = onNavigateToInbox,
-                            onOpenTask = onOpenTask,
-                        )
                     }
                 }
 
@@ -349,142 +306,93 @@ internal fun TodayContent(
 }
 
 /**
- * Where agent work is reviewed and followed. Two quiet chips instead of a
- * titled section: what needs the user is already badged on the menu and
- * listed in Now, so Today only offers the way in.
+ * Agent work and the briefing as one line, "검토 2 · 실행 1". Tapping it opens
+ * the briefing and the ways into the review queue and the runs.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AgentControlCard(
+private fun AgentLine(
+    reviewCount: Int,
+    runCount: Int,
+    briefing: BriefingResponse?,
+    initiallyOpen: Boolean,
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
 ) {
-    // A flow row, so at large font sizes the second chip moves to the next
-    // line instead of squeezing its label onto two.
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        AssistChip(
-            onClick = onNavigateToReview,
-            label = { Text(stringResource(R.string.today_review_queue), maxLines = 1) },
-            leadingIcon = {
-                Icon(ClawIcons.Checklist, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
-            },
-        )
-        AssistChip(
-            onClick = onNavigateToRuns,
-            label = { Text(stringResource(R.string.today_agent_runs), maxLines = 1) },
-            leadingIcon = {
-                Icon(ClawIcons.Chat, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
-            },
-        )
+    var open by rememberSaveable { mutableStateOf(initiallyOpen) }
+    val openState = stringResource(if (open) R.string.today_agent_line_open else R.string.today_agent_line_closed)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(MaterialTheme.shapes.small)
+                .clickable { open = !open }
+                .semantics { stateDescription = openState }
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.today_agent_line, reviewCount, runCount),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        ClawExpand(visible = open) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                briefing?.let { BriefingLines(it) }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onNavigateToReview) { Text(stringResource(R.string.today_review_queue)) }
+                    TextButton(onClick = onNavigateToRuns) { Text(stringResource(R.string.today_agent_runs)) }
+                }
+            }
+        }
     }
 }
 
+/** The day's briefing, in plain lines under the agent line. */
 @Composable
-private fun TodayHeroCard(
-    greeting: String,
-    completedTasks: Int,
-    totalTasks: Int,
-    eventCount: Int,
-    inboxCount: Int,
-    showInbox: Boolean,
-) {
-    val summary = when {
-        totalTasks > 0 -> pluralStringResource(
-            R.plurals.today_tasks_done_summary,
-            totalTasks,
-            completedTasks,
-            totalTasks,
-        )
-        eventCount > 0 -> pluralStringResource(
-            R.plurals.today_events_summary,
-            eventCount,
-            eventCount,
-        )
-        showInbox && inboxCount > 0 -> pluralStringResource(
-            R.plurals.today_inbox_summary,
-            inboxCount,
-            inboxCount,
-        )
-        showInbox -> stringResource(R.string.today_shape_day_hint)
-        else -> stringResource(R.string.today_shape_day_hint_local)
+private fun BriefingLines(briefing: BriefingResponse) {
+    val summary = briefing.summary.ifBlank { briefing.loadMessage }
+    if (summary.isNotBlank()) {
+        Text(summary, style = MaterialTheme.typography.bodyMedium)
     }
-    val taskMetric = pluralStringResource(
-        R.plurals.today_metric_tasks,
-        totalTasks,
-        completedTasks,
-        totalTasks,
-    )
-    val eventMetric = pluralStringResource(
-        R.plurals.today_metric_events,
-        eventCount,
-        eventCount,
-    )
-    val inboxMetric = pluralStringResource(
-        R.plurals.today_metric_inbox,
-        inboxCount,
-        inboxCount,
-    )
-    val progressDescription = pluralStringResource(
-        R.plurals.today_progress_accessibility,
-        totalTasks,
-        completedTasks,
-        totalTasks,
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = greeting,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
+    if (briefing.loadAssessment.isNotBlank()) {
+        ClawStatusChip(
+            text = loadAssessmentLabel(briefing.loadAssessment),
+            tone = loadTone(briefing.loadAssessment),
         )
+    }
+    briefing.highlights.take(3).forEach { highlight ->
         Text(
-            text = summary,
+            "· $highlight",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (totalTasks > 0) {
-            LinearProgressIndicator(
-                progress = { completedTasks.toFloat() / totalTasks.toFloat() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { contentDescription = progressDescription },
-            )
-        }
+    }
+    briefing.suggestions.forEach { suggestion ->
         Text(
-            text = if (showInbox) {
-                stringResource(
-                    R.string.today_metrics_format,
-                    taskMetric,
-                    eventMetric,
-                    inboxMetric,
-                )
-            } else {
-                stringResource(
-                    R.string.today_metrics_without_inbox_format,
-                    taskMetric,
-                    eventMetric,
-                )
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            stringResource(R.string.today_suggestion_line, suggestionActionLabel(suggestion.action), suggestion.title),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
-        // Capture is the FAB and the inbox has its own section with an
-        // "Open inbox" action, so the hero no longer repeats them as buttons.
     }
 }
 
 @Composable
 private fun TodoSectionCard(
     title: String,
-    subtitle: String,
     todos: List<Todo>,
     tone: ClawTone,
     onToggle: (String) -> Unit,
@@ -497,7 +405,6 @@ private fun TodoSectionCard(
         header = {
             ClawSectionHeader(
                 title = title,
-                subtitle = subtitle,
                 count = todos.size,
             )
         },
@@ -603,7 +510,6 @@ private fun EventSectionCard(events: List<Event>) {
         header = {
             ClawSectionHeader(
                 title = stringResource(R.string.today_calendar_title),
-                subtitle = stringResource(R.string.today_calendar_subtitle),
                 count = events.size,
             )
         },
@@ -652,182 +558,6 @@ private fun EventRow(event: Event) {
 }
 
 @Composable
-private fun InboxPreviewSection(
-    todos: List<Todo>,
-    totalInboxCount: Int,
-    onNavigateToInbox: () -> Unit,
-    onOpenTask: (String) -> Unit,
-) {
-    ClawListSection(
-        tone = ClawTone.Warning,
-        header = {
-            ClawSectionHeader(
-                title = stringResource(R.string.today_needs_review_title),
-                subtitle = stringResource(R.string.today_needs_review_subtitle),
-                count = totalInboxCount,
-                actionLabel = stringResource(R.string.today_open_inbox),
-                onActionClick = onNavigateToInbox,
-            )
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-            todos.forEach { todo ->
-                ClawListItemSurface(onClick = { onOpenTask(todo.id) }) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ClawIconTile(icon = ClawIcons.Inbox, size = 40.dp)
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                text = todo.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val planSummary = todo.planSummary
-                            if (!planSummary.isNullOrBlank()) {
-                                Text(
-                                    text = planSummary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        ClawStatusChip(
-                            text = when (todo.inboxState) {
-                                "plan_ready" -> stringResource(R.string.today_inbox_state_review)
-                                else -> stringResource(R.string.today_inbox_state_organize)
-                            },
-                            tone = ClawTone.Warning,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BriefingSection(briefing: BriefingResponse) {
-    val suggestionCount = briefing.suggestions.size
-    ClawListSection(
-        header = {
-            ClawSectionHeader(
-                title = stringResource(R.string.today_briefing_title),
-                subtitle = briefing.loadMessage.ifBlank {
-                    stringResource(R.string.today_briefing_fallback)
-                },
-                count = suggestionCount.takeIf { it > 0 },
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ClawStatusChip(
-                    text = loadAssessmentLabel(briefing.loadAssessment),
-                    tone = loadTone(briefing.loadAssessment),
-                )
-                if (briefing.highlights.isNotEmpty()) {
-                    ClawStatusChip(
-                        text = pluralStringResource(
-                            R.plurals.today_highlight_count,
-                            briefing.highlights.size,
-                            briefing.highlights.size,
-                        ),
-                        tone = ClawTone.Default,
-                    )
-                }
-            }
-            if (briefing.summary.isNotBlank()) {
-                Text(
-                    text = briefing.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-    ) {
-        if (briefing.highlights.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                briefing.highlights.take(3).forEach { highlight ->
-                    ClawListItemSurface {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                ClawIcons.Today,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = highlight,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        if (briefing.suggestions.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                briefing.suggestions.forEach { suggestion ->
-                    SuggestionActionCard(suggestion = suggestion)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
-    ClawListItemSurface {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = suggestion.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (suggestion.reason.isNotBlank()) {
-                    Text(
-                        text = suggestion.reason,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            ClawStatusChip(
-                text = suggestionActionLabel(suggestion.action),
-                tone = ClawTone.Primary,
-            )
-        }
-    }
-}
-
-@Composable
 private fun reminderLabel(minutes: Int): String = when {
     minutes >= 1440 && minutes % 1440 == 0 -> {
         val days = minutes / 1440
@@ -857,15 +587,6 @@ private fun suggestionActionLabel(action: String): String = when (action.lowerca
     "break_down" -> stringResource(R.string.today_suggestion_break_down)
     "prioritize" -> stringResource(R.string.today_suggestion_prioritize)
     else -> action.replace('_', ' ')
-}
-
-@Composable
-private fun localizedGreeting(greeting: String): String = when (greeting.trim().lowercase()) {
-    "good morning", "good morning!" -> stringResource(R.string.today_greeting_morning)
-    "good afternoon", "good afternoon!" -> stringResource(R.string.today_greeting_afternoon)
-    "good evening", "good evening!" -> stringResource(R.string.today_greeting_evening)
-    "" -> stringResource(R.string.today_ready_when_you_are)
-    else -> greeting
 }
 
 @Composable

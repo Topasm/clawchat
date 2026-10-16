@@ -9,13 +9,19 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.repository.AgentRunRepository
+import com.clawchat.android.core.data.repository.ReviewRepository
 import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -26,15 +32,15 @@ import kotlinx.coroutines.delay
 
 private const val TAG = "TodayViewModel"
 
+/** Today in three blocks: what is overdue, what is due today, and the day's events. */
 data class TodayUiState(
-    val greeting: String = "",
     val todayTodos: List<Todo> = emptyList(),
     val overdueTodos: List<Todo> = emptyList(),
     val todayEvents: List<Event> = emptyList(),
-    /** Pending tasks with no due date — neither today's nor overdue. */
-    val needsDateTodos: List<Todo> = emptyList(),
-    val inboxCount: Int = 0,
-    val inboxPreview: List<Todo> = emptyList(),
+    /** Agent results waiting for review, folded into one line at the top. */
+    val reviewCount: Int = 0,
+    /** Agent runs queued or running now. */
+    val runCount: Int = 0,
     val briefing: BriefingResponse? = null,
     val isBriefingLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -60,6 +66,9 @@ class TodayViewModel @Inject constructor(
     private val todayRepository: TodayRepository,
     private val todoRepository: TodoRepository,
     private val syncManager: SyncManager,
+    private val reviewRepository: ReviewRepository,
+    private val agentRunRepository: AgentRunRepository,
+    private val sessions: SessionStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TodayUiState())
@@ -69,8 +78,11 @@ class TodayViewModel @Inject constructor(
     init {
         doRefresh()
         fetchBriefing()
+        refreshAgentWork()
         viewModelScope.launch { syncManager.todoChanged.collect { doRefresh() } }
         viewModelScope.launch { syncManager.eventChanged.collect { doRefresh() } }
+        viewModelScope.launch { syncManager.reviewChanged.collect { refreshAgentWork() } }
+        viewModelScope.launch { syncManager.runChanged.collect { refreshAgentWork() } }
     }
 
     fun onAction(action: TodayAction) {
@@ -84,7 +96,10 @@ class TodayViewModel @Inject constructor(
     }
 
     // Public convenience methods — delegate to onAction for Screen composable compatibility
-    fun refresh() = onAction(TodayAction.Refresh)
+    fun refresh() {
+        onAction(TodayAction.Refresh)
+        refreshAgentWork()
+    }
     fun toggleComplete(todoId: String) = onAction(TodayAction.ToggleComplete(todoId))
     fun deleteTask(todoId: String) = onAction(TodayAction.Delete(todoId))
     fun setDueToday(todoId: String) = onAction(TodayAction.SetDueToday(todoId))
@@ -99,33 +114,11 @@ class TodayViewModel @Inject constructor(
             when (val todayResult = todayRepository.getToday()) {
                 is ApiResult.Success -> {
                     val today = todayResult.data
-                    // Avoid a second workspace query when the authoritative
-                    // Today response says there is no inbox to preview. This
-                    // is always the case for the device-only workspace.
-                    val inboxPreviewItems = if (today.inboxCount == 0) {
-                        emptyList()
-                    } else {
-                        when (
-                            val todosResult = todoRepository.listTodos(mapOf("limit" to "200"))
-                        ) {
-                            is ApiResult.Success -> todosResult.data.items
-                                .filter { todo ->
-                                    todo.inboxState == "plan_ready" ||
-                                        todo.inboxState == "captured"
-                                }
-                                .take(3)
-                            else -> emptyList()
-                        }
-                    }
                     _uiState.update {
                         it.copy(
-                            greeting = today.greeting,
                             todayTodos = today.todayTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
                             overdueTodos = today.overdueTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
                             todayEvents = today.todayEvents,
-                            needsDateTodos = today.needsDateTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
-                            inboxCount = today.inboxCount,
-                            inboxPreview = inboxPreviewItems,
                             isRefreshing = false,
                             isOffline = false,
                             error = null,
@@ -159,9 +152,7 @@ class TodayViewModel @Inject constructor(
 
     private fun doToggleComplete(todoId: String) {
         viewModelScope.launch {
-            val allTodos = _uiState.value.todayTodos +
-                _uiState.value.overdueTodos +
-                _uiState.value.needsDateTodos
+            val allTodos = _uiState.value.todayTodos + _uiState.value.overdueTodos
             val todo = allTodos.find { it.id == todoId } ?: return@launch
             val newStatus = if (todo.status == TaskStatus.COMPLETED) {
                 TaskStatus.PENDING
@@ -179,9 +170,6 @@ class TodayViewModel @Inject constructor(
                             overdueTodos = state.overdueTodos.map {
                                 if (it.id == todoId) it.copy(status = newStatus) else it
                             },
-                            needsDateTodos = state.needsDateTodos.map {
-                                if (it.id == todoId) it.copy(status = newStatus) else it
-                            },
                         )
                     },
                     rollback = { state ->
@@ -190,9 +178,6 @@ class TodayViewModel @Inject constructor(
                                 if (it.id == todoId) it.copy(status = todo.status) else it
                             },
                             overdueTodos = state.overdueTodos.map {
-                                if (it.id == todoId) it.copy(status = todo.status) else it
-                            },
-                            needsDateTodos = state.needsDateTodos.map {
                                 if (it.id == todoId) it.copy(status = todo.status) else it
                             },
                         )
@@ -214,7 +199,6 @@ class TodayViewModel @Inject constructor(
             state.copy(
                 todayTodos = state.todayTodos.filter { it.id != todoId },
                 overdueTodos = state.overdueTodos.filter { it.id != todoId },
-                needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
                 pendingDeletion = pending,
             )
         }
@@ -261,13 +245,11 @@ class TodayViewModel @Inject constructor(
                 _uiState.optimistic(
                     update = { state ->
                         val movedItem = state.overdueTodos.find { it.id == todoId }
-                            ?: state.needsDateTodos.find { it.id == todoId }
                         if (movedItem != null) {
                             val updated = movedItem.copy(dueDate = today)
                             state.copy(
                                 todayTodos = state.todayTodos + updated,
                                 overdueTodos = state.overdueTodos.filter { it.id != todoId },
-                                needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
                             )
                         } else {
                             state.copy(
@@ -281,7 +263,6 @@ class TodayViewModel @Inject constructor(
                         originalState.copy(
                             todayTodos = originalState.todayTodos,
                             overdueTodos = originalState.overdueTodos,
-                            needsDateTodos = originalState.needsDateTodos,
                         )
                     },
                 ) {
@@ -309,6 +290,26 @@ class TodayViewModel @Inject constructor(
             }
         }
     }
+
+    /** Counts for the one agent line; a device-only workspace has no agents to count. */
+    private fun refreshAgentWork() {
+        agentJob?.cancel()
+        agentJob = viewModelScope.launch {
+            if (sessions.runtimeState.first().mode != WorkspaceMode.SERVER) return@launch
+            val reviews = async { reviewRepository.listPending() }
+            val runs = async { agentRunRepository.listRuns(limit = 100) }
+            val reviewResult = reviews.await()
+            val runResult = runs.await()
+            _uiState.update { state ->
+                state.copy(
+                    reviewCount = (reviewResult as? ApiResult.Success)?.data?.size ?: state.reviewCount,
+                    runCount = (runResult as? ApiResult.Success)?.data?.count { it.status.isExecuting } ?: state.runCount,
+                )
+            }
+        }
+    }
+
+    private var agentJob: Job? = null
 
     private fun doCreateTask(input: TodoCreate) {
         val title = input.title.trim()

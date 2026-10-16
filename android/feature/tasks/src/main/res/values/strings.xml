@@ -17,6 +17,7 @@
 
     <string name="tasks_detail_title">Task detail</string>
     <string name="tasks_cd_back">Back</string>
+    <string name="tasks_more_actions">More actions</string>
     <string name="tasks_cd_delete">Delete task</string>
     <string name="tasks_deleted">Task deleted</string>
     <string name="tasks_undo">Undo</string>

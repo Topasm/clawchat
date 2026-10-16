@@ -25,7 +25,7 @@ class InboxRoutingRepositoryTest {
 
     @Test fun `load keeps open captures in the web's order and notes each task's project`() = runTest {
         coEvery { api.listInboxRoutings(owner) } returns InboxRoutingList(listOf(routing))
-        coEvery { api.listTodos(mapOf("limit" to "200"), owner) } returns PaginatedResponse(items = listOf(
+        coEvery { api.listTodos(mapOf("limit" to "200", "page" to "1"), owner) } returns PaginatedResponse(items = listOf(
             Todo("captured", "Captured", inboxState = "captured"),
             Todo("filed", "Slides", inboxState = "none", projectId = "p"),
             Todo("failed", "Failed", inboxState = "error"),
@@ -41,6 +41,16 @@ class InboxRoutingRepositoryTest {
         assertEquals(listOf("reading", "failed", "captured"), result.data.captures.map { it.id })
         assertEquals("p", result.data.projectOf["filed"])
         assertTrue(result.data.candidates.isEmpty())
+        assertFalse(result.data.hasMoreTodos)
+    }
+
+    @Test fun `scrolling further reads the next page of todos`() = runTest {
+        coEvery { api.listTodos(mapOf("limit" to "200", "page" to "2"), owner) } returns PaginatedResponse(
+            items = listOf(Todo("old", "Old capture", inboxState = "captured")), total = 401,
+        )
+        val page = (repository.loadMoreCaptures("server-a", 2) as ApiResult.Success).data
+        assertEquals(listOf("old"), page.captures.map { it.id })
+        assertTrue(page.hasMore)
     }
 
     @Test fun `placing a task goes to the project root at the current graph revision`() = runTest {

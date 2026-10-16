@@ -16,6 +16,15 @@ class InboxListsFormatTest {
         assertNull(inboxShortDay("soon", Locale.US, seoul))
     }
 
+    @Test fun `only a classifier that was unsure marks a row`() {
+        val routing = com.clawchat.android.core.data.model.InboxRouting(
+            id = "r", origin = "auto", kind = "note", title = "Idea", originalTitle = "Idea", createdAt = "2030-11-01T09:00:00Z",
+        )
+        assertEquals(false, routing.isLowConfidence)
+        assertEquals(true, routing.copy(kindConfidence = 0.62).isLowConfidence)
+        assertEquals(false, routing.copy(kindConfidence = 0.8).isLowConfidence)
+    }
+
     @Test fun `a vault folder is named by its last segment`() {
         assertEquals("Thesis", inboxFolderName("01_Projects/Thesis/"))
         assertNull(inboxFolderName(null))

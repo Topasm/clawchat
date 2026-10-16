@@ -26,4 +26,16 @@
     <string name="inbox_empty_title">Inbox is clear</string>
     <string name="inbox_empty_description">Write a task or a note below.</string>
     <string name="inbox_delete">Delete</string>
+    <string name="inbox_low_confidence">Filed with low confidence</string>
+    <string name="inbox_moved_to_task">Moved to tasks</string>
+    <string name="inbox_moved_to_note">Moved to notes</string>
+    <string name="inbox_moved_to_project">Moved to the project</string>
+    <plurals name="inbox_moved_many_to_task">
+        <item quantity="one">Moved %1$d to tasks</item>
+        <item quantity="other">Moved %1$d to tasks</item>
+    </plurals>
+    <plurals name="inbox_moved_many_to_note">
+        <item quantity="one">Moved %1$d to notes</item>
+        <item quantity="other">Moved %1$d to notes</item>
+    </plurals>
 </resources>

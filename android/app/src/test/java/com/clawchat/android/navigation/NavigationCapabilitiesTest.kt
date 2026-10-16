@@ -13,6 +13,20 @@ class NavigationCapabilitiesTest {
         assertFalse(NavRoute.Progress.route in NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER))
     }
 
+    @Test fun `the drawer reads inbox, tasks, schedule, chat, then the rest`() {
+        assertEquals(
+            listOf(
+                listOf(NavRoute.Inbox.route, NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Chat.route),
+                listOf(NavRoute.Projects.route, NavRoute.Progress.route, NavRoute.Devices.route, NavRoute.Search.route, NavRoute.Settings.route),
+            ),
+            NavigationCapabilities.drawerGroups(WorkspaceMode.SERVER),
+        )
+        assertEquals(
+            listOf(NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Search.route, NavRoute.Settings.route),
+            NavigationCapabilities.drawerRoutes(WorkspaceMode.LOCAL),
+        )
+    }
+
     @Test fun `settings stays available as a drawer detail destination in both workspaces`() {
         for (mode in listOf(WorkspaceMode.LOCAL, WorkspaceMode.SERVER)) {
             assertTrue(NavRoute.Settings.route in NavigationCapabilities.drawerRoutes(mode))
