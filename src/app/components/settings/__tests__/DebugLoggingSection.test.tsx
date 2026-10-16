@@ -63,8 +63,8 @@ describe('debug controls', () => {
     act(() => recordDebug({ event: 'response', resource: 'todos', status: 503 }));
     expect(screen.getByLabelText('Diagnostic log')).toHaveTextContent('503');
     fireEvent.click(screen.getByRole('switch'));
-    act(() => recordDebug({ event: 'response', status: 418 }));
-    expect(screen.getByLabelText('Diagnostic log')).not.toHaveTextContent('418');
+    act(() => recordDebug({ event: 'response', resource: 'after-stop', status: 418 }));
+    expect(screen.getByLabelText('Diagnostic log')).not.toHaveTextContent('after-stop');
     fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('button', { name: 'Clear diagnostic logs' }));
     expect(getDebugSnapshot().entries).toHaveLength(0);
