@@ -1,12 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../stores/useToastStore';
 import {
-  queryKeys,
-  useCreateProject,
   useInboxMove,
-  useInboxProjectCandidatesQuery,
   useInboxRoutingsQuery,
   useProjectsQuery,
   useTaskGraphInsightsQuery,
@@ -15,13 +11,11 @@ import {
 } from '../hooks/queries';
 import { useNoteAction } from '../hooks/queries/useNoteQueries';
 import InboxQueue from '../components/inbox/InboxQueue';
-import InboxProjectCandidates from '../components/inbox/InboxProjectCandidates';
 import InboxCaptureBar from '../components/inbox/InboxCaptureBar';
 import { inboxErrorMessage } from '../components/inbox/inboxErrors';
 import useInboxGraphRevision from '../hooks/useInboxGraphRevision';
 import useInboxPlacement from '../hooks/useInboxPlacement';
 import useInboxSections from '../hooks/useInboxSections';
-import type { ProjectFolderCandidate } from '../types/schemas';
 import { translateUi } from '../i18n';
 import useInboxCapture from '../hooks/useInboxCapture';
 
@@ -32,12 +26,10 @@ import useInboxCapture from '../hooks/useInboxCapture';
  */
 export default function InboxPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
   const { data: todos = [] } = useTodosQuery();
   const { data: projects = [] } = useProjectsQuery();
   const routings = useInboxRoutingsQuery();
-  const candidates = useInboxProjectCandidatesQuery();
   const graphInsights = useTaskGraphInsightsQuery(null);
   const { placementRevision, setPlacementRevision } = useInboxGraphRevision(graphInsights);
   const placement = useInboxPlacement({
@@ -51,7 +43,6 @@ export default function InboxPage() {
   const move = useInboxMove();
   const noteAction = useNoteAction();
   const { capture, busy: capturing } = useInboxCapture();
-  const createProject = useCreateProject();
 
   const review = useMemo(
     () => [
@@ -74,16 +65,6 @@ export default function InboxPage() {
     });
   const runMoves = async (moves: InboxMove[]) => {
     for (const next of moves) await runMove(next);
-  };
-
-  const importCandidate = (candidate: ProjectFolderCandidate) => {
-    createProject.mutate(
-      { title: candidate.name, description: candidate.folder },
-      {
-        onSuccess: () =>
-          void queryClient.invalidateQueries({ queryKey: queryKeys.inboxProjectCandidates }),
-      },
-    );
   };
 
   const busy = move.isPending || noteAction.isPending || placement.isPlacing;
@@ -111,11 +92,6 @@ export default function InboxPage() {
           }
           onOpenTask={(todoId) => navigate(`/tasks/${todoId}`)}
           onOpenNotes={() => navigate('/notes')}
-        />
-        <InboxProjectCandidates
-          candidates={candidates.data ?? []}
-          busy={createProject.isPending}
-          onImport={importCandidate}
         />
       </div>
       <InboxCaptureBar busy={capturing} onCapture={capture} />

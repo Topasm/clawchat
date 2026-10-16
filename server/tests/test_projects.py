@@ -396,6 +396,43 @@ async def test_startup_backfill_leaves_plain_captures_alone(db_session):
 
 
 @pytest.mark.asyncio
+async def test_a_task_with_steps_or_a_chat_stays_a_task_after_startup(db_session):
+    """Only a database from before Projects gets the structural guess, once.
+    Later a plain to-do with steps or an agent chat is still a to-do."""
+    await _backfill_first_class_projects(db_session)  # first start: nothing yet
+    await db_session.commit()
+
+    task = Todo(id="todo_task", title="Gpu 컴퓨팅 과제")
+    step = Todo(id="todo_step", title="커널 작성", parent_id=task.id)
+    paid = Todo(id="todo_paid", title="오늘 클로드 결제 하기")
+    db_session.add_all([task, step, paid])
+    await db_session.flush()
+    db_session.add(Conversation(id="conv_paid", title="결제", project_todo_id=paid.id))
+    await db_session.commit()
+
+    await _backfill_first_class_projects(db_session)
+    await db_session.commit()
+
+    assert (await db_session.execute(select(Project))).scalars().all() == []
+    await db_session.refresh(task)
+    assert task.project_id is None
+
+
+@pytest.mark.asyncio
+async def test_a_database_from_before_projects_promotes_its_workspaces_once(db_session):
+    root = Todo(id="todo_old_root", title="Thesis")
+    child = Todo(id="todo_old_child", title="Write", parent_id=root.id)
+    db_session.add_all([root, child])
+    await db_session.commit()
+
+    await _backfill_first_class_projects(db_session)
+    await db_session.commit()
+
+    [project] = (await db_session.execute(select(Project))).scalars().all()
+    assert project.root_task_id == root.id
+
+
+@pytest.mark.asyncio
 async def test_legacy_root_todo_backfill_is_idempotent(db_session):
     root = Todo(
         id="todo_legacy_root", title="Legacy project", source="obsidian_project"

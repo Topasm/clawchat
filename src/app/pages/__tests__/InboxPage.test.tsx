@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectResponse, TodoResponse } from '../../types/api';
-import type { InboxRouting, ProjectFolderCandidate } from '../../types/schemas';
+import type { InboxRouting } from '../../types/schemas';
 import InboxPage from '../InboxPage';
 
 const mocks = vi.hoisted(() => ({
@@ -264,23 +264,5 @@ describe('InboxPage', () => {
       inbox_state: 'classifying',
     });
     await waitFor(() => expect(input).toHaveValue(''));
-  });
-
-  it('offers vault project folders and imports one as a project', () => {
-    mocks.candidates = [
-      {
-        name: 'iclr_2027',
-        folder: '01_Projects/iclr_2027',
-        source_name: 'workspace',
-        has_todo: true,
-      } satisfies ProjectFolderCandidate,
-    ];
-    renderPage();
-    const panel = screen.getByRole('complementary', { name: 'Projects in your vault' });
-    fireEvent.click(within(panel).getByRole('button', { name: 'Import' }));
-    expect(mocks.createProject).toHaveBeenCalledWith(
-      { title: 'iclr_2027', description: '01_Projects/iclr_2027' },
-      expect.any(Object),
-    );
   });
 });

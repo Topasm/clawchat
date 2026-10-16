@@ -149,7 +149,7 @@ export default function ProjectCreateDialog({ open, onOpenChange }: ProjectCreat
             .addToast(
               'error',
               translateUi(
-                'Project created, but the folder could not be attached. Set it under "Where this runs".',
+                'Project created, but the folder could not be attached. Set it under "Folder on each device".',
               ),
             );
         }

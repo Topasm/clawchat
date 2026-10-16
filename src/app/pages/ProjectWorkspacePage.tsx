@@ -5,6 +5,7 @@ import {
   useGetOrCreateProjectConversation,
   useExecutionProvidersQuery,
   useProjectQuery,
+  useTaskExecutionTelemetryQuery,
   useTestExecutionProvider,
   useTodosQuery,
   useUpdateProject,
@@ -19,7 +20,6 @@ import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import { projectStatusLabel } from '../components/projects/projectStatus';
 import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
-import ProjectMachineLine from '../components/shared/ProjectMachineLine';
 import { useChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
 import { useChatContextStore } from '../hooks/useContextChat';
 import usePlatform from '../hooks/usePlatform';
@@ -31,7 +31,7 @@ import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import apiClient from '../services/apiClient';
 import { ConversationResponseSchema } from '../types/schemas';
 
-type ProjectSection = 'plan' | 'activity' | 'files' | 'notes';
+type ProjectSection = 'plan' | 'activity' | 'files';
 
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams<{
@@ -45,11 +45,9 @@ export default function ProjectWorkspacePage() {
       ? 'activity'
       : requestedSection === 'files' || requestedSection === 'artifacts'
         ? 'files'
-        : requestedSection === 'notes'
-          ? 'notes'
-          : 'plan';
-  // Hosts, provider and rules live in a dialog: they are set once per project
-  // and were pushing the plan below the fold while open.
+        : 'plan';
+  // Provider, model and rules are advanced settings in a dialog, offered only
+  // once the project has work handed to an agent.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [], isLoading: areTodosLoading } = useTodosQuery();
@@ -70,6 +68,11 @@ export default function ProjectWorkspacePage() {
   const lifecycleGeneration = useRef(0);
   const currentPanelConversation = useRef(panelConversationId);
   currentPanelConversation.current = panelConversationId;
+  const { data: telemetry = [] } = useTaskExecutionTelemetryQuery(projectId);
+  const telemetryByTask = useMemo(
+    () => new Map(telemetry.map((entry) => [entry.task_id, entry])),
+    [telemetry],
+  );
   const projectTasks = useMemo(
     () =>
       todos
@@ -215,7 +218,16 @@ export default function ProjectWorkspacePage() {
       />
     );
   }
-  const revealWhereItRuns = () => setSettingsOpen(true);
+  // A project of the user's own work needs no execution settings; they come
+  // forward once something here is handed to an agent (or was set up before).
+  const hasDelegatedWork =
+    project.running_agent_count > 0 ||
+    project.pending_review_count > 0 ||
+    !!project.execution_host_id ||
+    !!project.default_execution_provider ||
+    projectTasks.some(
+      (task) => !!task.assignee || !!telemetryByTask.get(task.id)?.latest_run_status,
+    );
   // One grey line instead of a strip of four numbers; a zero says nothing.
   const overview = [
     project.ready_count > 0 ? translateUi('{{count}} ready', { count: project.ready_count }) : null,
@@ -244,17 +256,18 @@ export default function ProjectWorkspacePage() {
         </button>
         <div className="cc-project-workspace__identity-column">
           <ProjectIdentity project={project} />
-          <ProjectMachineLine project={project} onChange={revealWhereItRuns} />
         </div>
-        <button
-          type="button"
-          className="cc-icon-button"
-          aria-label={translateUi('Execution settings')}
-          title={translateUi('Execution settings')}
-          onClick={() => setSettingsOpen(true)}
-        >
-          <SettingsIcon size={16} />
-        </button>
+        {hasDelegatedWork && (
+          <button
+            type="button"
+            className="cc-icon-button"
+            aria-label={translateUi('Execution settings')}
+            title={translateUi('Execution settings')}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <SettingsIcon size={16} />
+          </button>
+        )}
         {/* Destructive and rare: an icon beside the primary action, not a
             second button competing with it. It still asks first. */}
         <button
@@ -285,7 +298,6 @@ export default function ProjectWorkspacePage() {
         title={translateUi('Execution settings')}
         className="cc-dialog__content--wide cc-project-settings-dialog"
       >
-        <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
         <ProjectExecutionSettings project={project} />
       </Dialog>
 
@@ -317,27 +329,27 @@ export default function ProjectWorkspacePage() {
         >
           {translateUi('Files')}
         </button>
-        <button
-          type="button"
-          className={`cc-project-workspace__tab${section === 'notes' ? ' cc-project-workspace__tab--active' : ''}`}
-          onClick={() => setSearchParams({ section: 'notes' })}
-        >
-          {translateUi('Notes')}
-        </button>
       </div>
 
-      {section === 'notes' ? (
-        <InboxNotesPanel projects={[project]} projectId={project.id} />
-      ) : section === 'files' ? (
+      {section === 'files' ? (
         <ProjectArtifacts projectId={project.id} />
       ) : section === 'activity' ? (
         <ProjectActivity project={project} todos={projectTasks} />
       ) : (
         <>
+          {/* The first screen: the project's folder on each device, its work,
+              then its notes. */}
+          <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
           {overview && <p className="cc-project-workspace__summary">{overview}</p>}
 
           <ProjectActivity project={project} todos={projectTasks} attentionOnly />
           <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
+          <section className="cc-project-workspace__section" aria-label={translateUi('Notes')}>
+            <div className="cc-project-workspace__section-header">
+              <h2>{translateUi('Notes')}</h2>
+            </div>
+            <InboxNotesPanel projects={[project]} projectId={project.id} compact />
+          </section>
         </>
       )}
     </div>

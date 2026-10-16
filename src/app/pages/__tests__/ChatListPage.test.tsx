@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import ChatListPage from '../ChatListPage';
 
@@ -17,7 +18,20 @@ const project = {
   completed_task_count: 0,
 };
 
+const mocks = vi.hoisted(() => ({ createProject: vi.fn() }));
+
 vi.mock('../../hooks/queries', () => ({
+  queryKeys: { inboxProjectCandidates: ['inbox-project-candidates'] },
+  useInboxProjectCandidatesQuery: () => ({
+    data: [
+      {
+        name: 'iclr_2027',
+        folder: '01_Projects/iclr_2027',
+        source_name: 'workspace',
+        has_todo: true,
+      },
+    ],
+  }),
   useConversationsQuery: () => ({
     data: [
       {
@@ -45,7 +59,11 @@ vi.mock('../../hooks/queries', () => ({
     ],
   }),
   useCreateConversation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCreateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateProject: () => ({
+    mutate: mocks.createProject,
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useExecutionHostsQuery: () => ({ data: [], isLoading: false }),
   useRegisterWorkerHost: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useBindProjectWorkspace: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -57,11 +75,13 @@ vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: false })
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/projects']}>
-      <Routes>
-        <Route path="/projects" element={<ChatListPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/projects']}>
+        <Routes>
+          <Route path="/projects" element={<ChatListPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -72,5 +92,21 @@ describe('ChatListPage scopes', () => {
     expect(screen.getByText(project.title)).toBeInTheDocument();
     expect(screen.getByText('Outside question')).toBeInTheDocument();
     expect(screen.queryByText('Project-only thread')).not.toBeInTheDocument();
+  });
+
+  it('has no quick chat button of its own', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: '+ Quick Chat' })).toBeNull();
+  });
+
+  it('offers vault project folders and imports one only when asked', () => {
+    renderPage();
+    const panel = screen.getByRole('region', { name: 'Projects in your vault' });
+    expect(mocks.createProject).not.toHaveBeenCalled();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Import' }));
+    expect(mocks.createProject).toHaveBeenCalledWith(
+      { title: 'iclr_2027', description: '01_Projects/iclr_2027' },
+      expect.any(Object),
+    );
   });
 });

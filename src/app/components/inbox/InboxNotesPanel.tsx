@@ -7,13 +7,15 @@ import { useAuthStore } from '../../stores/useAuthStore';
 interface Props {
   projects: { id: string; title: string }[];
   projectId?: string;
+  /** Inside a project: just its notes, without the board of projects to drop on. */
+  compact?: boolean;
 }
 export default function InboxNotesPanel(props: Props) {
   const server = useAuthStore((s) => s.serverUrl);
   return <NotesContent key={`${server}:${props.projectId ?? 'inbox'}`} {...props} />;
 }
 
-function NotesContent({ projects, projectId }: Props) {
+function NotesContent({ projects, projectId, compact = false }: Props) {
   const query = useNotesQuery();
   const mutation = useNoteAction();
   const [filter, setFilter] = useState<string | null>(projectId ?? null);
@@ -50,11 +52,15 @@ function NotesContent({ projects, projectId }: Props) {
 
   return (
     <section className="cc-notes" aria-label={translateUi('Notes')}>
-      <p className="cc-notes__hint">
-        {translateUi('Long-press a note and drop it on a project. Tap a project to see its notes.')}
-      </p>
+      {!compact && (
+        <p className="cc-notes__hint">
+          {translateUi(
+            'Long-press a note and drop it on a project. Tap a project to see its notes.',
+          )}
+        </p>
+      )}
       <DragDropContext onDragEnd={drop}>
-        <div className="cc-notes__projects">
+        <div className="cc-notes__projects" hidden={compact}>
           {destinations.map((project) => (
             <Droppable
               key={project.id}

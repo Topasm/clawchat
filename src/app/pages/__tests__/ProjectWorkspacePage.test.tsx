@@ -29,7 +29,7 @@ const project = {
   deadline: null,
   root_task_id: 'todo-root',
   graph_revision: 3,
-  default_execution_provider: 'builtin',
+  default_execution_provider: 'builtin' as string | null,
   default_execution_model: null,
   execution_workspace_path: null,
   execution_workspace_isolation: 'local',
@@ -63,6 +63,7 @@ vi.mock('../../hooks/queries', () => ({
   useUpdateProject: () => ({ mutate: mocks.updateProject, isPending: false }),
   useExecutionProvidersQuery: () => ({ data: [], isLoading: false }),
   useTestExecutionProvider: () => ({ mutate: vi.fn(), isPending: false }),
+  useTaskExecutionTelemetryQuery: () => ({ data: [] }),
 }));
 
 vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: mocks.isMobile }) }));
@@ -119,6 +120,8 @@ describe('ProjectWorkspacePage', () => {
     mocks.updateProject.mockReset();
     mocks.planTodos = [];
     project.description = null;
+    project.default_execution_provider = 'builtin';
+    project.running_agent_count = 0;
   });
 
   it('opens Project Agent only when asked (⌘K) and keeps the root out of the plan', async () => {
@@ -218,18 +221,44 @@ describe('ProjectWorkspacePage', () => {
     expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
-  it('uses only Plan, Activity, Files and Notes as workspace sections', () => {
+  it('uses only Plan, Activity and Files as workspace sections', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: 'Overview' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Runs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
     expect(screen.getByText('Project activity content')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
     expect(screen.getByText('Project files content')).toBeInTheDocument();
-    // The Inbox files ideas as notes; a project's own live here.
-    fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
-    expect(screen.getByText(`Notes for ${project.id}`)).toBeInTheDocument();
+  });
+
+  it('opens on the folder paths, the plan and the notes', () => {
+    renderPage();
+    const firstScreen = [
+      screen.getByText('Workspace settings'),
+      screen.getByText('Project plan content'),
+      screen.getByText(`Notes for ${project.id}`),
+    ];
+    // In that order, top to bottom.
+    expect(
+      firstScreen[0].compareDocumentPosition(firstScreen[1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      firstScreen[1].compareDocumentPosition(firstScreen[2]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('keeps execution settings out of the way until work is handed to an agent', () => {
+    project.default_execution_provider = null;
+    const { unmount } = renderPage();
+    expect(screen.queryByRole('button', { name: 'Execution settings' })).toBeNull();
+    unmount();
+
+    project.running_agent_count = 1;
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+    expect(screen.getByRole('dialog', { name: 'Execution settings' })).toBeInTheDocument();
   });
 
   it('shows the canonical document button only for a supported first description line', () => {
@@ -243,29 +272,6 @@ describe('ProjectWorkspacePage', () => {
     renderPage();
 
     expect(screen.getByRole('button', { name: 'Open original document' })).toBeInTheDocument();
-  });
-
-  it('opens the one workspace editor as a dialog from the machine line', () => {
-    renderPage();
-    expect(screen.queryByText('Workspace settings')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
-
-    expect(screen.getByRole('dialog', { name: 'Execution settings' })).toBeInTheDocument();
-    expect(screen.getAllByText('Workspace settings')).toHaveLength(1);
-  });
-
-  it.each(['Activity', 'Files'])('edits the workspace without leaving the %s tab', (tab) => {
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: tab }));
-    const content = screen.getByText(
-      tab === 'Files' ? 'Project files content' : 'Project activity content',
-    );
-    expect(content).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
-    expect(screen.getByText('Workspace settings')).toBeVisible();
-    expect(content).toBeInTheDocument();
-    expect(screen.queryByText('Project plan content')).not.toBeInTheDocument();
   });
 
   it('saves project-wide agent execution rules', () => {

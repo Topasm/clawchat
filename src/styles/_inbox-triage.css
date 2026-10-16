@@ -17,12 +17,6 @@
   align-items: start;
 }
 
-@media (min-width: 960px) {
-  .cc-inbox-layout:has(.cc-inbox-candidates) {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
-  }
-}
-
 .cc-inbox-queue {
   display: grid;
   gap: var(--cc-space-5);
@@ -245,9 +239,10 @@
   margin-right: auto;
 }
 
-.cc-inbox-candidates {
+.cc-project-candidates {
   display: grid;
   gap: var(--cc-space-1);
+  margin-top: var(--cc-space-5);
 }
 
 /* On the Inbox the bottom bar adds to the Inbox (the chat bar steps aside). */
