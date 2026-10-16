@@ -65,9 +65,9 @@ describe('AllTasksPage status flow', () => {
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('completed');
   });
 
-  it('opens the graph requested by a project deep link', () => {
+  it('opens the graph requested by a project deep link', async () => {
     renderPage('/tasks?view=graph&project_id=project-1');
 
-    expect(screen.getByText('Graph')).toBeInTheDocument();
+    expect(await screen.findByText('Graph')).toBeInTheDocument();
   });
 });

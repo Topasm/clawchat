@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 
 export interface ChatPanelPresentation {
@@ -98,16 +98,32 @@ export default function useChatPanel(): ChatPanelState {
     storeConversationId(quickConversationIdRef.current);
   }, [storeConversationId, updatePresentation]);
 
-  return {
-    isOpen,
-    conversationId,
-    presentation,
-    toggle,
-    open,
-    close,
-    setConversationId,
-    setPresentation: updatePresentation,
-    reset,
-    beginSelection,
-  };
+  // Shared through context with every page, so keep it stable between renders
+  // that change none of it.
+  return useMemo(
+    () => ({
+      isOpen,
+      conversationId,
+      presentation,
+      toggle,
+      open,
+      close,
+      setConversationId,
+      setPresentation: updatePresentation,
+      reset,
+      beginSelection,
+    }),
+    [
+      isOpen,
+      conversationId,
+      presentation,
+      toggle,
+      open,
+      close,
+      setConversationId,
+      updatePresentation,
+      reset,
+      beginSelection,
+    ],
+  );
 }

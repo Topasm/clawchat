@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   resolveExecutionSkillId,
@@ -21,12 +21,14 @@ import EmptyState from '../shared/EmptyState';
 import SegmentedControl from '../shared/SegmentedControl';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 import { describeTaskState } from '../task-list/TaskListView';
-import TaskGraph from '../task-graph/TaskGraph';
-import TaskGraphProposalDialog from '../task-graph/TaskGraphProposalDialog';
 import useOpenRunThread from '../../hooks/useOpenRunThread';
 import { useOptionalChatPanelController } from '../chat-panel/ChatPanelControllerContext';
 import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import { projectTaskAction } from './projectTaskAction';
+
+// React Flow is only needed for the flow view and the expand dialog, not the outline.
+const TaskGraph = lazy(() => import('../task-graph/TaskGraph'));
+const TaskGraphProposalDialog = lazy(() => import('../task-graph/TaskGraphProposalDialog'));
 
 type PlanView = 'outline' | 'flow';
 
@@ -182,16 +184,18 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             onSelectTask={setSelectedTaskId}
           />
         ) : (
-          <TaskGraph
-            todos={todos}
-            metadataTodos={todos}
-            relationships={relationships}
-            fixedProjectId={project.id}
-            showPlanningAction={false}
-            initialMode="execution"
-            selectedTaskId={selectedTaskId}
-            onSelectTask={setSelectedTaskId}
-          />
+          <Suspense fallback={null}>
+            <TaskGraph
+              todos={todos}
+              metadataTodos={todos}
+              relationships={relationships}
+              fixedProjectId={project.id}
+              showPlanningAction={false}
+              initialMode="execution"
+              selectedTaskId={selectedTaskId}
+              onSelectTask={setSelectedTaskId}
+            />
+          </Suspense>
         )}
 
         {selectedTask && (
@@ -265,13 +269,15 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
       </section>
 
       {proposalTarget && (
-        <TaskGraphProposalDialog
-          targets={[proposalTarget]}
-          initialTargetId={proposalTarget.id}
-          onOpenChange={(open) => {
-            if (!open) setProposalTarget(null);
-          }}
-        />
+        <Suspense fallback={null}>
+          <TaskGraphProposalDialog
+            targets={[proposalTarget]}
+            initialTargetId={proposalTarget.id}
+            onOpenChange={(open) => {
+              if (!open) setProposalTarget(null);
+            }}
+          />
+        </Suspense>
       )}
     </>
   );

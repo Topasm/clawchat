@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   TASK_STATUS_FILTERS,
@@ -8,7 +8,9 @@ import {
 import { useTasksShortcuts } from '../keyboard';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import TaskListPage from '../components/task-list/TaskListPage';
-import TaskGraphPage from '../components/task-graph/TaskGraphPage';
+
+// The graph view pulls in React Flow; the list view must not pay for it.
+const TaskGraphPage = lazy(() => import('../components/task-graph/TaskGraphPage'));
 
 const TASKS_VIEW_STORAGE_KEY = 'clawchat.tasksView';
 
@@ -56,7 +58,13 @@ export default function AllTasksPage() {
     onStatusFilterChange: setStatusFilter,
   };
   const content =
-    viewMode === 'graph' ? <TaskGraphPage {...sharedProps} /> : <TaskListPage {...sharedProps} />;
+    viewMode === 'graph' ? (
+      <Suspense fallback={null}>
+        <TaskGraphPage {...sharedProps} />
+      </Suspense>
+    ) : (
+      <TaskListPage {...sharedProps} />
+    );
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     event.stopPropagation();

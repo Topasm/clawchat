@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useToastStore } from '../../stores/useToastStore';
 import Toast from './Toast';
 
@@ -10,7 +10,7 @@ export default function ToastContainer() {
     <div className="cc-toast-container">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
-          <motion.div
+          <m.div
             key={toast.id}
             layout
             initial={{ opacity: 0, x: 40, scale: 0.95 }}
@@ -19,7 +19,7 @@ export default function ToastContainer() {
             transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
           >
             <Toast toast={toast} />
-          </motion.div>
+          </m.div>
         ))}
       </AnimatePresence>
     </div>,

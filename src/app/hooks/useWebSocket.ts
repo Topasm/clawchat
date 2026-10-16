@@ -21,6 +21,7 @@ import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
 import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
 import { invalidateModuleQueries } from './queries/invalidateModuleQueries';
+import { createRunQueryRefresher } from './queries/runQueryRefresh';
 import { translateUi } from '../i18n';
 /**
  * Connects to the server WebSocket on mount and wires up event handlers
@@ -35,6 +36,7 @@ export default function useWebSocket(): void {
     wsClient.connect(serverUrl, token);
     const invalidateExecutionTelemetry = () =>
       void queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
+    const runRefresh = createRunQueryRefresher(queryClient);
     // Sync connection status to auth store
     const unsubStatus = wsClient.onStatusChange((status) => {
       useAuthStore.getState().setConnectionStatus(status);
@@ -137,10 +139,7 @@ export default function useWebSocket(): void {
         result: d.result,
         run_id: d.run_id ?? undefined,
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
-      invalidateExecutionTelemetry();
+      runRefresh.runChanged(d.run_id);
     };
     const handleTaskFailed = (data: unknown) => {
       const d = data as {
@@ -153,8 +152,7 @@ export default function useWebSocket(): void {
         error: d.error,
         run_id: d.run_id ?? undefined,
       });
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
-      invalidateExecutionTelemetry();
+      runRefresh.runChanged(d.run_id);
     };
     const handleRunStateChanged = (data: unknown) => {
       const d = data as {
@@ -179,10 +177,7 @@ export default function useWebSocket(): void {
           review_id: d.review_id ?? undefined,
         });
       }
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      invalidateExecutionTelemetry();
+      runRefresh.runChanged(d.run_id);
       // Sub-task runs report through their parent; only top-level runs get a voice.
       if (d.parent_task_id) return;
       const title = d.title || translateUi('Agent run');
@@ -229,8 +224,9 @@ export default function useWebSocket(): void {
       };
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', d);
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
-      invalidateExecutionTelemetry();
+      // Progress moves no run's state; the run lists poll while a run is
+      // active, so only that run's event log needs a refetch.
+      runRefresh.runProgressed((data as { run_id?: string | null }).run_id);
     };
     // --- AI stream events (from orchestrator /send path) ---
     const handleStreamStart = (data: unknown) => {
@@ -418,6 +414,7 @@ export default function useWebSocket(): void {
     wsClient.on('conversation_updated', handleConversationUpdated);
     return () => {
       disposed = true;
+      runRefresh.dispose();
       unsubNotifAction?.();
       unsubStatus();
       wsClient.off('tick', handleLivenessNoop);

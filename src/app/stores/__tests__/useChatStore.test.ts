@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useChatStore, type ChatMessage } from '../useChatStore';
+import { flushChatSessionStorage, useChatStore, type ChatMessage } from '../useChatStore';
 
 function message(id: string, text = 'Hello'): ChatMessage {
   return {
@@ -12,8 +12,9 @@ function message(id: string, text = 'Hello'): ChatMessage {
 
 describe('useChatStore', () => {
   beforeEach(() => {
-    localStorage.clear();
     useChatStore.getState().resetToDemo();
+    flushChatSessionStorage();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -123,6 +124,7 @@ describe('useChatStore', () => {
       conversationId: 'conversation-1',
       deliveryStatus: 'streaming',
     });
+    flushChatSessionStorage();
     const persisted = localStorage.getItem('chat-session-storage:v1');
     expect(persisted).not.toBeNull();
 
@@ -156,8 +158,62 @@ describe('useChatStore', () => {
 
     expect(() => {
       useChatStore.getState().setDraft('conversation-1', 'still in memory');
+      flushChatSessionStorage();
     }).not.toThrow();
     expect(useChatStore.getState().drafts['conversation-1']).toBe('still in memory');
+  });
+
+  it('writes streamed tokens to storage at most once a second', () => {
+    vi.useFakeTimers();
+    try {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem');
+      const store = useChatStore.getState();
+      store.addStreamingMessage({
+        ...message('stream-1', ''),
+        conversationId: 'conversation-1',
+        deliveryStatus: 'streaming',
+      });
+      for (let i = 0; i < 50; i += 1) store.appendToMessage('stream-1', 'x');
+      store.setDraft('conversation-1', 'typing');
+
+      expect(setItem).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1000);
+
+      expect(setItem).toHaveBeenCalledOnce();
+      const saved = JSON.parse(localStorage.getItem('chat-session-storage:v1')!);
+      expect(saved.state.streamingMessages[0].text).toBe('x'.repeat(50));
+      expect(saved.state.drafts).toEqual({ 'conversation-1': 'typing' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('flushes the pending snapshot when the page hides', () => {
+    useChatStore.getState().setDraft('conversation-1', 'before close');
+    expect(localStorage.getItem('chat-session-storage:v1')).toBeNull();
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    const saved = JSON.parse(localStorage.getItem('chat-session-storage:v1')!);
+    expect(saved.state.drafts).toEqual({ 'conversation-1': 'before close' });
+  });
+
+  it('leaves state untouched when reconciling removes nothing', () => {
+    const store = useChatStore.getState();
+    store.addStreamingMessage({
+      ...message('local-1'),
+      conversationId: 'conversation-1',
+      deliveryStatus: 'pending',
+    });
+    const before = useChatStore.getState();
+    const listener = vi.fn();
+    const unsubscribe = useChatStore.subscribe(listener);
+
+    store.reconcileMessages('conversation-1', new Set(['server-9']));
+
+    unsubscribe();
+    expect(listener).not.toHaveBeenCalled();
+    expect(useChatStore.getState()).toBe(before);
   });
 
   it('merges task progress updates', () => {

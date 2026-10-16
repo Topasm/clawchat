@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useOutlet } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 
 export default function AnimatedOutlet() {
   const location = useLocation();
@@ -18,29 +17,15 @@ export default function AnimatedOutlet() {
     return () => media.removeEventListener('change', onChange);
   }, []);
 
-  // Freeze the current outlet so it stays rendered during exit animation
-  // (React Router v7 returns null for the old route on navigate)
-  // `outlet` is intentionally keyed only by pathname; including it would
-  // replace the exiting route before AnimatePresence finishes its transition.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const frozenOutlet = useMemo(() => outlet, [location.pathname]);
-
   if (isMobile) {
     return <>{outlet}</>;
   }
 
+  // Keyed by path so each route replays the CSS fade-in. The next route shows
+  // as soon as it renders instead of waiting for the previous one to fade out.
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        className="cc-route-transition"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 8 }}
-        transition={{ duration: 0.15, ease: 'easeInOut' }}
-      >
-        {frozenOutlet}
-      </motion.div>
-    </AnimatePresence>
+    <div key={location.pathname} className="cc-route-transition">
+      {outlet}
+    </div>
   );
 }

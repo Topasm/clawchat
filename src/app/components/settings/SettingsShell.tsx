@@ -8,6 +8,7 @@ import { readSettingsReturnTo, settingsNavigationState } from '../../services/se
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useHostSessionStore } from '../../stores/useHostSessionStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import MotionProvider from '../shared/MotionProvider';
 import ToastContainer from '../shared/ToastContainer';
 
 type SettingsPane = 'general' | 'workspace' | 'connections' | 'diagnostics' | 'server';
@@ -136,7 +137,9 @@ export default function SettingsShell({
           {children}
         </main>
       </div>
-      <ToastContainer />
+      <MotionProvider>
+        <ToastContainer />
+      </MotionProvider>
     </div>
   );
 }

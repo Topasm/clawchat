@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { createThrottledPersistStorage } from './throttledPersistStorage';
 import { useAuthStore } from './useAuthStore';
 import { useToastStore } from './useToastStore';
 import { connectSSE, type ToolActivity } from '../services/sseClient';
@@ -10,30 +11,14 @@ import { queryClient } from '../config/queryClient';
 import { invalidateModuleQueries } from '../hooks/queries/invalidateModuleQueries';
 import { translateUi } from '../i18n';
 const MAX_MESSAGES = 500;
-const chatSessionStorage = createJSONStorage(() => ({
-  getItem: (name: string) => {
-    try {
-      return localStorage.getItem(name);
-    } catch {
-      return null;
-    }
-  },
-  setItem: (name: string, value: string) => {
-    try {
-      localStorage.setItem(name, value);
-    } catch {
-      // Persistence is a recovery layer. In-memory chat must keep working if
-      // storage is unavailable or full.
-    }
-  },
-  removeItem: (name: string) => {
-    try {
-      localStorage.removeItem(name);
-    } catch {
-      // Best effort only.
-    }
-  },
-}));
+// Streaming tokens, task progress and draft keystrokes all set state, so the
+// persisted slice is written at most once a second (and when the page hides).
+const chatSessionStorage = createThrottledPersistStorage<Partial<ChatState>>(() => localStorage);
+
+/** Write the pending chat session snapshot to storage now. */
+export function flushChatSessionStorage() {
+  chatSessionStorage.flush();
+}
 let pendingRunTimer: ReturnType<typeof setTimeout> | null = null;
 function armPendingRunTimeout() {
   clearPendingRunTimeout();
@@ -247,12 +232,17 @@ export const useChatStore = create<ChatState>()(
           streamingActivity: streaming ? state.streamingActivity : null,
         })),
       reconcileMessages: (conversationId, authoritativeIds) =>
-        set((state) => ({
-          streamingMessages: state.streamingMessages.filter(
+        set((state) => {
+          const streamingMessages = state.streamingMessages.filter(
             (message) =>
               message.conversationId !== conversationId || !authoritativeIds.has(message._id),
-          ),
-        })),
+          );
+          // Every message refetch reconciles; leave subscribers alone when it
+          // removed nothing.
+          return streamingMessages.length === state.streamingMessages.length
+            ? state
+            : { streamingMessages };
+        }),
       markMessageFailed: (messageId) =>
         set((state) => ({
           streamingMessages: state.streamingMessages.map((message) =>

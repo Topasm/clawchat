@@ -1,7 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import useChatPanel from '../useChatPanel';
-import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
+import {
+  flushChatSessionStorage,
+  getChatWorkspaceScope,
+  useChatStore,
+} from '../../stores/useChatStore';
 
 describe('useChatPanel', () => {
   it('invalidates earlier selections across callers, direct opens and closing', () => {
@@ -20,6 +24,16 @@ describe('useChatPanel', () => {
     useChatStore.getState().setCurrentConversationId(null);
   });
 
+  it('returns the same controller until something in it changes', () => {
+    const { result, rerender } = renderHook(() => useChatPanel());
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+    act(() => result.current.toggle());
+    expect(result.current).not.toBe(first);
+    expect(result.current.isOpen).toBe(true);
+  });
+
   it('remembers each project run across panel reset and persistence rehydration', async () => {
     const { result } = renderHook(() => useChatPanel());
     act(() => {
@@ -29,6 +43,7 @@ describe('useChatPanel', () => {
       result.current.open('run-b', { projectId: 'b', kind: 'run', title: 'Task Agent' });
       result.current.reset();
     });
+    flushChatSessionStorage();
     await act(async () => {
       await useChatStore.persist.rehydrate();
     });

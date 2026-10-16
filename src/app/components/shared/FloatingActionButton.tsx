@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import apiClient from '../../services/apiClient';
 import { queryClient } from '../../config/queryClient';
@@ -108,7 +108,7 @@ export default function FloatingActionButton({ aboveChatBar = false }: { aboveCh
     <>
       <AnimatePresence>
         {expanded && (
-          <motion.div
+          <m.div
             className="cc-fab__backdrop"
             onClick={() => setExpanded(false)}
             initial={{ opacity: 0 }}
@@ -123,7 +123,7 @@ export default function FloatingActionButton({ aboveChatBar = false }: { aboveCh
           {expanded && (
             <div className="cc-fab__actions">
               {actions.map((action, i) => (
-                <motion.button
+                <m.button
                   key={action.label}
                   type="button"
                   className="cc-fab__action"
@@ -135,7 +135,7 @@ export default function FloatingActionButton({ aboveChatBar = false }: { aboveCh
                 >
                   {action.icon}
                   {action.label}
-                </motion.button>
+                </m.button>
               ))}
             </div>
           )}
