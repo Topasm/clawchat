@@ -8,7 +8,7 @@ import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
 import TodaySuggestions from './TodaySuggestions';
 import { ChevronRightIcon } from '../shared/Icons';
-import { GearIcon } from '../shared/NavIcons';
+import { GearIcon, TodayIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import type { BriefingData } from '../../hooks/useTodayBriefing';
@@ -69,10 +69,15 @@ export default function TodayView({
     .join(' · ');
   return (
     <div>
-      <div className="cc-page-header cc-today-header">
+      <div className="cc-page-header cc-page-header--flush cc-today-header">
         <div>
-          <h1 className="cc-page-header__title">{todayDate ? formatDate(todayDate) : ''}</h1>
-          {summary && <div className="cc-page-header__subtitle">{summary}</div>}
+          <h1 className="cc-page-header__title cc-page-header__title--icon">
+            <TodayIcon className="cc-page-header__icon cc-page-header__icon--today" />
+            {translateUi('Today')}
+          </h1>
+          <div className="cc-page-header__subtitle">
+            {[todayDate ? formatDate(todayDate) : '', summary].filter(Boolean).join(' · ')}
+          </div>
         </div>
         {isMobile && (
           <button

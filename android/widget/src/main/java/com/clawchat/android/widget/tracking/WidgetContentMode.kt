@@ -24,8 +24,13 @@ class SwitchWidgetContentAction : ActionCallback {
         parameters: ActionParameters,
     ) {
         val mode = parameters[MODE_KEY] ?: return
-        updateAppWidgetState(context, glanceId) { it[WidgetContentModeKey] = mode }
-        TodoTrackingWidget().update(context, glanceId)
+        var changed = false
+        updateAppWidgetState(context, glanceId) {
+            changed = it[WidgetContentModeKey] != mode
+            it[WidgetContentModeKey] = mode
+        }
+        // Tapping the tab already showing is a no-op, not a reload.
+        if (changed) TodoTrackingWidget().update(context, glanceId)
     }
 
     companion object {

@@ -9,6 +9,10 @@ export const koreanUiTranslations: Record<string, string> = {
   "Don't ask next time": '다음부터 묻지 않기',
   'Low-risk results of this automation are approved as they land. A result that could have changed files still asks.':
     '이 자동화의 낮은 위험 결과는 도착하는 대로 승인됩니다. 파일을 바꿨을 수 있는 결과는 여전히 묻습니다.',
+  Progress: '진행',
+  '{{percent}}% done': '{{percent}}% 완료',
+  'Check {{count}}': '확인 {{count}}',
+  'Running {{count}}': '실행 {{count}}',
   Notes: '메모',
   'Long-press a note and drop it on a project. Tap a project to see its notes.':
     '메모를 길게 눌러 프로젝트에 놓으세요. 프로젝트를 누르면 모아 둔 메모를 볼 수 있습니다.',

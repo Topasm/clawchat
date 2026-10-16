@@ -1,20 +1,35 @@
 // ---------------------------------------------------------------------------
-// ClawChat Theme System (ported from mobile)
+// ClawChat Theme System
+//
+// Most of the screen is grey; colour is kept for meaning. Dark is grey, not
+// black: panels sit a step darker than the page and cards a step lighter, so
+// surfaces part by brightness instead of lines.
 // ---------------------------------------------------------------------------
 
 export interface ColorPalette {
+  /** The page. */
   background: string;
+  /** The sidebar and side panels: a step away from the page, no border. */
+  sidebar: string;
+  /** Cards, flow boxes and dialogs. */
   surface: string;
+  /** Raised areas: the selected row, search field, tags, finished flow boxes. */
   surfaceSecondary: string;
   text: string;
   textSecondary: string;
   textTertiary: string;
   border: string;
+  /** Lines of the flow graph. */
+  connector: string;
   disabled: string;
 
+  /** Filled blue: done checks, the + button, progress rings, the running box. */
   primary: string;
   primaryLight: string;
   primaryDark: string;
+  /** Blue as text: links and section titles. */
+  link: string;
+  /** The task list icon. */
   secondary: string;
 
   success: string;
@@ -39,71 +54,77 @@ export interface ColorPalette {
 // ---- Light palette --------------------------------------------------------
 
 export const lightColors: ColorPalette = {
-  background: '#F7F8FA',
+  background: '#FFFFFF',
+  sidebar: '#F4F4F6',
   surface: '#FFFFFF',
-  surfaceSecondary: '#F0F2F5',
-  text: '#181A1D',
-  textSecondary: '#525862',
-  textTertiary: '#6B727C',
-  border: '#E1E4E8',
-  disabled: '#AEB4BC',
+  surfaceSecondary: '#ECECEF',
+  text: '#1D1D1F',
+  textSecondary: '#48484A',
+  textTertiary: '#6E6E73',
+  border: '#E6E6EA',
+  connector: '#AEAEB2',
+  disabled: '#AEAEB2',
 
-  primary: '#2563EB',
-  primaryLight: '#DBEAFE',
-  primaryDark: '#1D4ED8',
-  secondary: '#0F9F8F',
+  primary: '#3A82F7',
+  primaryLight: '#E2EDFE',
+  primaryDark: '#2F6FE0',
+  link: '#2F6FE0',
+  secondary: '#1F8F8C',
 
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#EF5350',
+  success: '#2F9A5F',
+  warning: '#A86F00',
+  error: '#D23B40',
 
-  assistantBubble: '#F0F2F5',
-  userBubble: '#2563EB',
-  streaming: '#0F9F8F',
-  actionCard: '#FFFBEB',
+  assistantBubble: '#F4F4F6',
+  userBubble: '#3A82F7',
+  streaming: '#2F9A5F',
+  actionCard: '#FFFFFF',
 
-  todayBlue: '#3478F6',
-  inboxYellow: '#FFCC00',
-  completedGreen: '#34C759',
-  overdueRed: '#FF3B30',
+  todayBlue: '#F2B90C',
+  inboxYellow: '#F2B90C',
+  completedGreen: '#2F9A5F',
+  overdueRed: '#D23B40',
 
   shadow: '#000000',
-  deleteBackground: '#FFF0F0',
+  deleteBackground: '#FBEDEE',
   metaTagBackground: 'rgba(0,0,0,0.04)',
 };
 
 // ---- Dark palette ---------------------------------------------------------
 
 export const darkColors: ColorPalette = {
-  background: '#111316',
-  surface: '#181B1F',
-  surfaceSecondary: '#22262B',
-  text: '#F3F4F6',
-  textSecondary: '#A0A6AF',
-  textTertiary: '#858C96',
-  border: '#30353B',
-  disabled: '#5B626C',
+  background: '#1E1E20',
+  sidebar: '#19191B',
+  surface: '#28282B',
+  surfaceSecondary: '#2C2C2F',
+  text: '#F2F2F3',
+  textSecondary: '#C7C7CC',
+  textTertiary: '#9A9A9F',
+  border: '#38383B',
+  connector: '#6E6E73',
+  disabled: '#6E6E73',
 
-  primary: '#60A5FA',
-  primaryLight: '#1E3A5F',
-  primaryDark: '#3B82F6',
-  secondary: '#5EEAD4',
+  primary: '#4A8DFA',
+  primaryLight: '#273B5E',
+  primaryDark: '#6EA6FF',
+  link: '#6EA6FF',
+  secondary: '#4CC2BE',
 
-  success: '#30D158',
-  warning: '#FF9F0A',
-  error: '#FF453A',
+  success: '#5CC98A',
+  warning: '#F5C83A',
+  error: '#F0676B',
 
-  assistantBubble: '#22262B',
-  userBubble: '#2563EB',
-  streaming: '#64D2A6',
-  actionCard: '#22262B',
+  assistantBubble: '#28282B',
+  userBubble: '#4A8DFA',
+  streaming: '#5CC98A',
+  actionCard: '#28282B',
 
-  todayBlue: '#0A84FF',
-  inboxYellow: '#FFD60A',
-  completedGreen: '#30D158',
-  overdueRed: '#FF453A',
+  todayBlue: '#F5C83A',
+  inboxYellow: '#F5C83A',
+  completedGreen: '#5CC98A',
+  overdueRed: '#F0676B',
 
   shadow: '#000000',
-  deleteBackground: '#3A2020',
+  deleteBackground: '#3A2626',
   metaTagBackground: 'rgba(255,255,255,0.08)',
 };

@@ -8,6 +8,7 @@ import com.clawchat.android.core.data.local.LocalNoteEntity
 import com.clawchat.android.core.data.local.LocalTodoDao
 import com.clawchat.android.core.data.model.*
 import com.clawchat.android.core.network.*
+import com.clawchat.android.core.sync.SyncManager
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 import javax.inject.Inject
@@ -19,6 +20,7 @@ class NoteRepository @Inject constructor(
     private val sessions: SessionStore,
     private val notes: LocalNoteDao,
     private val todos: LocalTodoDao,
+    private val syncManager: SyncManager,
 ) {
     private suspend fun <T> scoped(workspace: String, local: suspend () -> T, remote: suspend (ExpectedSessionScope) -> T): ApiResult<T> {
         val runtime = sessions.runtimeState.first()
@@ -29,6 +31,10 @@ class NoteRepository @Inject constructor(
             apiCall { remote(scope) }
         }
     }
+
+    /** Surfaces outside this screen, such as the widget, refresh without waiting for a WebSocket echo. */
+    private suspend fun <T> mutation(workspace: String, local: suspend () -> T, remote: suspend (ExpectedSessionScope) -> T) =
+        scoped(workspace, local, remote).also { if (it is ApiResult.Success) syncManager.notifyNoteChanged() }
 
     suspend fun load(workspace: String) = scoped(workspace,
         local = { NoteSnapshot(notes.list().map { it.toNote() }, todos.getAllFlow().first()
@@ -42,7 +48,7 @@ class NoteRepository @Inject constructor(
         remote = { api.listNotes(it) },
     )
 
-    suspend fun create(workspace: String, body: NoteCreate) = scoped(workspace,
+    suspend fun create(workspace: String, body: NoteCreate) = mutation(workspace,
         local = {
             val id = "note_${body.idempotencyKey}"
             val now = Instant.now().toString()
@@ -53,17 +59,17 @@ class NoteRepository @Inject constructor(
         }, remote = { api.createNote(body, it) },
     )
 
-    suspend fun edit(workspace: String, id: String, content: String) = scoped(workspace,
+    suspend fun edit(workspace: String, id: String, content: String) = mutation(workspace,
         local = { notes.edit(id, content.trim(), Instant.now().toString()); requireNotNull(notes.get(id)).toNote() },
         remote = { api.editNote(id, NoteContentUpdate(content.trim()), it) },
     )
 
-    suspend fun move(workspace: String, id: String, projectId: String?) = scoped(workspace,
+    suspend fun move(workspace: String, id: String, projectId: String?) = mutation(workspace,
         local = { notes.move(id, projectId, Instant.now().toString()); requireNotNull(notes.get(id)).toNote() },
         remote = { api.moveNote(id, NoteMove(projectId), it) },
     )
 
-    suspend fun delete(workspace: String, id: String) = scoped(workspace,
+    suspend fun delete(workspace: String, id: String) = mutation(workspace,
         local = { notes.delete(id) }, remote = { api.deleteNote(id, it) },
     )
 }

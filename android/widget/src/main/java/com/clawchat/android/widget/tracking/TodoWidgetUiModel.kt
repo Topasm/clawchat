@@ -92,7 +92,7 @@ internal data class TodoWidgetUiModel(
                                 runwayFraction = null,
                                 inProgress = inProgress,
                             ) to todo.updatedAt
-                        due != null && daysRemaining != null -> {
+                        daysRemaining != null -> {
                             val current = nextDeadline
                             if (current == null ||
                                 daysRemaining < current.daysRemaining ||

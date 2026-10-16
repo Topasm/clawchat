@@ -52,6 +52,9 @@ class SyncManager internal constructor(
     private val _todoChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val todoChanged: SharedFlow<Unit> = _todoChanged.asSharedFlow()
 
+    private val _noteChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val noteChanged: SharedFlow<Unit> = _noteChanged.asSharedFlow()
+
     private val _eventChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val eventChanged: SharedFlow<Unit> = _eventChanged.asSharedFlow()
 
@@ -97,6 +100,11 @@ class SyncManager internal constructor(
     /** Publish a mutation completed by this process without waiting for WebSocket echo. */
     fun notifyTodoChanged() {
         _todoChanged.tryEmit(Unit)
+    }
+
+    /** Publish a note mutation completed by this process without waiting for WebSocket echo. */
+    fun notifyNoteChanged() {
+        _noteChanged.tryEmit(Unit)
     }
 
     /** Publish a review mutation completed locally or by reconnect replay. */
@@ -177,6 +185,7 @@ class SyncManager internal constructor(
                     _lastEventAtEpochMillis.value = System.currentTimeMillis()
                     when (event.module) {
                         "todos" -> notifyTodoChanged()
+                        "notes" -> notifyNoteChanged()
                         "events" -> _eventChanged.tryEmit(Unit)
                         "reviews" -> notifyReviewChanged()
                         "runs" -> _runChanged.tryEmit(Unit)
@@ -210,6 +219,7 @@ class SyncManager internal constructor(
                     // Repositories refetch authoritative state after a
                     // direct or relay reconnect to recover missed events.
                     notifyTodoChanged()
+                    notifyNoteChanged()
                     _eventChanged.tryEmit(Unit)
                     notifyReviewChanged()
                     _runChanged.tryEmit(Unit)

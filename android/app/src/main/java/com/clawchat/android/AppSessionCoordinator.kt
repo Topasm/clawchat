@@ -122,6 +122,14 @@ class AppSessionCoordinator @Inject constructor(
             }
         }
 
+        // Notes reach no reminder or notification; only the widget's Notes tab shows them.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            syncManager.noteChanged.collectLatest {
+                delay(WIDGET_REFRESH_COALESCE_MILLIS)
+                updateWidgetsSafely()
+            }
+        }
+
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             merge(
                 syncManager.todoChanged,
