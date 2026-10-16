@@ -1093,6 +1093,30 @@ Runs the inbox pipeline as a background task. Classifies the todo and suggests a
 }
 ```
 
+### Inbox Auto-Organize
+
+```text
+GET  /api/inbox/routings                 # What the Inbox filed in the last 24 hours (not cleared, not undone)
+POST /api/inbox/routings/acknowledge     # Clear that list
+POST /api/inbox/routings/:id/undo        # Put the item back exactly as it was, under its old id
+POST /api/todos/:id/to-note              # A task with nothing attached becomes a note
+POST /api/todos/:id/file-as-task         # An Inbox capture leaves the Inbox, with the date its title names
+POST /api/notes/:id/to-task              # A note becomes a task (first line the title)
+GET  /api/inbox/project-candidates       # Vault project folders no project is named after yet
+```
+
+With `inboxAutoOrganize` on (the default; `PUT /api/settings`), a root
+capture (`inbox_state` `captured` or `classifying`) whose title names one
+upcoming date -- `11월 3일`, `11/3`, `3일까지`, `다음 주 화요일`, `Nov 3 2pm`
+-- leaves the Inbox at once as a task due then, with the date taken out of
+the title. Otherwise the classifier returns `kind` (task or note),
+`kind_confidence` and an optional `due_date`; at 0.8 or more the capture is
+filed as that kind, below it waits under "Needs a look". The Inbox never
+drafts a plan by itself. Every move, by the server (`origin: auto`) or the
+user (`origin: user`), is an `inbox_routings` row, so the share of captures
+that needed a hand is measurable, and the user's own recent moves are shown
+to the classifier as examples.
+
 ### Place in Project Tree
 
 ```text

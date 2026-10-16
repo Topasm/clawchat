@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 
 from auth.dependencies import get_current_user
 from config import settings
@@ -22,6 +22,7 @@ from schemas.common import (
 from schemas.graph_insights import GraphInsightsResponse
 from schemas.inbox_triage import InboxTriagePreviewRequest, InboxTriagePreviewResponse
 from schemas.inbox_review import InboxReviewState, InboxReviewUpdate
+from schemas.inbox_routing import InboxRoutingResponse
 from schemas.task import (
     DelegateRequest,
     DelegateResponse,
@@ -52,12 +53,15 @@ from services.agents import (
     task_delegation_service,
 )
 from services.ai import resolve_active_ai
+from services.notifications import schedule_settings
 from services.planning import (
     inbox_pipeline_service,
+    inbox_routing_service,
     inbox_triage_service,
     inbox_review_service,
     plan_proposal_service,
 )
+from services.planning.inbox_settings import auto_organize_enabled
 from services.tasks import (
     graph_insights_service,
     task_placement_service,
@@ -465,6 +469,18 @@ async def create_todo(
             recurrence_rule=body.recurrence_rule,
             recurrence_end=body.recurrence_end,
         )
+        if (
+            todo.inbox_state in ("captured", "classifying")
+            and not todo.parent_id
+            and not todo.project_id
+            and await auto_organize_enabled(db)
+        ):
+            await inbox_routing_service.route_on_capture(
+                db,
+                todo,
+                zone=await _user_zone(db),
+                ai_available=resolve_active_ai(request.app.state) is not None,
+            )
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -740,6 +756,48 @@ async def delete_todo(
     await db.commit()
 
     await notify_module_data_changed("todos")
+
+
+async def _user_zone(db: AsyncSession) -> tzinfo:
+    return (await schedule_settings.load(db)).zone
+
+
+@router.post("/{todo_id}/to-note", response_model=InboxRoutingResponse)
+async def convert_todo_to_note(
+    todo_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Turn a task with nothing attached into a note; undo restores the task."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
+    routing = await inbox_routing_service.task_to_note(db, todo, origin="user")
+    await db.commit()
+    await db.refresh(routing)
+    for module in ("todos", "notes", "inbox_routings"):
+        await notify_module_data_changed(module)
+    return routing
+
+
+@router.post("/{todo_id}/file-as-task", response_model=InboxRoutingResponse)
+async def file_todo_as_task(
+    todo_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Take an Inbox capture out as a task, with the deadline its title names."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
+    routing = await inbox_routing_service.file_as_task(
+        db, todo, origin="user", zone=await _user_zone(db)
+    )
+    await db.commit()
+    await db.refresh(routing)
+    for module in ("todos", "inbox_routings"):
+        await notify_module_data_changed(module)
+    return routing
 
 
 @router.post("/{todo_id}/organize")

@@ -230,6 +230,8 @@ New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_s
 
 The `POST /api/todos/{id}/organize` endpoint triggers the pipeline as a background task with a fresh DB session (via `session_factory`, not the request-scoped session).
 
+Captures are filed without a click (`inbox_routing_service.py`): a title naming one upcoming date (`inbox_deadline.py`) becomes a task due then as the capture is created; otherwise the classifier's `kind` decides at 0.8 confidence or more, and anything less waits for the user. Phone captures arrive as `captured` and are filed the same way. Each move writes an `InboxRouting` with the item's prior state, so undo restores it under the same id. Turning `inboxAutoOrganize` off in settings restores the old behaviour, planning included.
+
 Delegation: `POST /api/todos/{id}/delegate` accepts `{ "skill_id": "research" }`, creates an `AgentTask` with a `skill_chain`, and runs the skill executor. The user-approved path also sends `require_ready=true` and `approved=true`; it recomputes graph readiness and atomically claims `pending → in_progress` before creating a single Run. Legacy `agent_type` and delegation without the Ready guard remain supported for compatibility.
 
 Agent Run review items include a deterministic approval-impact projection from

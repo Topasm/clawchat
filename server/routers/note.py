@@ -8,7 +8,10 @@ from database import get_db
 from exceptions import ConflictError, NotFoundError
 from models.note import Note
 from models.project import Project
+from schemas.inbox_routing import InboxRoutingResponse
 from schemas.note import NoteCreate, NoteResponse, NoteUpdate
+from services.notifications import schedule_settings
+from services.planning import inbox_routing_service
 from ws.notifications import notify_module_data_changed
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -85,3 +88,18 @@ async def delete_note(note_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await notify_module_data_changed("notes")
     return Response(status_code=204)
+
+
+@router.post("/{note_id}/to-task", response_model=InboxRoutingResponse)
+async def convert_note_to_task(note_id: str, db: AsyncSession = Depends(get_db)):
+    """Turn a note into a task (first line the title); undo restores the note."""
+    note = await require_note(db, note_id)
+    zone = (await schedule_settings.load(db)).zone
+    routing = await inbox_routing_service.note_to_task(
+        db, note, origin="user", zone=zone
+    )
+    await db.commit()
+    await db.refresh(routing)
+    for module in ("todos", "notes", "inbox_routings"):
+        await notify_module_data_changed(module)
+    return routing

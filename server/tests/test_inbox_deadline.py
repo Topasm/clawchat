@@ -1,10 +1,15 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 from schemas.inbox_triage import InboxTriagePreviewRequest
-from services.planning.inbox_deadline import suggest_deadline
+from services.planning.inbox_deadline import (
+    capture_day,
+    due_instant,
+    parse_deadline,
+    suggest_deadline,
+)
 
 
 @pytest.mark.parametrize(
@@ -52,9 +57,12 @@ def test_timezone_boundary_and_sqlite_naive_utc_capture():
     "text",
     [
         "논문 피규어 만들기",
-        "금요일 회의",
         "언젠가까지",
         "2026-02-30까지",
+        "3일 동안 실험",
+        "11월 3일부터 11월 5일까지",
+        "매주 금요일 회의",
+        "목요일까지 이번주 다음주",
         "월요일까지 초안 금요일까지 수정",
     ],
 )
@@ -75,3 +83,38 @@ def test_invalid_timezone_is_a_validation_error():
         InboxTriagePreviewRequest(
             todo_ids=["t"], expected_graph_revision=0, timezone="Not/AZone"
         )
+
+
+CAPTURED = datetime(2026, 10, 16, 3, 0, tzinfo=timezone.utc)  # Friday 12:00 in Seoul
+
+
+@pytest.mark.parametrize(
+    ("text", "local_date", "local_time", "title"),
+    [
+        ("Gpu 컴퓨팅 과제 11월 3일", "2026-11-03", None, "Gpu 컴퓨팅 과제"),
+        ("Gpu 컴퓨팅 과제 11/3", "2026-11-03", None, "Gpu 컴퓨팅 과제"),
+        ("보고서 10월 2일까지", "2027-10-02", None, "보고서"),
+        ("2026년 12월 1일 마감 신청", "2026-12-01", None, "신청"),
+        ("세미나 발표 20일까지", "2026-10-20", None, "세미나 발표"),
+        ("세미나 발표 3일까지", "2026-11-03", None, "세미나 발표"),
+        ("다음 주 화요일 면담", "2026-10-20", None, "면담"),
+        ("영어 글쓰기 과제 목요일까지 이번주", "2026-10-15", None, "영어 글쓰기 과제"),
+        ("영어 글쓰기 과제 목요일까지 다음주", "2026-10-22", None, "영어 글쓰기 과제"),
+        ("미팅 11월 3일 오후 2시", "2026-11-03", "14:00", "미팅"),
+        ("미팅 내일 오전 10시 30분", "2026-10-17", "10:30", "미팅"),
+        ("Call dentist Nov 3 2pm", "2026-11-03", "14:00", "Call dentist"),
+        ("Submit form by tomorrow 14:30", "2026-10-17", "14:30", "Submit form"),
+        ("내일 3시간 공부", "2026-10-17", None, "3시간 공부"),
+    ],
+)
+def test_wider_expressions_resolve_and_leave_the_title(text, local_date, local_time, title):
+    parsed = parse_deadline(text, capture_day(CAPTURED, "Asia/Seoul"))
+    assert parsed is not None
+    assert parsed.local_date.isoformat() == local_date
+    assert (parsed.local_time.strftime("%H:%M") if parsed.local_time else None) == local_time
+    assert parsed.stripped_title == title
+
+
+def test_a_clock_time_is_the_due_instant():
+    parsed = parse_deadline("미팅 11월 3일 오후 2시", date(2026, 10, 16))
+    assert due_instant(parsed, "Asia/Seoul") == datetime(2026, 11, 3, 5, 0, tzinfo=timezone.utc)

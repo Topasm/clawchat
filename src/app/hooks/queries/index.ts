@@ -115,6 +115,12 @@ export {
 } from './useAdminQueries';
 export { useCapabilitiesQuery } from './useCapabilitiesQuery';
 export {
+  useInboxMove,
+  useInboxProjectCandidatesQuery,
+  useInboxRoutingsQuery,
+} from './useInboxRoutingQueries';
+export type { InboxMove } from './useInboxRoutingQueries';
+export {
   useObsidianHealthQuery,
   useObsidianSync,
   useObsidianReindex,

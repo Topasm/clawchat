@@ -7,6 +7,7 @@ import AgentToolsSettings from '../components/settings/AgentToolsSettings';
 import CalendarSyncSettings from '../components/settings/CalendarSyncSettings';
 import DataSharingSettings from '../components/settings/DataSharingSettings';
 import ScheduleSettings from '../components/settings/ScheduleSettings';
+import InboxSettings from '../components/settings/InboxSettings';
 import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -433,6 +434,8 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <AgentToolsSettings />
+
+        <InboxSettings />
 
         <ScheduleSettings />
 

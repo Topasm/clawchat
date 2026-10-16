@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
 from routers import note as note_router
+from routers import inbox as inbox_router
 from routers import scheduled_jobs as scheduled_jobs_router
 from routers import agent_tools as agent_tools_router
 from routers import calendar_sync as calendar_sync_router
@@ -349,6 +350,7 @@ app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(attachment_router.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(note_router.router, prefix="/api/notes", tags=["notes"])
+app.include_router(inbox_router.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(ai_models_router.router, prefix="/api/admin/ai/models", tags=["admin"])
 app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidian"])
 app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])

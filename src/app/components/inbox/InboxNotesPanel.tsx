@@ -30,7 +30,7 @@ function NotesContent({ projects, projectId }: Props) {
   const notes = query.data ?? [];
   const currentFilter = filter && projects.some((p) => p.id === filter) ? filter : null;
   const visible = notes.filter((n) => n.project_id === currentFilter);
-  const destinations = [{ id: '', title: translateUi('Inbox') }, ...projects];
+  const destinations = [{ id: '', title: translateUi('No project') }, ...projects];
 
   const move = (id: string, destination: string | null) => {
     if (mutation.isPending) return;

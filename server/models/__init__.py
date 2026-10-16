@@ -28,6 +28,7 @@ from models.scheduled_job import ScheduledJob  # noqa: F401
 from models.agent_tools import AgentToolCall, AgentToolSettings, McpServer  # noqa: F401
 from models.calendar_sync import CalendarAccount, CalendarPush, CalendarSource  # noqa: F401
 from models.data_source import DataSource, DataSourceEntry, DataSourceQuery  # noqa: F401
+from models.inbox_routing import InboxRouting  # noqa: F401
 
 # Sentinel used by database.init_db to ensure all models are imported
 _register_all = True

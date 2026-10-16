@@ -16,6 +16,8 @@ export function invalidateModuleQueries(queryClient: QueryClient, module?: strin
 
   if (module === 'todos') {
     queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+    // The classifier files captures in the background and says so as a todo change.
+    queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
     queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
     void invalidateTaskDerivedQueries(queryClient);
     queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
@@ -30,8 +32,11 @@ export function invalidateModuleQueries(queryClient: QueryClient, module?: strin
     invalidateExecutionTelemetry();
   } else if (module === 'notes') {
     queryClient.invalidateQueries({ queryKey: ['notes'] });
+  } else if (module === 'inbox_routings') {
+    queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
   } else if (module === 'projects') {
     queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    queryClient.invalidateQueries({ queryKey: queryKeys.inboxProjectCandidates });
     queryClient.invalidateQueries({ queryKey: ['notes'] });
   } else if (module === 'runs') {
     queryClient.invalidateQueries({ queryKey: ['runs'] });

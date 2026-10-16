@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "server"))
 from database import async_session_factory, init_db  # noqa: E402
 from models.agent_run import AgentRun  # noqa: E402
 from models.agent_task import AgentTask  # noqa: E402
+from models.inbox_routing import InboxRouting  # noqa: E402
+from models.note import Note  # noqa: E402
 from models.project import Project  # noqa: E402
 from models.todo import Todo  # noqa: E402
 from services.tasks import project_service  # noqa: E402
@@ -94,6 +96,7 @@ async def seed() -> None:
             stamp(todo, at(hours=-hours_ago))
             db.add(todo)
 
+        standalone = []
         for index, (title, days_due) in enumerate([
             ("Pay the electricity bill", 0.5),
             ("Return the library books", 4),
@@ -101,6 +104,39 @@ async def seed() -> None:
             todo = Todo(title=title, due_date=at(days_due))
             stamp(todo, at(-2, hours=-index))
             db.add(todo)
+            standalone.append(todo)
+
+        # What the Inbox filed by itself this morning: the library books as a
+        # task with the date its title named, and an idea as a note.
+        note = Note(content="Ask Mina to co-present the demo")
+        stamp(note, at(hours=-1))
+        db.add(note)
+        await db.flush()
+        books = standalone[1]
+        for routing in (
+            InboxRouting(
+                origin="auto",
+                kind="task",
+                todo_id=books.id,
+                title=books.title,
+                original_title=f"{books.title} by Saturday",
+                due_date=books.due_date,
+                before_json=json.dumps(
+                    {"type": "todo_fields", "title": f"{books.title} by Saturday"}
+                ),
+                created_at=at(hours=-0.5),
+            ),
+            InboxRouting(
+                origin="auto",
+                kind="note",
+                note_id=note.id,
+                title=note.content,
+                original_title=note.content,
+                before_json=json.dumps({"type": "todo_row"}),
+                created_at=at(hours=-1),
+            ),
+        ):
+            db.add(routing)
 
         await db.flush()
 

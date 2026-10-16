@@ -74,6 +74,9 @@ vi.mock('../../components/chat-panel/ChatPanelControllerContext', () => ({
     setConversationId: mocks.setConversationId,
   }),
 }));
+vi.mock('../../components/inbox/InboxNotesPanel', () => ({
+  default: ({ projectId }: { projectId?: string }) => <div>Notes for {projectId}</div>,
+}));
 vi.mock('../../components/projects/ProjectPlan', () => ({
   default: ({ todos }: { todos: Array<Record<string, unknown>> }) => {
     mocks.planTodos = todos;
@@ -212,16 +215,18 @@ describe('ProjectWorkspacePage', () => {
     expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
-  it('uses only Plan, Activity and Files as workspace sections', () => {
+  it('uses only Plan, Activity, Files and Notes as workspace sections', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: 'Overview' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Runs' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
     expect(screen.getByText('Project activity content')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
     expect(screen.getByText('Project files content')).toBeInTheDocument();
+    // The Inbox files ideas as notes; a project's own live here.
+    fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+    expect(screen.getByText(`Notes for ${project.id}`)).toBeInTheDocument();
   });
 
   it('shows the canonical document button only for a supported first description line', () => {

@@ -17,6 +17,7 @@ const LoginPage = lazy(() => import('./app/pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
 const SchedulePage = lazy(() => import('./app/pages/SchedulePage'));
 const InboxPage = lazy(() => import('./app/pages/InboxPage'));
+const NotesPage = lazy(() => import('./app/pages/NotesPage'));
 const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
 const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage'));
 const AttentionRedirect = lazy(() => import('./app/pages/AttentionRedirect'));
@@ -244,6 +245,16 @@ export default function AppRouter() {
             <ErrorBoundary name="InboxPage">
               <LazyRoute>
                 <InboxPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/notes"
+          element={
+            <ErrorBoundary name="NotesPage">
+              <LazyRoute>
+                <NotesPage />
               </LazyRoute>
             </ErrorBoundary>
           }

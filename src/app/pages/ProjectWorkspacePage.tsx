@@ -21,6 +21,7 @@ import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
 import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
+import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import { projectStatusLabel } from '../components/projects/projectStatus';
 import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
@@ -35,7 +36,7 @@ import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import apiClient from '../services/apiClient';
 import { ConversationResponseSchema } from '../types/schemas';
 
-type ProjectSection = 'plan' | 'activity' | 'files';
+type ProjectSection = 'plan' | 'activity' | 'files' | 'notes';
 
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams<{
@@ -49,7 +50,9 @@ export default function ProjectWorkspacePage() {
       ? 'activity'
       : requestedSection === 'files' || requestedSection === 'artifacts'
         ? 'files'
-        : 'plan';
+        : requestedSection === 'notes'
+          ? 'notes'
+          : 'plan';
   // Hosts, provider and rules live in a dialog: they are set once per project
   // and were pushing the plan below the fold while open.
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -324,9 +327,18 @@ export default function ProjectWorkspacePage() {
         >
           {translateUi('Files')}
         </button>
+        <button
+          type="button"
+          className={`cc-project-workspace__tab${section === 'notes' ? ' cc-project-workspace__tab--active' : ''}`}
+          onClick={() => setSearchParams({ section: 'notes' })}
+        >
+          {translateUi('Notes')}
+        </button>
       </div>
 
-      {section === 'files' ? (
+      {section === 'notes' ? (
+        <InboxNotesPanel projects={[project]} projectId={project.id} />
+      ) : section === 'files' ? (
         <ProjectArtifacts projectId={project.id} />
       ) : section === 'activity' ? (
         <ProjectActivity project={project} todos={projectTasks} />
