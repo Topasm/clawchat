@@ -36,20 +36,8 @@
     <string name="tasks_run_confirm">Hand “%1$s” to an agent? It plans and works on the task and reports back in the task thread.</string>
     <string name="tasks_run_confirm_action">Run</string>
     <string name="tasks_run_cancel">Cancel</string>
-    <string name="tasks_links_title">Task links</string>
-    <string name="tasks_links_subtitle">Dependencies and related work from the shared task graph.</string>
-    <string name="tasks_links_loading">Loading task links…</string>
-    <string name="tasks_links_empty">No task links yet.</string>
     <string name="tasks_tags_title">Tags</string>
     <string name="tasks_fallback_title">Task %1$s</string>
-    <string name="tasks_relationship_depends_on">Depends on</string>
-    <string name="tasks_relationship_required_by">Required by</string>
-    <string name="tasks_relationship_duplicates">Duplicates</string>
-    <string name="tasks_relationship_duplicated_by">Duplicated by</string>
-    <string name="tasks_relationship_related_to">Related to</string>
-    <string name="tasks_relationship_type_depends_on">Dependency</string>
-    <string name="tasks_relationship_type_duplicate">Duplicate</string>
-    <string name="tasks_relationship_type_related">Related</string>
     <string name="projects_title">Projects</string>
     <string name="projects_back">Back</string>
     <string name="projects_refresh">Refresh</string>
@@ -83,11 +71,10 @@
     <string name="tasks_notes_loading">Loading notes…</string>
     <string name="tasks_notes_retry">Retry</string>
     <string name="tasks_note_too_long">Keep notes within 4,000 characters.</string>
-    <string name="tasks_steps_title">Steps</string>
+    <string name="tasks_steps_title">Flow</string>
     <string name="tasks_step_add">Add step</string>
-    <string name="tasks_step_hint">What needs to be done?</string>
-    <string name="tasks_step_scope">Adds a child task, not a message to the agent.</string>
-    <string name="tasks_steps_empty">Break this task into steps when needed.</string>
+    <string name="tasks_step_hint">Next step</string>
+    <string name="tasks_steps_empty">Type the first step below.</string>
     <string name="projects_open_run">View progress</string>
     <string name="projects_answer_run">Answer agent</string>
     <string name="projects_review_run">Review result</string>
@@ -99,4 +86,10 @@
     <string name="tasks_storage_workspace_unnamed">Saved to your workspace</string>
     <string name="tasks_storage_chip_this_device">This device</string>
     <string name="tasks_storage_chip_pending">Waiting to sync</string>
+    <string name="tasks_flow_other_task">Other task: %1$s</string>
+    <string name="tasks_flow_waiting">Waiting</string>
+    <string name="tasks_flow_in_progress">In progress</string>
+    <string name="tasks_paths_title">Paths</string>
+    <string name="tasks_paths_copied">Path copied</string>
+    <string name="tasks_paths_web">Web</string>
 </resources>
