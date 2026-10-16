@@ -46,6 +46,27 @@ interface ClawChatApi {
     @POST("api/todos/placements/{id}/undo")
     suspend fun undoInboxPlacement(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxPlacementResult
 
+    @GET("api/inbox/routings")
+    suspend fun listInboxRoutings(@Tag expectedScope: ExpectedSessionScope): InboxRoutingList
+
+    @POST("api/inbox/routings/{id}/undo")
+    suspend fun undoInboxRouting(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
+
+    @POST("api/todos/{id}/to-note")
+    suspend fun todoToNote(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
+
+    @POST("api/todos/{id}/file-as-task")
+    suspend fun fileTodoAsTask(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
+
+    @POST("api/notes/{id}/to-task")
+    suspend fun noteToTask(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
+
+    @GET("api/inbox/project-candidates")
+    suspend fun listProjectCandidates(@Tag expectedScope: ExpectedSessionScope): List<ProjectFolderCandidate>
+
+    @POST("api/projects")
+    suspend fun createProject(@Body body: ProjectCreate, @Tag expectedScope: ExpectedSessionScope): ProjectPlan
+
     @GET("api/projects")
     suspend fun listProjects(@Tag expectedScope: ExpectedSessionScope): List<ProjectPlan>
 

@@ -307,10 +307,6 @@ fun ClawChatNavGraph(
                     InboxScreen(
                         onBack = { navController.popBackStack() },
                         onTaskClick = { navController.navigate(NavRoute.Tasks.destination(it)) },
-                        onOpenPlacement = { taskId, projectId ->
-                            navController.navigate(if (projectId == null) NavRoute.Tasks.destination(taskId)
-                                else NavRoute.Projects.destination(projectId, taskId)) { launchSingleTop = true }
-                        },
                     )
                 }
             }
