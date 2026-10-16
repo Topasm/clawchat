@@ -364,7 +364,9 @@ async def stream_chat(
                 yield f"data: {json.dumps({'module_data_changed': action_metadata})}\n\n"
         else:
             try:
-                async for event in reply_events(session_factory, ai_service, messages):
+                async for event in reply_events(
+                    session_factory, ai_service, messages, conversation_id=body.conversation_id
+                ):
                     if event.kind == "activity":
                         yield f"data: {json.dumps({'tool_activity': event.payload})}\n\n"
                         continue

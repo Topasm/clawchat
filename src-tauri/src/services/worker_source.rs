@@ -8,9 +8,14 @@
 // folder. The rules are the ones `worker_context` keeps for project folders:
 // nothing is followed through a symlink, every path is resolved and checked
 // against the root, and every answer is bounded.
+//
+// One change is possible: appending a task line to a `TODO.md`, after the
+// user approved it in review. It is refused unless this machine's own
+// setting allows changes to the folder -- the server's word is not enough --
+// and it follows the same path rules, plus a size cap on the file.
 
 use std::fs;
-use std::io::Read;
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -26,6 +31,13 @@ const MAX_SEARCH_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_MATCHES: usize = 50;
 const MAX_SNIPPET_CHARS: usize = 200;
 const SEARCHABLE_EXTENSIONS: &[&str] = &["md", "markdown", "txt"];
+/// Largest a `TODO.md` may grow by an append; past this it is refused.
+pub const MAX_TODO_FILE_BYTES: u64 = 1024 * 1024;
+/// Longest task line an append may add, prefix included.
+const MAX_TASK_LINE_CHARS: usize = 512;
+/// The only file an append may change, compared case-insensitively.
+const TODO_FILE_NAME: &str = "todo.md";
+const TASK_PREFIX: &str = "- [ ] ";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +55,10 @@ pub struct SourceQuery {
     pub include_folders: Vec<String>,
     #[serde(default)]
     pub exclude_folders: Vec<String>,
+    /// This machine's own setting for the folder, never the server's. A write
+    /// is refused without it.
+    #[serde(default)]
+    pub allow_writes: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -210,6 +226,9 @@ fn open_root(root: &str) -> Result<PathBuf, &'static str> {
 /// Answer one relayed request. Refusals are answers too, so the server can
 /// record why; only a malformed request is an `Err`.
 pub fn query(request: &SourceQuery) -> SourceAnswer {
+    if request.op == "append_todo" && !request.allow_writes {
+        return SourceAnswer::refused("writes_not_allowed");
+    }
     let root = match open_root(&request.root) {
         Ok(root) => root,
         Err(reason) => return SourceAnswer::refused(reason),
@@ -230,8 +249,145 @@ pub fn query(request: &SourceQuery) -> SourceAnswer {
             &share,
             request.query.as_deref().unwrap_or(""),
         ),
+        "append_todo" => append_todo(
+            &root,
+            &parts,
+            &relative,
+            &share,
+            request.query.as_deref().unwrap_or(""),
+        ),
         _ => SourceAnswer::refused("unknown_operation"),
     }
+}
+
+/// The one line an append adds: an unchecked task, nothing more. The server
+/// builds it; this side refuses anything that could add a second line.
+fn task_line(text: &str) -> Option<String> {
+    let line = nfc(text.trim());
+    let well_formed = line.starts_with(TASK_PREFIX)
+        && line.len() > TASK_PREFIX.len()
+        && !line.contains(['\n', '\r', '\0'])
+        && line.chars().count() <= MAX_TASK_LINE_CHARS;
+    well_formed.then_some(line)
+}
+
+/// Add `text` as the last line of the `TODO.md` at `parts`, creating the
+/// file when its folder exists but it does not.
+fn append_todo(
+    root: &Path,
+    parts: &[String],
+    relative: &str,
+    share: &Share,
+    text: &str,
+) -> SourceAnswer {
+    let Some((name, folder)) = parts.split_last() else {
+        return SourceAnswer::refused("not_found");
+    };
+    if name.to_lowercase() != TODO_FILE_NAME {
+        return SourceAnswer::refused("not_todo_file");
+    }
+    if !share.can_read(relative) {
+        return SourceAnswer::refused("not_shared");
+    }
+    let Some(line) = task_line(text) else {
+        return SourceAnswer::refused("invalid_task");
+    };
+    let parent = match resolve(root, folder) {
+        Ok(parent) => parent,
+        Err(reason) => return SourceAnswer::refused(reason),
+    };
+    if !fs::symlink_metadata(&parent)
+        .map(|metadata| metadata.is_dir())
+        .unwrap_or(false)
+    {
+        return SourceAnswer::refused("not_found");
+    }
+    let file = parent.join(name);
+    let outcome = match fs::symlink_metadata(&file) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err("symlink"),
+        Ok(metadata) if !metadata.is_file() => Err("not_found"),
+        Ok(metadata) => append_existing(&file, &metadata, &line),
+        Err(error) if error.kind() == ErrorKind::NotFound => create_todo(&file, &line),
+        Err(_) => Err("io_error"),
+    };
+    match outcome {
+        Ok(()) => SourceAnswer {
+            ok: true,
+            ..SourceAnswer::default()
+        },
+        Err(reason) => SourceAnswer::refused(reason),
+    }
+}
+
+fn append_existing(file: &Path, checked: &fs::Metadata, line: &str) -> Result<(), &'static str> {
+    let mut handle = fs::OpenOptions::new()
+        .read(true)
+        .append(true)
+        .open(file)
+        .map_err(|_| "io_error")?;
+    let opened = handle.metadata().map_err(|_| "io_error")?;
+    // The name was checked to be a plain file; what got opened must be that
+    // same file, not a symlink swapped in between the check and the open.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if opened.dev() != checked.dev() || opened.ino() != checked.ino() {
+            return Err("symlink");
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = checked;
+    if !opened.is_file() {
+        return Err("not_found");
+    }
+    let length = opened.len();
+    if length + line.len() as u64 + 2 > MAX_TODO_FILE_BYTES {
+        return Err("too_large");
+    }
+    let mut head = Vec::with_capacity(8 * 1024);
+    (&mut handle)
+        .take(8 * 1024)
+        .read_to_end(&mut head)
+        .map_err(|_| "io_error")?;
+    if head.contains(&0) {
+        return Err("not_text");
+    }
+    let mut addition = String::with_capacity(line.len() + 2);
+    if length > 0 {
+        let mut last = [0u8; 1];
+        handle
+            .seek(SeekFrom::Start(length - 1))
+            .and_then(|_| handle.read_exact(&mut last))
+            .map_err(|_| "io_error")?;
+        if last[0] != b'\n' {
+            addition.push('\n');
+        }
+    }
+    addition.push_str(line);
+    addition.push('\n');
+    handle
+        .write_all(addition.as_bytes())
+        .and_then(|_| handle.flush())
+        .map_err(|_| "io_error")
+}
+
+fn create_todo(file: &Path, line: &str) -> Result<(), &'static str> {
+    // `create_new` refuses whatever appeared at the name since the check,
+    // a symlink included, instead of writing through it.
+    let mut handle = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(file)
+        .map_err(|error| {
+            if error.kind() == ErrorKind::AlreadyExists {
+                "symlink"
+            } else {
+                "io_error"
+            }
+        })?;
+    handle
+        .write_all(format!("{line}\n").as_bytes())
+        .map_err(|_| "io_error")
 }
 
 fn list(root: &Path, parts: &[String], relative: &str, share: &Share) -> SourceAnswer {
@@ -511,7 +667,221 @@ mod tests {
             query: None,
             include_folders: include.iter().map(|s| s.to_string()).collect(),
             exclude_folders: exclude.iter().map(|s| s.to_string()).collect(),
+            allow_writes: false,
         })
+    }
+
+    fn append(
+        root: &Path,
+        path: &str,
+        line: &str,
+        include: &[&str],
+        exclude: &[&str],
+        allow_writes: bool,
+    ) -> SourceAnswer {
+        query(&SourceQuery {
+            root: root.to_string_lossy().into_owned(),
+            op: "append_todo".to_owned(),
+            path: path.to_owned(),
+            query: Some(line.to_owned()),
+            include_folders: include.iter().map(|s| s.to_string()).collect(),
+            exclude_folders: exclude.iter().map(|s| s.to_string()).collect(),
+            allow_writes,
+        })
+    }
+
+    fn contents(root: &Path, relative: &str) -> String {
+        fs::read_to_string(root.join(relative)).expect("read back")
+    }
+
+    #[test]
+    fn appends_a_task_to_a_shared_todo() {
+        let dir = vault();
+        let answer = append(
+            dir.path(),
+            "00_Inbox/TODO.md",
+            "- [ ] Draft the abstract",
+            &["00_Inbox"],
+            &[],
+            true,
+        );
+        assert!(answer.ok, "{answer:?}");
+        assert_eq!(
+            contents(dir.path(), "00_Inbox/TODO.md"),
+            "- [ ] Email Kim\n- [ ] Draft the abstract\n"
+        );
+    }
+
+    #[test]
+    fn a_file_without_a_last_newline_gets_one_before_the_task() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write(dir.path(), "TODO.md", "- [ ] First");
+        assert!(append(dir.path(), "TODO.md", "- [ ] Second", &[], &[], true).ok);
+        assert_eq!(
+            contents(dir.path(), "TODO.md"),
+            "- [ ] First\n- [ ] Second\n"
+        );
+    }
+
+    #[test]
+    fn a_missing_todo_is_created_in_an_existing_shared_folder() {
+        let dir = vault();
+        let answer = append(
+            dir.path(),
+            "01_Projects/E65/notes/TODO.md",
+            "- [ ] x",
+            &[],
+            &[],
+            true,
+        );
+        assert_eq!(answer.error.as_deref(), Some("not_found"));
+
+        let created = append(dir.path(), "01_Projects/TODO.md", "- [ ] x", &[], &[], true);
+        assert!(created.ok, "{created:?}");
+        assert_eq!(contents(dir.path(), "01_Projects/TODO.md"), "- [ ] x\n");
+    }
+
+    #[test]
+    fn nothing_is_written_unless_this_machine_allows_writes() {
+        let dir = vault();
+        let answer = append(dir.path(), "00_Inbox/TODO.md", "- [ ] x", &[], &[], false);
+        assert_eq!(answer.error.as_deref(), Some("writes_not_allowed"));
+        assert_eq!(
+            contents(dir.path(), "00_Inbox/TODO.md"),
+            "- [ ] Email Kim\n"
+        );
+    }
+
+    #[test]
+    fn writes_follow_the_read_rules_and_touch_only_todo_files() {
+        let dir = vault();
+        for (path, include, exclude, reason) in [
+            ("01_Projects/E65/notes.md", vec![], vec![], "not_todo_file"),
+            (
+                "01_Projects/E65/TODO.md",
+                vec!["00_Inbox"],
+                vec![],
+                "not_shared",
+            ),
+            (
+                "02_Resources/개인서류/TODO.md",
+                vec![],
+                vec!["02_Resources/개인서류"],
+                "not_shared",
+            ),
+            ("../TODO.md", vec![], vec![], "outside_source"),
+            ("/tmp/TODO.md", vec![], vec![], "absolute_path"),
+            (".obsidian/TODO.md", vec![], vec![], "hidden_path"),
+            ("", vec![], vec![], "not_found"),
+        ] {
+            let answer = append(dir.path(), path, "- [ ] x", &include, &exclude, true);
+            assert_eq!(answer.error.as_deref(), Some(reason), "{path}");
+        }
+        assert_eq!(
+            contents(dir.path(), "01_Projects/E65/TODO.md"),
+            "- [ ] Draft the abstract\n"
+        );
+        assert!(!dir.path().join("02_Resources/개인서류/TODO.md").exists());
+    }
+
+    #[test]
+    fn decomposed_held_back_folders_are_never_written() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let decomposed: String = "개인서류".nfd().collect();
+        write(
+            dir.path(),
+            &format!("{decomposed}/TODO.md"),
+            "- [ ] secret\n",
+        );
+        let answer = append(
+            dir.path(),
+            "개인서류/TODO.md",
+            "- [ ] x",
+            &[],
+            &["개인서류"],
+            true,
+        );
+        assert_eq!(answer.error.as_deref(), Some("not_shared"));
+    }
+
+    #[test]
+    fn only_one_unchecked_task_line_is_accepted() {
+        let dir = vault();
+        for line in [
+            "- [ ] one\n- [ ] two",
+            "- [ ] one\r# heading",
+            "# heading",
+            "- [ ] ",
+            "plain text",
+            &format!("- [ ] {}", "x".repeat(MAX_TASK_LINE_CHARS)),
+        ] {
+            let answer = append(dir.path(), "00_Inbox/TODO.md", line, &[], &[], true);
+            assert_eq!(answer.error.as_deref(), Some("invalid_task"), "{line:?}");
+        }
+        assert_eq!(
+            contents(dir.path(), "00_Inbox/TODO.md"),
+            "- [ ] Email Kim\n"
+        );
+    }
+
+    #[test]
+    fn a_todo_past_the_size_cap_is_not_grown() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write(
+            dir.path(),
+            "TODO.md",
+            &"x".repeat(MAX_TODO_FILE_BYTES as usize),
+        );
+        let answer = append(dir.path(), "TODO.md", "- [ ] x", &[], &[], true);
+        assert_eq!(answer.error.as_deref(), Some("too_large"));
+        assert_eq!(
+            fs::metadata(dir.path().join("TODO.md")).unwrap().len(),
+            MAX_TODO_FILE_BYTES
+        );
+    }
+
+    #[test]
+    fn a_binary_file_named_todo_is_not_appended_to() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("TODO.md"), b"\0\0binary").expect("write");
+        let answer = append(dir.path(), "TODO.md", "- [ ] x", &[], &[], true);
+        assert_eq!(answer.error.as_deref(), Some("not_text"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writes_never_go_through_a_symlink() {
+        let dir = vault();
+        let outside = tempfile::tempdir().expect("outside");
+        write(outside.path(), "TODO.md", "- [ ] outside\n");
+        std::os::unix::fs::symlink(
+            outside.path().join("TODO.md"),
+            dir.path().join("01_Projects/TODO.md"),
+        )
+        .expect("file link");
+        std::os::unix::fs::symlink(outside.path(), dir.path().join("00_Inbox/linked"))
+            .expect("dir link");
+
+        assert_eq!(
+            append(dir.path(), "01_Projects/TODO.md", "- [ ] x", &[], &[], true)
+                .error
+                .as_deref(),
+            Some("symlink")
+        );
+        assert_eq!(
+            append(
+                dir.path(),
+                "00_Inbox/linked/TODO.md",
+                "- [ ] x",
+                &[],
+                &[],
+                true
+            )
+            .error
+            .as_deref(),
+            Some("symlink")
+        );
+        assert_eq!(contents(outside.path(), "TODO.md"), "- [ ] outside\n");
     }
 
     fn names(answer: &SourceAnswer) -> Vec<&str> {
@@ -643,6 +1013,7 @@ mod tests {
             query: Some("e65".to_owned()),
             include_folders: vec!["01_Projects".to_owned()],
             exclude_folders: vec![],
+            allow_writes: false,
         });
         assert!(answer.ok);
         let found: Vec<_> = answer
@@ -659,6 +1030,7 @@ mod tests {
             query: Some("passport".to_owned()),
             include_folders: vec![],
             exclude_folders: vec!["02_Resources/개인서류".to_owned()],
+            allow_writes: false,
         });
         assert!(private.matches.is_empty());
     }

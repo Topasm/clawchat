@@ -364,6 +364,7 @@ export const ReviewSubjectTypeSchema = z.enum([
   'code_diff',
   'schedule_change',
   'sync_conflict',
+  'data_source_write',
 ]);
 export const ReviewStatusSchema = z.enum([
   'pending',
@@ -1667,6 +1668,8 @@ export const DataSourceResponseSchema = z.object({
   capabilities: z.array(z.enum(['list', 'read', 'search'])),
   include_folders: z.array(z.string()),
   exclude_folders: z.array(z.string()),
+  ai_access: z.boolean().optional().default(false),
+  allow_writes: z.boolean().optional().default(false),
   is_online: z.boolean(),
   last_seen_at: z.string().nullable().optional(),
   index_updated_at: z.string().nullable().optional(),
@@ -1714,10 +1717,10 @@ export const DataSourceQueryResponseSchema = z.object({
 
 export const DataSourceQueryLogSchema = z.object({
   id: z.string(),
-  op: z.enum(['list', 'read', 'search']),
+  op: z.enum(['list', 'read', 'search', 'append_todo']),
   path: z.string().nullable().optional(),
   query: z.string().nullable().optional(),
-  status: z.enum(['queued', 'claimed', 'done', 'failed', 'denied', 'expired']),
+  status: z.enum(['awaiting_approval', 'queued', 'claimed', 'done', 'failed', 'denied', 'expired']),
   error: z.string().nullable().optional(),
   requested_by: z.string(),
   requester_name: z.string().nullable().optional(),

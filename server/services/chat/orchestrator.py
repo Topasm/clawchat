@@ -422,7 +422,9 @@ class Orchestrator:
         # Stream response via WebSocket (uses the active AI provider). A reply
         # may use the user's read-only tools; the client hears about each call.
         async def tokens():
-            async for event in reply_events(self.session_factory, self.active_ai, messages):
+            async for event in reply_events(
+                self.session_factory, self.active_ai, messages, conversation_id=conversation_id
+            ):
                 if event.kind == "activity":
                     await self.ws.send_json(user_id, {
                         "type": "tool_activity",

@@ -18,9 +18,10 @@ from services.tools.catalog import ToolSpec, tools_for_chat
 from services.tools.tool_loop import ToolCallRequest, run_tool_loop
 
 TOOLS_HINT = (
-    "\n\nThe tools available here only read. Work that changes anything outside "
-    "ClawChat is done by delegating a task, where each call can be approved; "
-    "suggest delegating when the user asks for that."
+    "\n\nThe tools available here only read; adding a task to a shared TODO.md "
+    "only proposes it for the user's approval. Other work that changes anything "
+    "outside ClawChat is done by delegating a task, where each call can be "
+    "approved; suggest delegating when the user asks for that."
 )
 
 
@@ -57,7 +58,11 @@ def _with_hint(messages: list[dict]) -> list[dict]:
 
 
 async def _loop_events(
-    session_factory: Any, ai: Any, messages: list[dict], specs: list[ToolSpec]
+    session_factory: Any,
+    ai: Any,
+    messages: list[dict],
+    specs: list[ToolSpec],
+    requested_by: str,
 ) -> AsyncIterator[ReplyEvent]:
     """Run the tool loop in a task so tool activity reaches the client as it happens."""
     system, history, user_message = _split(messages)
@@ -71,7 +76,13 @@ async def _loop_events(
             async with session_factory() as db:
 
                 async def invoke(spec: ToolSpec, arguments: dict[str, Any]) -> str:
-                    return await gateway.invoke(db, run_id=None, spec=spec, arguments=arguments)
+                    return await gateway.invoke(
+                        db,
+                        run_id=None,
+                        spec=spec,
+                        arguments=arguments,
+                        requested_by=requested_by,
+                    )
 
                 text, _ = await run_tool_loop(
                     ai,
@@ -97,9 +108,18 @@ async def _loop_events(
 
 
 async def reply_events(
-    session_factory: Any, ai: Any, messages: list[dict]
+    session_factory: Any,
+    ai: Any,
+    messages: list[dict],
+    *,
+    conversation_id: str | None = None,
 ) -> AsyncIterator[ReplyEvent]:
-    """Stream the reply to ``messages`` (system first, the user's message last)."""
+    """Stream the reply to ``messages`` (system first, the user's message last).
+
+    [conversation_id] is what a read of a device's shared folder is recorded
+    as having been asked by.
+    """
+    requested_by = f"chat:{conversation_id}" if conversation_id else "chat"
     async with session_factory() as db:
         specs = await tools_for_chat(db)
     if not specs:
@@ -108,12 +128,14 @@ async def reply_events(
         return
 
     if getattr(ai, "supports_native_tool_calling", False) and hasattr(ai, "tool_turn"):
-        async for event in _loop_events(session_factory, ai, messages, specs):
+        async for event in _loop_events(session_factory, ai, messages, specs, requested_by):
             yield event
         return
 
     # The CLI's tool calls arrive on other requests, so they need their own
     # sessions on the same database.
-    async with agent_mcp_endpoint.run_scope(None, specs, session_factory):
+    async with agent_mcp_endpoint.run_scope(
+        None, specs, session_factory, requested_by=requested_by
+    ):
         async for token in ai.stream_completion(_with_hint(messages)):
             yield ReplyEvent("token", token)

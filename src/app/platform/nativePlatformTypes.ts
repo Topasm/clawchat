@@ -58,12 +58,15 @@ export interface WorkspaceContextFile {
 export interface SourceQueryRequest {
   /** The folder on this machine. Never sent to the server. */
   root: string;
-  op: 'list' | 'read' | 'search';
+  op: 'list' | 'read' | 'search' | 'append_todo';
   /** Relative to `root`. */
   path: string;
+  /** What to search for; for `append_todo`, the task line to add. */
   query?: string | null;
   includeFolders: string[];
   excludeFolders: string[];
+  /** This machine's own setting; a write is refused without it. */
+  allowWrites?: boolean;
 }
 
 export interface SourceAnswer {
@@ -88,7 +91,7 @@ export interface NativeWorkerApi {
   run: (request: WorkerRunRequest) => Promise<WorkerRunResult>;
   /** What a bound folder says about itself, bounded and without following links. */
   readContext: (path: string) => Promise<WorkspaceContextFile[]>;
-  /** List, read or search a shared folder here, within what was shared. */
+  /** List, read or search a shared folder here, or add an approved task, within what was shared. */
   querySource: (request: SourceQueryRequest) => Promise<SourceAnswer>;
   /** Names and dates of a shared folder's files. Never contents. */
   indexSource: (

@@ -106,6 +106,9 @@ describe('DataSourceSharer', () => {
       name: 'workspace',
       include_folders: ['00_Inbox', '01_Projects'],
       exclude_folders: ['01_Projects/Private'],
+      // Neither the AI nor writes until the owner turns them on here.
+      ai_access: false,
+      allow_writes: false,
     });
     // The folder's location on this machine never leaves it.
     expect(JSON.stringify(registration)).not.toContain('/Users/me');
@@ -129,6 +132,7 @@ describe('DataSourceSharer', () => {
       includeFolders: ['00_Inbox', '01_Projects'],
       // What this machine holds back stays back even if Home forgot it.
       excludeFolders: ['02_Resources/Personal', '01_Projects/Private'],
+      allowWrites: false,
     });
     expect(body).toMatchObject({ ok: true, content: '- [ ] Email Kim' });
 
@@ -137,6 +141,41 @@ describe('DataSourceSharer', () => {
     );
     expect(claim?.[0]).toBe('/execution-hosts/host_1/data-queries/claim');
     expect(claim?.[2]).toMatchObject({ params: { wait: 20 } });
+  });
+
+  it("passes an approved write on with this machine's own write setting", async () => {
+    workerMocks.querySource.mockResolvedValue({
+      ok: true,
+      entries: [],
+      matches: [],
+      truncated: false,
+    });
+    const answered = serveOnce({
+      ...claimed,
+      op: 'append_todo',
+      query: '- [ ] Draft the abstract',
+    });
+    const sharer = new DataSourceSharer({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      sources: [{ ...vault, aiAccess: true, allowWrites: true }],
+    });
+
+    sharer.start();
+    const body = await answered;
+    sharer.stop();
+
+    const registration = apiMocks.post.mock.calls.find(([url]) => url === '/data-sources')?.[1];
+    expect(registration).toMatchObject({ ai_access: true, allow_writes: true });
+    expect(workerMocks.querySource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: 'append_todo',
+        path: '00_Inbox/TODO.md',
+        query: '- [ ] Draft the abstract',
+        allowWrites: true,
+      }),
+    );
+    expect(body).toMatchObject({ ok: true });
   });
 
   it('answers a request for a folder it does not know with a refusal', async () => {

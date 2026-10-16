@@ -10,6 +10,8 @@ class ReviewSubjectType(StrEnum):
     CODE_DIFF = "code_diff"
     SCHEDULE_CHANGE = "schedule_change"
     SYNC_CONFLICT = "sync_conflict"
+    #: A change to a file on a device's shared folder, held until approved.
+    DATA_SOURCE_WRITE = "data_source_write"
 
 
 class ReviewStatus(StrEnum):

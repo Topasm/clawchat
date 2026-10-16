@@ -20,6 +20,7 @@ from services.agents import (
     agent_run_service,
     run_resume_service,
 )
+from services.data_sources import service as data_source_service
 from services.planning import (
     plan_proposal_service,
 )
@@ -193,6 +194,20 @@ async def decide_review(
                     db, request, item.subject_id, body.note, user_id
                 ),
             }
+    elif item.subject_type == ReviewSubjectType.DATA_SOURCE_WRITE:
+        # Approving sends the change to the machine and waits for it; when
+        # the machine is off this raises and the item stays open.
+        outcome = await data_source_service.decide_write(
+            db, item.subject_id, body.decision
+        )
+        await review_item_service.set_subject_review_status(
+            db,
+            ReviewSubjectType.DATA_SOURCE_WRITE,
+            item.subject_id,
+            body.decision,
+            note=body.note,
+        )
+        await db.commit()
     else:
         raise ConflictError(
             f"Review decisions for {item.subject_type} are not supported yet"
@@ -207,6 +222,8 @@ async def decide_review(
         await notify_module_data_changed("todos")
     elif item.subject_type == ReviewSubjectType.ARTIFACT_REVISION:
         await notify_module_data_changed("artifacts")
+    elif item.subject_type == ReviewSubjectType.DATA_SOURCE_WRITE:
+        await notify_module_data_changed("data_sources")
     else:
         await notify_module_data_changed("runs")
         await notify_module_data_changed("todos")

@@ -166,6 +166,12 @@ async def build_review_response(
                 "run_status": run.status,
                 "approval_impact": approval_impact.model_dump(mode="json"),
             }
+    elif item.subject_type == ReviewSubjectType.DATA_SOURCE_WRITE:
+        from services.data_sources import service as data_source_service
+
+        described = await data_source_service.describe_write(db, item.subject_id)
+        if described is not None:
+            title, description, metadata = described
     return ReviewItemResponse(
         **{
             column: getattr(item, column)

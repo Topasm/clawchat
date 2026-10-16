@@ -12,7 +12,7 @@ from typing import Any
 
 from domain.agent_tools import ToolCallStatus, ToolDecision, ToolTrust
 from models.agent_tools import AgentToolCall, McpServer
-from services.tools import approvals, mcp_client, searxng
+from services.tools import approvals, mcp_client, searxng, vault_tools
 from services.tools.catalog import WEB_SEARCH, ToolSpec, get_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +25,11 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _execute(db: AsyncSession, spec: ToolSpec, arguments: dict[str, Any]) -> tuple[str, bool]:
+async def _execute(
+    db: AsyncSession, spec: ToolSpec, arguments: dict[str, Any], *, requested_by: str
+) -> tuple[str, bool]:
+    if spec.name in vault_tools.VAULT_TOOLS and spec.server_id is None:
+        return await vault_tools.execute(db, spec.name, arguments, requested_by=requested_by)
     if spec.name == WEB_SEARCH and spec.server_id is None:
         settings = await get_settings(db)
         if not settings.searxng_url:
@@ -52,8 +56,13 @@ async def invoke(
     run_id: str | None,
     spec: ToolSpec,
     arguments: dict[str, Any],
+    requested_by: str | None = None,
 ) -> str:
-    """Run one tool call for ``run_id`` and return what the model should see."""
+    """Run one tool call for ``run_id`` and return what the model should see.
+
+    [requested_by] names the chat or run in the audit trail of the data the
+    call reaches; ``run:<id>`` by default, ``chat`` without a run.
+    """
     if not isinstance(arguments, dict):
         arguments = {}
     call = AgentToolCall(
@@ -90,7 +99,12 @@ async def invoke(
         await db.commit()
 
     try:
-        text, is_error = await _execute(db, spec, arguments)
+        text, is_error = await _execute(
+            db,
+            spec,
+            arguments,
+            requested_by=requested_by or (f"run:{run_id}" if run_id else "chat"),
+        )
     except Exception as exc:  # a broken tool must not take the run down
         logger.exception("Tool %s crashed", spec.name)
         text, is_error = f"{spec.name} failed unexpectedly: {exc.__class__.__name__}", True

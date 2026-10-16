@@ -15,6 +15,7 @@ export function subjectLabel(item: ReviewItemResponse): string {
     plan_proposal: translateUi('Plan'),
     artifact_revision: translateUi('Document change'),
     agent_run: translateUi('Agent result'),
+    data_source_write: translateUi('Change to a shared file'),
   };
   return labels[item.subject_type] ?? item.subject_type.replaceAll('_', ' ');
 }
@@ -94,7 +95,8 @@ export default function ReviewItemCard({
             >
               {translateUi('\n                        Approve\n                      ')}
             </button>
-            {item.status === 'pending' && (
+            {/* A change to a file is approved or rejected as it stands. */}
+            {item.status === 'pending' && item.subject_type !== 'data_source_write' && (
               <button
                 className="cc-btn"
                 type="button"

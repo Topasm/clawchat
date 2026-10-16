@@ -4,6 +4,11 @@ A request is checked against what the source's owner shared, queued for the
 machine that holds the data, and answered by that machine's desktop app. When
 the machine is off, or does not answer in time, names and dates come from the
 light index instead; contents never do, because the server never has them.
+
+The AI reads through the same path, and only sources whose owner turned on AI
+access. A change to a source -- adding a task to a ``TODO.md`` -- is recorded
+as a request that waits for approval in review and reaches the machine only
+once the user approves it.
 """
 
 from __future__ import annotations
@@ -15,10 +20,11 @@ import posixpath
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exceptions import AppError, ForbiddenError, NotFoundError, ValidationError
+from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from models.data_source import DataSource, DataSourceEntry, DataSourceQuery
 from models.execution_host import ExecutionHost
 from schemas.data_source import (
@@ -27,6 +33,7 @@ from schemas.data_source import (
     DataSourceQueryResponse,
     DataSourceResponse,
     DataSourceTodoItem,
+    DataSourceWriteProposal,
 )
 from schemas.data_source import DataSourceEntry as EntryOut
 from schemas.data_source import DataSourceSearchMatch as MatchOut
@@ -46,6 +53,10 @@ MAX_CLAIM_WAIT_SECONDS = 25.0
 #: Content handed back from one read.
 MAX_CONTENT_CHARS = 512_000
 MAX_CACHED_MATCHES = 50
+#: Longest task line a write may add.
+MAX_TASK_CHARS = 500
+#: The only file a write may change, compared case-insensitively.
+TODO_FILE_NAME = "todo.md"
 
 
 # -- registration -------------------------------------------------------------
@@ -86,7 +97,13 @@ def apply_settings(
     capabilities: list[str] | None = None,
     include_folders: list[str] | None = None,
     exclude_folders: list[str] | None = None,
+    ai_access: bool | None = None,
+    allow_writes: bool | None = None,
 ) -> None:
+    if ai_access is not None:
+        source.ai_access = ai_access
+    if allow_writes is not None:
+        source.allow_writes = allow_writes
     if capabilities is not None:
         source.capabilities = json.dumps(sorted(set(capabilities)))
     if include_folders is not None:
@@ -122,6 +139,8 @@ async def describe(db: AsyncSession, source: DataSource) -> DataSourceResponse:
         capabilities=_json_list(source.capabilities),
         include_folders=_json_list(source.include_folders),
         exclude_folders=_json_list(source.exclude_folders),
+        ai_access=bool(source.ai_access),
+        allow_writes=bool(source.allow_writes),
         is_online=is_online(source),
         last_seen_at=source.last_seen_at,
         index_updated_at=source.index_updated_at,
@@ -268,6 +287,13 @@ async def _record(
     return row
 
 
+_REFUSALS = {
+    "ai_access_off": "This source is not shared with the AI.",
+    "writes_not_allowed": "This source does not take changes.",
+    "not_todo_file": "Only a TODO.md file can be added to.",
+}
+
+
 async def _deny(db, source, *, op, path, query, requested_by, reason: str) -> AppError:
     await _record(
         db, source, op=op, path=path, query=query,
@@ -279,7 +305,7 @@ async def _deny(db, source, *, op, path, query, requested_by, reason: str) -> Ap
         op, path, source.id, requested_by, reason,
     )
     return ForbiddenError(
-        "That part of the source is not shared.",
+        _REFUSALS.get(reason, "That part of the source is not shared."),
         details={"reason": reason},
     )
 
@@ -310,8 +336,18 @@ async def query_source(
     text: str | None,
     requested_by: str,
     timeout: float = DEFAULT_ANSWER_TIMEOUT_SECONDS,
+    for_ai: bool = False,
 ) -> DataSourceQueryResponse:
-    """Answer one request, from the machine if it can, from the index if not."""
+    """Answer one request, from the machine if it can, from the index if not.
+
+    [for_ai] marks a request a model made, from a chat or a run; it is refused
+    unless the source's owner turned AI access on.
+    """
+    if for_ai and not source.ai_access:
+        raise await _deny(
+            db, source, op=op, path=raw_path, query=text,
+            requested_by=requested_by, reason="ai_access_off",
+        )
     if op not in _json_list(source.capabilities):
         raise await _deny(
             db, source, op=op, path=raw_path, query=text,
@@ -349,6 +385,22 @@ async def query_source(
         db, source, op=op, path=path, query=text,
         requested_by=requested_by, status="queued",
     )
+    if not await _relay(db, source, row, timeout=timeout):
+        return await _fallback(db, source, op, path, text, policy, reason="timeout")
+    return await _collect(db, source, row, policy)
+
+
+async def _relay(
+    db: AsyncSession, source: DataSource, row: DataSourceQuery, *, timeout: float
+) -> bool:
+    """Hand the queued [row] to its machine and wait for the answer.
+
+    ``False`` when the machine did not answer in time; the row is then
+    ``expired``. Otherwise [row] is refreshed with what the machine said.
+    A write the machine already took stays ``claimed`` instead: it may be
+    under way, and its late outcome is still recorded.
+    """
+    waiting_statuses = ("queued",) if row.op == "append_todo" else ("queued", "claimed")
     query_id = row.id
     answered = broker.expect(query_id)
     try:
@@ -361,7 +413,7 @@ async def query_source(
                 update(DataSourceQuery)
                 .where(
                     DataSourceQuery.id == query_id,
-                    DataSourceQuery.status.in_(("queued", "claimed")),
+                    DataSourceQuery.status.in_(waiting_statuses),
                 )
                 .values(
                     status="expired",
@@ -370,14 +422,15 @@ async def query_source(
                 )
             )
             await db.commit()
-            if gave_up.rowcount:
-                return await _fallback(db, source, op, path, text, policy, reason="timeout")
+            await db.refresh(row)
+            if gave_up.rowcount or row.status == "claimed":
+                return False
             # The answer landed between the timeout and the update.
     finally:
         broker.forget(query_id)
 
     await db.refresh(row)
-    return await _collect(db, source, row, policy)
+    return True
 
 
 async def _fallback(db, source, op, path, text, policy, *, reason: str) -> DataSourceQueryResponse:
@@ -487,12 +540,201 @@ async def _collect(
     return response
 
 
+# -- approved writes ----------------------------------------------------------
+
+
+def task_line(text: str) -> str:
+    """The checklist line a write adds: one line, unchecked.
+
+    Line breaks are folded into spaces so a task can never smuggle a second
+    line -- a heading, another task -- into the file.
+    """
+    single = " ".join(unicodedata.normalize("NFC", text).split())
+    for prefix in ("- [ ] ", "- [x] ", "- [X] ", "- ", "* "):
+        if single.startswith(prefix):
+            single = single[len(prefix):].strip()
+            break
+    if not single:
+        raise ValidationError("Say what the task is.", details={"reason": "task_required"})
+    if len(single) > MAX_TASK_CHARS:
+        raise ValidationError(
+            f"A task is at most {MAX_TASK_CHARS} characters.",
+            details={"reason": "task_too_long"},
+        )
+    return f"- [ ] {single}"
+
+
+async def propose_write(
+    db: AsyncSession,
+    source: DataSource,
+    *,
+    op: str,
+    raw_path: str | None,
+    text: str,
+    requested_by: str,
+    for_ai: bool = False,
+) -> DataSourceWriteProposal:
+    """Record a change to [source] and put it in review; nothing is sent yet.
+
+    Refused, and recorded as refused, when the source does not take changes,
+    when the file is not a ``TODO.md`` inside what is shared, or -- for the
+    AI -- when the source is not shared with it.
+    """
+    from services.review import review_item_service
+
+    if op != "append_todo":
+        raise ValidationError("Only adding a task is supported.", details={"reason": "unknown_operation"})
+    if for_ai and not source.ai_access:
+        raise await _deny(
+            db, source, op=op, path=raw_path, query=text,
+            requested_by=requested_by, reason="ai_access_off",
+        )
+    if not source.allow_writes:
+        raise await _deny(
+            db, source, op=op, path=raw_path, query=text,
+            requested_by=requested_by, reason="writes_not_allowed",
+        )
+    try:
+        path = normalize_path(raw_path)
+    except PathDenied as exc:
+        raise await _deny(
+            db, source, op=op, path=raw_path, query=text,
+            requested_by=requested_by, reason=exc.reason,
+        ) from exc
+    line = task_line(text)
+    if posixpath.basename(path).lower() != TODO_FILE_NAME:
+        raise await _deny(
+            db, source, op=op, path=path, query=line,
+            requested_by=requested_by, reason="not_todo_file",
+        )
+    if not policy_for(source).can_read(path):
+        raise await _deny(
+            db, source, op=op, path=path, query=line,
+            requested_by=requested_by, reason="not_shared",
+        )
+
+    row = await _record(
+        db, source, op=op, path=path, query=line,
+        requested_by=requested_by, status="awaiting_approval",
+    )
+    host = await db.get(ExecutionHost, source.host_id)
+    where = f"{source.name} on {host.label}" if host is not None else source.name
+    item = await review_item_service.ensure_review_item(
+        db,
+        subject_type=ReviewSubjectType.DATA_SOURCE_WRITE,
+        subject_id=row.id,
+        project_id=None,
+        summary=f"Add a task to {path} in {where}",
+        risk_level=ReviewRiskLevel.MEDIUM,
+    )
+    await db.commit()
+    return DataSourceWriteProposal(
+        query_id=row.id,
+        review_id=item.id,
+        source_id=source.id,
+        op="append_todo",
+        path=path,
+        line=line,
+        status="awaiting_approval",
+    )
+
+
+async def decide_write(
+    db: AsyncSession,
+    query_id: str,
+    decision: ReviewStatus,
+    *,
+    timeout: float = DEFAULT_ANSWER_TIMEOUT_SECONDS,
+) -> dict:
+    """Carry out the user's decision on a proposed change.
+
+    Rejecting drops it. Approving checks everything again -- the owner may
+    have stopped allowing changes since -- and sends it to the machine,
+    which must be online: nothing is left queued for a machine that is off,
+    so the review stays open for another try.
+    """
+    row = await db.get(DataSourceQuery, query_id)
+    source = await db.get(DataSource, row.source_id) if row is not None else None
+    if row is None or source is None:
+        raise NotFoundError("The proposed change no longer exists.")
+    if row.status != "awaiting_approval":
+        raise _error(
+            "DATA_SOURCE_WRITE_DECIDED",
+            "This change was already decided.",
+            409,
+            write_status=row.status,
+        )
+    if decision == ReviewStatus.CHANGES_REQUESTED:
+        raise ValidationError(
+            "A change to a file is approved or rejected as it stands.",
+            details={"reason": "approve_or_reject"},
+        )
+    now = datetime.now(timezone.utc)
+    if decision != ReviewStatus.APPROVED:
+        row.status = "denied"
+        row.error = "rejected"
+        row.completed_at = now
+        return {"query_id": row.id, "status": row.status, "error": row.error}
+
+    path = row.path or ""
+    reason = None
+    if not source.allow_writes:
+        reason = "writes_not_allowed"
+    elif not policy_for(source).can_read(path):
+        reason = "not_shared"
+    if reason is not None:
+        row.status = "denied"
+        row.error = reason
+        row.completed_at = now
+        return {"query_id": row.id, "status": row.status, "error": reason}
+    if not is_online(source):
+        raise _error(
+            "DATA_SOURCE_OFFLINE",
+            "The machine that holds this file is offline. Approve again once it is on.",
+            503,
+            last_seen_at=source.last_seen_at.isoformat() if source.last_seen_at else None,
+        )
+
+    row.status = "queued"
+    row.approved_at = now
+    await _relay(db, source, row, timeout=timeout)
+    return {"query_id": row.id, "status": row.status, "error": row.error}
+
+
+async def describe_write(db: AsyncSession, query_id: str) -> tuple[str, str, dict] | None:
+    """Title, preview and metadata of a proposed change, for the review card."""
+    row = await db.get(DataSourceQuery, query_id)
+    source = await db.get(DataSource, row.source_id) if row is not None else None
+    if row is None or source is None:
+        return None
+    host = await db.get(ExecutionHost, source.host_id)
+    title = f"{source.name} · {row.path}"
+    return (
+        title,
+        row.query or "",
+        {
+            "query_id": row.id,
+            "source_id": source.id,
+            "source_name": source.name,
+            "host_label": host.label if host is not None else "",
+            "op": row.op,
+            "path": row.path,
+            "line": row.query,
+            "requested_by": row.requested_by,
+            "write_status": row.status,
+            "write_error": row.error,
+            "is_online": is_online(source),
+        },
+    )
+
+
 # -- the machine's side -------------------------------------------------------
 
 
 async def _claim_once(db: AsyncSession, host_id: str) -> DataSourceQuery | None:
     # Requests older than any asker would still wait for are left alone; the
     # asker that queued them has already moved on.
+    # An approved write was asked for long ago; it counts from its approval.
     oldest = datetime.now(timezone.utc) - timedelta(seconds=DEFAULT_ANSWER_TIMEOUT_SECONDS * 2)
     while True:
         candidate = (
@@ -500,7 +742,7 @@ async def _claim_once(db: AsyncSession, host_id: str) -> DataSourceQuery | None:
             .where(
                 DataSourceQuery.host_id == host_id,
                 DataSourceQuery.status == "queued",
-                DataSourceQuery.created_at >= oldest,
+                or_(DataSourceQuery.created_at >= oldest, DataSourceQuery.approved_at >= oldest),
             )
             .order_by(DataSourceQuery.created_at.asc())
             .limit(1)
@@ -577,8 +819,19 @@ async def claim_next_query(
 async def submit_answer(
     db: AsyncSession, host: ExecutionHost, query_id: str, answer: DataQueryAnswer
 ) -> bool:
-    """Record the machine's answer for the asker; ``False`` if nobody waits."""
-    if not broker.is_waiting(query_id):
+    """Record the machine's answer for the asker; ``False`` if nobody waits.
+
+    A write's outcome is recorded either way: the file may have changed even
+    though nobody waited to hear it.
+    """
+    is_write = (
+        await db.execute(
+            select(DataSourceQuery.op).where(
+                DataSourceQuery.id == query_id, DataSourceQuery.host_id == host.id
+            )
+        )
+    ).scalar_one_or_none() == "append_todo"
+    if not broker.is_waiting(query_id) and not is_write:
         await db.execute(
             update(DataSourceQuery)
             .where(
@@ -601,13 +854,16 @@ async def submit_answer(
         .values(
             status="done" if answer.ok else "failed",
             error=None if answer.ok else (answer.error or "io_error"),
-            result=payload if answer.ok else None,
-            result_bytes=len(payload) if answer.ok else None,
+            # A write's answer carries nothing worth relaying.
+            result=payload if answer.ok and not is_write else None,
+            result_bytes=len(payload) if answer.ok and not is_write else None,
             completed_at=datetime.now(timezone.utc),
         )
     )
     await db.commit()
     if not result.rowcount:
+        return False
+    if not broker.is_waiting(query_id):
         return False
     if not answer.ok:
         logger.warning(

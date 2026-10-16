@@ -33,6 +33,8 @@ class RunToolScope:
     run_id: str | None
     specs: dict[str, ToolSpec]
     session_factory: Any
+    #: Who the calls are recorded as when they reach a device's data.
+    requested_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,11 +62,17 @@ def endpoint_url() -> str:
 
 @asynccontextmanager
 async def run_scope(
-    run_id: str | None, specs: list[ToolSpec], session_factory: Any
+    run_id: str | None,
+    specs: list[ToolSpec],
+    session_factory: Any,
+    *,
+    requested_by: str | None = None,
 ) -> AsyncIterator[CliToolAccess]:
     """Expose ``specs`` to the CLI for the duration of one agent or chat turn."""
     token = secrets.token_urlsafe(32)
-    _scopes[token] = RunToolScope(run_id, {spec.name: spec for spec in specs}, session_factory)
+    _scopes[token] = RunToolScope(
+        run_id, {spec.name: spec for spec in specs}, session_factory, requested_by
+    )
     access = CliToolAccess(url=endpoint_url(), token=token)
     marker = current_cli_tools.set(access)
     try:
@@ -106,7 +114,11 @@ async def _call_tool(_ctx, params: types.CallToolRequestParams) -> types.CallToo
         )
     async with scope.session_factory() as db:
         text = await gateway.invoke(
-            db, run_id=scope.run_id, spec=spec, arguments=dict(params.arguments or {})
+            db,
+            run_id=scope.run_id,
+            spec=spec,
+            arguments=dict(params.arguments or {}),
+            requested_by=scope.requested_by,
         )
     return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
 
