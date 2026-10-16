@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.datastore.preferences.core.Preferences
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -153,16 +154,26 @@ private fun TodoTrackingContent(
         null -> null
     }
     val titleSize = if (size.width >= WidgetSize.Width4) 16.sp else 14.sp
+    val headerHeight = if (isCompactHeight) 40.dp else 44.dp
+    val showAddAction = isLoggedIn && !isCompactHeight
+    // What is left for the list once the header, the error line and the
+    // add action have their share.
+    val listHeight = size.height - headerHeight -
+        (if (showAddAction) AddActionHeight else 0.dp) -
+        (if (completionFailed) 18.dp else 0.dp)
 
+    // Any tap that lands on nothing more specific opens the app: the blank
+    // space under a short list, the header between tabs and icons, a message.
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .widgetBackground(backgroundOpacity),
+            .widgetBackground(backgroundOpacity)
+            .clickable(actionStartActivityByComponent(mainActivity)),
     ) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .height(if (isCompactHeight) 40.dp else 44.dp)
+                .height(headerHeight)
                 .padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -173,7 +184,6 @@ private fun TodoTrackingContent(
                     active = mode == contentMode,
                     count = count.takeIf { mode == contentMode },
                     fontSize = titleSize,
-                    mainActivity = mainActivity,
                 )
             }
             Spacer(GlanceModifier.defaultWeight())
@@ -234,6 +244,7 @@ private fun TodoTrackingContent(
                     NoteList(
                         model = data,
                         mainActivity = mainActivity,
+                        availableHeight = listHeight,
                         modifier = GlanceModifier.defaultWeight(),
                     )
                 }
@@ -262,26 +273,30 @@ private fun TodoTrackingContent(
                         mainActivity = mainActivity,
                         workspaceKey = workspaceKey,
                         compact = isCompactHeight,
+                        availableHeight = listHeight,
                         modifier = GlanceModifier.defaultWeight(),
                     )
                 }
             }
         }
 
-        if (isLoggedIn && !isCompactHeight) {
+        if (showAddAction) {
             AddTaskAction()
         }
     }
 }
 
-/** The active tab opens the app, as the title always did; the other switches to it. */
+/**
+ * A tab only ever switches tabs. When the active title also opened the app,
+ * the same word did two different things depending on which tab was showing;
+ * the app now opens from the rows and the blank space instead.
+ */
 @Composable
 private fun HeaderTab(
     mode: WidgetContentMode,
     active: Boolean,
     count: Int?,
     fontSize: TextUnit,
-    mainActivity: ComponentName,
 ) {
     val context = LocalContext.current
     val (title, titleWithCount) = when (mode) {
@@ -297,13 +312,9 @@ private fun HeaderTab(
         ),
         maxLines = 1,
         modifier = GlanceModifier.clickable(
-            if (active) {
-                actionStartActivityByComponent(mainActivity)
-            } else {
-                actionRunCallback<SwitchWidgetContentAction>(
-                    actionParametersOf(SwitchWidgetContentAction.MODE_KEY to mode.name),
-                )
-            },
+            actionRunCallback<SwitchWidgetContentAction>(
+                actionParametersOf(SwitchWidgetContentAction.MODE_KEY to mode.name),
+            ),
         ),
     )
 }
@@ -315,67 +326,97 @@ private fun TodoList(
     mainActivity: ComponentName,
     workspaceKey: String,
     compact: Boolean,
+    availableHeight: Dp,
     modifier: GlanceModifier,
 ) {
     val context = LocalContext.current
-    LazyColumn(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.Start,
-    ) {
+    val entries = buildList {
         // Sorted by deadline, so the order alone carries the urgency that
         // section headings used to spell out.
-        items(model.deadlines, itemId = { it.id.hashCode().toLong() }) { todo ->
-            TodoRow(
-                todo = todo,
-                mainActivity = mainActivity,
-                workspaceKey = workspaceKey,
-                compact = compact,
-            )
+        model.deadlines.forEach { todo ->
+            add(ListEntry(todo.id.hashCode().toLong(), TodoRowHeight) {
+                TodoRow(todo, mainActivity, workspaceKey, compact)
+            })
         }
         if (model.deadlines.isEmpty()) {
-            item {
-                ListNote(
-                    text = context.getString(R.string.widget_no_deadlines_within, horizonDays) +
-                        (model.nextDeadline?.let { " · " + nextDeadlineText(context, it) } ?: ""),
-                    mainActivity = mainActivity,
-                )
-            }
+            val text = context.getString(R.string.widget_no_deadlines_within, horizonDays) +
+                (model.nextDeadline?.let { " · " + nextDeadlineText(context, it) } ?: "")
+            add(ListEntry(-1L, ListNoteHeight) { ListNote(text, mainActivity) })
         }
         if (model.others.isNotEmpty()) {
             // The one heading left: below it the rows stop being a runway.
             if (model.deadlines.isNotEmpty()) {
-                item { ListNote(context.getString(R.string.widget_other_tasks), mainActivity) }
+                val text = context.getString(R.string.widget_other_tasks)
+                add(ListEntry(-2L, ListNoteHeight) { ListNote(text, mainActivity) })
             }
-            items(model.others, itemId = { it.id.hashCode().toLong() }) { todo ->
-                TodoRow(
-                    todo = todo,
-                    mainActivity = mainActivity,
-                    workspaceKey = workspaceKey,
-                    compact = compact,
-                )
+            model.others.forEach { todo ->
+                add(ListEntry(todo.id.hashCode().toLong(), TodoRowHeight) {
+                    TodoRow(todo, mainActivity, workspaceKey, compact)
+                })
             }
         }
-        item { Spacer(GlanceModifier.height(2.dp)) }
+    }
+    WidgetList(entries, availableHeight, modifier)
+}
+
+private val TodoRowHeight = 42.dp
+private val NoteRowHeight = 40.dp
+private val ListNoteHeight = 30.dp
+private val AddActionHeight = 42.dp
+private const val MaxColumnChildren = 10
+
+/** One row of a widget list, with the fixed height that decides whether the list fits. */
+private class ListEntry(
+    val id: Long,
+    val height: Dp,
+    val content: @Composable () -> Unit,
+)
+
+/**
+ * A list that fits is laid out as a plain column. A scrolling widget list
+ * swallows taps on the blank space under its rows, while a column leaves them
+ * to the widget body, which opens the app. Only a list too long to fit scrolls.
+ * Glance renders at most ten children in a Column, so more rows always scroll.
+ */
+@Composable
+private fun WidgetList(entries: List<ListEntry>, availableHeight: Dp, modifier: GlanceModifier) {
+    val listModifier = modifier
+        .fillMaxWidth()
+        .padding(horizontal = 8.dp)
+    val fits = entries.size <= MaxColumnChildren &&
+        entries.sumOf { it.height.value.toDouble() } <= availableHeight.value
+    if (fits) {
+        Column(modifier = listModifier) {
+            entries.forEach { it.content() }
+        }
+    } else {
+        LazyColumn(modifier = listModifier, horizontalAlignment = Alignment.Start) {
+            items(entries, itemId = { it.id }) { it.content() }
+            item { Spacer(GlanceModifier.height(2.dp)) }
+        }
     }
 }
 
 @Composable
 private fun ListNote(text: String, mainActivity: ComponentName) {
-    Text(
-        text = text,
-        style = TextStyle(
-            color = GlanceTheme.colors.onSurfaceVariant,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-        ),
-        maxLines = 1,
+    Box(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+            .height(ListNoteHeight)
+            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
             .clickable(actionStartActivityByComponent(mainActivity)),
-    )
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
@@ -386,10 +427,12 @@ private fun TodoRow(
     compact: Boolean,
 ) {
     val context = LocalContext.current
+    // The whole row opens the app; only the circle completes the task.
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .height(42.dp),
+            .height(TodoRowHeight)
+            .clickable(actionStartActivityByComponent(mainActivity)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -418,9 +461,7 @@ private fun TodoRow(
 
         Text(
             text = todo.title,
-            modifier = GlanceModifier
-                .defaultWeight()
-                .clickable(actionStartActivityByComponent(mainActivity)),
+            modifier = GlanceModifier.defaultWeight(),
             style = TextStyle(
                 color = if (todo.isOverdue) GlanceTheme.colors.error
                 else GlanceTheme.colors.onSurface,
@@ -489,50 +530,48 @@ private fun RunwayBar(fraction: Float, overdue: Boolean) {
 private fun NoteList(
     model: NoteWidgetUiModel,
     mainActivity: ComponentName,
+    availableHeight: Dp,
     modifier: GlanceModifier,
 ) {
+    val entries = model.items.map { note ->
+        ListEntry(note.id.hashCode().toLong(), NoteRowHeight) { NoteRow(note, mainActivity) }
+    }
+    WidgetList(entries, availableHeight, modifier)
+}
+
+@Composable
+private fun NoteRow(note: NoteWidgetItem, mainActivity: ComponentName) {
     val context = LocalContext.current
-    val today = LocalDate.now()
-    LazyColumn(
-        modifier = modifier
+    Row(
+        modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.Start,
+            .height(NoteRowHeight)
+            .padding(horizontal = 8.dp)
+            .clickable(actionStartActivityByComponent(mainActivity)),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(model.items, itemId = { it.id.hashCode().toLong() }) { note ->
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .padding(horizontal = 8.dp)
-                    .clickable(actionStartActivityByComponent(mainActivity)),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = note.headline,
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
-                    maxLines = 1,
-                    modifier = GlanceModifier.defaultWeight(),
-                )
-                note.updatedOn?.let { day ->
-                    Spacer(GlanceModifier.width(8.dp))
-                    Text(
-                        text = if (day == today) {
-                            context.getString(R.string.widget_today)
-                        } else {
-                            shortDate(context, day)
-                        },
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        maxLines = 1,
-                    )
-                }
-            }
+        Text(
+            text = note.headline,
+            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+            maxLines = 1,
+            modifier = GlanceModifier.defaultWeight(),
+        )
+        note.updatedOn?.let { day ->
+            Spacer(GlanceModifier.width(8.dp))
+            Text(
+                text = if (day == LocalDate.now()) {
+                    context.getString(R.string.widget_today)
+                } else {
+                    shortDate(context, day)
+                },
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                maxLines = 1,
+            )
         }
-        item { Spacer(GlanceModifier.height(2.dp)) }
     }
 }
 
@@ -562,7 +601,7 @@ private fun AddTaskAction() {
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .height(42.dp)
+            .height(AddActionHeight)
             .padding(horizontal = 12.dp)
             .clickable(actionStartActivityByIntent(quickAddIntent)),
         verticalAlignment = Alignment.CenterVertically,
