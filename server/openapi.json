@@ -2395,6 +2395,11 @@
             "title": "Id",
             "type": "string"
           },
+          "kind": {
+            "default": "caldav",
+            "title": "Kind",
+            "type": "string"
+          },
           "label": {
             "title": "Label",
             "type": "string"
@@ -2443,6 +2448,28 @@
         "title": "CalendarAccountResponse",
         "type": "object"
       },
+      "CalendarFeedCreate": {
+        "description": "A calendar's secret address in iCal format; stored encrypted, never returned.",
+        "properties": {
+          "label": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Label",
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "CalendarFeedCreate",
+        "type": "object"
+      },
       "CalendarSourceResponse": {
         "properties": {
           "color": {
@@ -2483,6 +2510,11 @@
               }
             ],
             "title": "Last Synced At"
+          },
+          "suggestions_enabled": {
+            "default": true,
+            "title": "Suggestions Enabled",
+            "type": "boolean"
           }
         },
         "required": [
@@ -2519,6 +2551,17 @@
               }
             ],
             "title": "Is Write Target"
+          },
+          "suggestions_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestions Enabled"
           }
         },
         "title": "CalendarSourceUpdate",
@@ -11451,6 +11494,166 @@
         "title": "TodayResponse",
         "type": "object"
       },
+      "TodaySuggestion": {
+        "description": "Work a calendar event, or a free stretch of time, calls for.",
+        "properties": {
+          "auto_added": {
+            "title": "Auto Added",
+            "type": "boolean"
+          },
+          "block_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block End"
+          },
+          "block_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Start"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "event_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Start"
+          },
+          "event_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Title"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "todo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Todo Id"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "auto_added",
+          "title"
+        ],
+        "title": "TodaySuggestion",
+        "type": "object"
+      },
+      "TodaySuggestionList": {
+        "properties": {
+          "auto_add": {
+            "title": "Auto Add",
+            "type": "boolean"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/TodaySuggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "suggestions",
+          "auto_add"
+        ],
+        "title": "TodaySuggestionList",
+        "type": "object"
+      },
+      "TodaySuggestionSettings": {
+        "properties": {
+          "auto_add": {
+            "title": "Auto Add",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "auto_add"
+        ],
+        "title": "TodaySuggestionSettings",
+        "type": "object"
+      },
       "TodoCreate": {
         "properties": {
           "assignee": {
@@ -14215,6 +14418,52 @@
           }
         ],
         "summary": "Update Calendar",
+        "tags": [
+          "calendar-sync"
+        ]
+      }
+    },
+    "/api/calendar-sync/feeds": {
+      "post": {
+        "operationId": "connect_feed_api_calendar_sync_feeds_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarFeedCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarAccountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Connect Feed",
         "tags": [
           "calendar-sync"
         ]
@@ -20399,6 +20648,224 @@
           }
         ],
         "summary": "Get Briefing",
+        "tags": [
+          "today",
+          "today"
+        ]
+      }
+    },
+    "/api/today/suggestions": {
+      "get": {
+        "operationId": "list_suggestions_api_today_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaySuggestionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Suggestions",
+        "tags": [
+          "today",
+          "today"
+        ]
+      }
+    },
+    "/api/today/suggestions/settings": {
+      "put": {
+        "operationId": "update_suggestion_settings_api_today_suggestions_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TodaySuggestionSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaySuggestionSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Suggestion Settings",
+        "tags": [
+          "today",
+          "today"
+        ]
+      }
+    },
+    "/api/today/suggestions/{suggestion_id}/accept": {
+      "post": {
+        "operationId": "accept_suggestion_api_today_suggestions__suggestion_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaySuggestion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Suggestion",
+        "tags": [
+          "today",
+          "today"
+        ]
+      }
+    },
+    "/api/today/suggestions/{suggestion_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_suggestion_api_today_suggestions__suggestion_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaySuggestion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dismiss Suggestion",
+        "tags": [
+          "today",
+          "today"
+        ]
+      }
+    },
+    "/api/today/suggestions/{suggestion_id}/undo": {
+      "post": {
+        "operationId": "undo_suggestion_api_today_suggestions__suggestion_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaySuggestion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Undo Suggestion",
         "tags": [
           "today",
           "today"

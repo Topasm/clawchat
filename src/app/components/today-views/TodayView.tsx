@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
-import { useToggleTodoComplete, useUpdateTodo } from '../../hooks/queries';
+import { useToggleTodoComplete } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
 import { formatDate } from '../../utils/formatters';
 import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
+import TodaySuggestions from './TodaySuggestions';
 import { ChevronRightIcon } from '../shared/Icons';
 import { GearIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
@@ -30,7 +31,8 @@ const MOBILE_VISIBLE_TASKS = 6;
 /**
  * Today is one line of counts and one list, in the order the day asks for
  * them: what is late, then what is due. Events lead the list on desktop.
- * The summary the server writes stays folded until asked for.
+ * Suggestions (from the calendar and the briefing) fold into one line above
+ * it, and the summary the server writes stays folded until asked for.
  */
 export default function TodayView({
   todayDate,
@@ -43,7 +45,6 @@ export default function TodayView({
 }: TodayViewProps) {
   const navigate = useNavigate();
   const toggleMutation = useToggleTodoComplete();
-  const updateTodoMutation = useUpdateTodo();
   const { isMobile } = usePlatform();
   const toggleTodoComplete = useCallback(
     (id: string) => {
@@ -90,6 +91,8 @@ export default function TodayView({
       </div>
 
       <AiSetupBanner />
+
+      <TodaySuggestions briefingSuggestions={briefingData?.suggestions} />
 
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 
@@ -139,53 +142,6 @@ export default function TodayView({
           {briefingOpen && (
             <div className="cc-briefing-card cc-briefing-card--attached">
               <div className="cc-briefing-card__content">{briefingData.summary}</div>
-              {briefingData.suggestions && briefingData.suggestions.length > 0 && (
-                <ul className="cc-briefing-card__suggestions">
-                  {briefingData.suggestions.map((s, i) => (
-                    <li key={i} className="cc-briefing-card__suggestion">
-                      <details className="cc-briefing-card__suggestion-text">
-                        <summary>{s.title}</summary>
-                        <span className="cc-briefing-card__suggestion-reason">{s.reason}</span>
-                      </details>
-                      {s.action === 'move_to_tomorrow' && (
-                        <button
-                          type="button"
-                          className="cc-btn cc-btn--compact cc-btn--ghost"
-                          onClick={() => {
-                            const tomorrow = new Date();
-                            tomorrow.setDate(tomorrow.getDate() + 1);
-                            tomorrow.setHours(23, 59, 0, 0);
-                            updateTodoMutation.mutate({
-                              id: s.todo_id,
-                              data: { due_date: tomorrow.toISOString() },
-                            });
-                          }}
-                        >
-                          {translateUi('Move to tomorrow')}
-                        </button>
-                      )}
-                      {s.action === 'start_with' && (
-                        <button
-                          type="button"
-                          className="cc-btn cc-btn--compact cc-btn--ghost"
-                          onClick={() => navigate(`/tasks/${s.todo_id}`)}
-                        >
-                          {translateUi('Start')}
-                        </button>
-                      )}
-                      {s.action === 'reschedule' && (
-                        <button
-                          type="button"
-                          className="cc-btn cc-btn--compact cc-btn--ghost"
-                          onClick={() => navigate(`/tasks/${s.todo_id}`)}
-                        >
-                          {translateUi('Reschedule')}
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           )}
         </div>

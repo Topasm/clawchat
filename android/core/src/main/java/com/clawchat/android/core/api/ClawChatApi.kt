@@ -114,6 +114,19 @@ interface ClawChatApi {
     @GET("api/today/briefing")
     suspend fun getBriefing(@Tag expectedScope: ExpectedSessionScope? = null): BriefingResponse
 
+    @GET("api/today/suggestions")
+    suspend fun getTodaySuggestions(
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodaySuggestionList
+
+    /** [answer] is accept, dismiss, or undo. */
+    @POST("api/today/suggestions/{id}/{answer}")
+    suspend fun answerTodaySuggestion(
+        @Path("id") id: String,
+        @Path("answer") answer: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodaySuggestion
+
     // --- Todos ---
 
     @GET("api/todos")

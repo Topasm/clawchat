@@ -12,17 +12,25 @@ def _now() -> datetime:
 
 
 class CalendarAccount(Base):
-    """A CalDAV account (iCloud, Nextcloud, Fastmail, ...) the user connected."""
+    """A calendar the user connected.
+
+    ``caldav``: an account (iCloud, Nextcloud, Fastmail, ...) read and written
+    over CalDAV. ``ics_url``: one calendar's secret iCal address (Google's
+    "secret address in iCal format"), read only; ``server_url`` then holds just
+    its host and ``feed_url`` the encrypted address.
+    """
 
     __tablename__ = "calendar_accounts"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: make_id("calacct_"))
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="caldav", server_default="caldav")
     label: Mapped[str] = mapped_column(Text, nullable=False)
     server_url: Mapped[str] = mapped_column(Text, nullable=False)
     username: Mapped[str] = mapped_column(Text, nullable=False)
     # An app-specific password; the API never returns it.
     password: Mapped[str] = mapped_column(Text, nullable=False)
     home_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    feed_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now)
@@ -47,6 +55,10 @@ class CalendarSource(Base):
     import_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Where events created in ClawChat are saved (at most one calendar).
     is_write_target: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Its events may lead to suggested tasks (off for holidays and birthdays).
+    suggestions_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
     ctag: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now)

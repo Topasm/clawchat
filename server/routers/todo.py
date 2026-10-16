@@ -166,7 +166,8 @@ async def _enrich_todo_response(
     resp.sync_status = _compute_sync_status(todo.source)
 
     # project_label
-    resp.project_label = _humanize_folder_name(todo.source_id)
+    if todo.source != "calendar":
+        resp.project_label = _humanize_folder_name(todo.source_id)
 
     # plan_summary — only fetch when inbox_state is plan_ready
     if include_plan_summary and todo.inbox_state == "plan_ready":

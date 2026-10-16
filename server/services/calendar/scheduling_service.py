@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -148,8 +148,12 @@ async def find_free_slots(
     range_end: datetime,
     duration_minutes: int = 60,
     working_hours: tuple[int, int] = (DEFAULT_WORK_START, DEFAULT_WORK_END),
+    zone: tzinfo = timezone.utc,
 ) -> list[dict]:
-    """Find free time slots of at least `duration_minutes` within working hours."""
+    """Find free time slots of at least `duration_minutes` within working hours.
+
+    Working hours and weekends are read on the wall clock of ``zone``.
+    """
     entries = await _collect_busy_entries(db, range_start, range_end)
     busy = _merge_intervals(
         [(entry["start_time"], entry["end_time"]) for entry in entries]
@@ -160,13 +164,13 @@ async def find_free_slots(
     work_start_h, work_end_h = working_hours
     duration = timedelta(minutes=duration_minutes)
 
-    current_day = range_start.date()
-    end_day = range_end.date()
+    current_day = range_start.astimezone(zone).date()
+    end_day = range_end.astimezone(zone).date()
 
     busy_index = 0
     while current_day <= end_day:
-        day_start = datetime(current_day.year, current_day.month, current_day.day, work_start_h, 0, tzinfo=timezone.utc)
-        day_end = datetime(current_day.year, current_day.month, current_day.day, work_end_h, 0, tzinfo=timezone.utc)
+        day_start = datetime(current_day.year, current_day.month, current_day.day, work_start_h, 0, tzinfo=zone)
+        day_end = datetime(current_day.year, current_day.month, current_day.day, work_end_h, 0, tzinfo=zone)
 
         # Skip weekends
         if current_day.weekday() >= 5:

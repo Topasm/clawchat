@@ -13,6 +13,8 @@ import com.clawchat.android.core.data.local.toModel
 import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TodayResponse
+import com.clawchat.android.core.data.model.TodaySuggestion
+import com.clawchat.android.core.data.model.TodaySuggestionList
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
@@ -40,6 +42,13 @@ data class CachedToday(
 interface TodayRepository {
     suspend fun getToday(): ApiResult<TodayResponse>
     suspend fun getBriefing(): ApiResult<BriefingResponse>
+
+    /** What the calendar suggests; a device-only workspace has no calendar to read. */
+    suspend fun getSuggestions(): ApiResult<TodaySuggestionList> = ApiResult.Success(TodaySuggestionList())
+
+    /** [answer] is accept, dismiss, or undo. */
+    suspend fun answerSuggestion(id: String, answer: String): ApiResult<TodaySuggestion> =
+        ApiResult.Error("Suggestions require a server")
 
     /** Replays the last synced day so an offline launch is not a blank screen. */
     suspend fun getCachedToday(today: LocalDate = LocalDate.now()): CachedToday
@@ -113,6 +122,20 @@ class TodayRepositoryImpl @Inject constructor(
                 apiCall { api.getBriefing(expectedScope) }
             }
         }
+    }
+
+    override suspend fun getSuggestions(): ApiResult<TodaySuggestionList> {
+        val runtimeState = currentRuntimeState()
+        if (runtimeState.mode != WorkspaceMode.SERVER) return ApiResult.Success(TodaySuggestionList())
+        val expectedScope = runtimeState.activeServerRequestScope() ?: return workspaceNotConfigured()
+        return apiCall { api.getTodaySuggestions(expectedScope) }
+    }
+
+    override suspend fun answerSuggestion(id: String, answer: String): ApiResult<TodaySuggestion> {
+        val runtimeState = currentRuntimeState()
+        if (runtimeState.mode != WorkspaceMode.SERVER) return ApiResult.Error("Suggestions require a server")
+        val expectedScope = runtimeState.activeServerRequestScope() ?: return workspaceNotConfigured()
+        return apiCall { api.answerTodaySuggestion(id, answer, expectedScope) }
     }
 
     override suspend fun getCachedToday(today: LocalDate): CachedToday {

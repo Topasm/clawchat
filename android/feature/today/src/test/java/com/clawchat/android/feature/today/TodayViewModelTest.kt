@@ -12,6 +12,8 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.TodayResponse
+import com.clawchat.android.core.data.model.TodaySuggestion
+import com.clawchat.android.core.data.model.TodaySuggestionList
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.CachedToday
 import com.clawchat.android.core.data.repository.ReviewRepository
@@ -89,6 +91,7 @@ class TodayViewModelTest {
         every { syncManager.eventChanged } returns MutableSharedFlow()
         coEvery { todayRepository.getBriefing() } returns ApiResult.Error("Unavailable")
         coEvery { todayRepository.getCachedToday(any()) } returns CachedToday()
+        coEvery { todayRepository.getSuggestions() } returns ApiResult.Success(TodaySuggestionList())
         every { syncManager.reviewChanged } returns MutableSharedFlow()
         every { syncManager.runChanged } returns MutableSharedFlow()
         coEvery { reviewRepository.listPending(any()) } returns ApiResult.Success(listOf(mockk(), mockk()))
@@ -338,5 +341,55 @@ class TodayViewModelTest {
                 TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
             )
         }
+    }
+
+    @Test
+    fun `calendar suggestions load with the day`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todayRepository.getSuggestions() } returns ApiResult.Success(
+            TodaySuggestionList(listOf(TodaySuggestion(id = "evsug_1", kind = "prepare_meeting", title = "Notes for 1:1"))),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("evsug_1"), viewModel.uiState.value.suggestions.map { it.id })
+    }
+
+    @Test
+    fun `dismissing hides the suggestion at once and asks the server`() = runTest {
+        val pending = TodaySuggestion(id = "evsug_1", kind = "prepare_meeting", title = "Notes for 1:1")
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todayRepository.getSuggestions() } returnsMany listOf(
+            ApiResult.Success(TodaySuggestionList(listOf(pending))),
+            ApiResult.Success(TodaySuggestionList()),
+        )
+        coEvery { todayRepository.answerSuggestion("evsug_1", "dismiss") } returns
+            ApiResult.Success(pending.copy(status = "dismissed"))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.answerSuggestion("evsug_1", SUGGESTION_DISMISS)
+
+        assertEquals(emptyList<TodaySuggestion>(), viewModel.uiState.value.suggestions)
+        testDispatcher.scheduler.advanceUntilIdle()
+        coVerify { todayRepository.answerSuggestion("evsug_1", "dismiss") }
+        assertEquals(emptyList<TodaySuggestion>(), viewModel.uiState.value.suggestions)
+    }
+
+    @Test
+    fun `a failed dismissal brings the suggestion back`() = runTest {
+        val pending = TodaySuggestion(id = "evsug_1", kind = "submit", title = "HW3")
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todayRepository.getSuggestions() } returns
+            ApiResult.Success(TodaySuggestionList(listOf(pending)))
+        coEvery { todayRepository.answerSuggestion(any(), any()) } returns ApiResult.Error("Offline")
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.answerSuggestion("evsug_1", SUGGESTION_DISMISS)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("evsug_1"), viewModel.uiState.value.suggestions.map { it.id })
     }
 }

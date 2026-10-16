@@ -154,11 +154,17 @@ export type { McpServerInput, ToolTrust } from './useAgentToolQueries';
 export {
   useCalendarAccountsQuery,
   useConnectCalendarAccount,
+  useConnectCalendarFeed,
   useDeleteCalendarAccount,
   useSyncCalendarAccount,
   useUpdateCalendarSource,
 } from './useCalendarSyncQueries';
 export type { CalendarAccountInput } from './useCalendarSyncQueries';
+export {
+  useTodaySuggestionsQuery,
+  useAnswerTodaySuggestion,
+  useSetSuggestionAutoAdd,
+} from './useTodaySuggestionQueries';
 export {
   useDataSourcesQuery,
   useDataSourceQuery,

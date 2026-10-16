@@ -1639,11 +1639,14 @@ export const CalendarSourceResponseSchema = z.object({
   color: z.string().nullable(),
   import_enabled: z.boolean(),
   is_write_target: z.boolean(),
+  suggestions_enabled: z.boolean().optional().default(true),
   last_synced_at: z.string().nullable(),
 });
 
 export const CalendarAccountResponseSchema = z.object({
   id: z.string(),
+  // "ics_url": a read-only secret iCal address; server_url is then only its host.
+  kind: z.enum(['caldav', 'ics_url']).optional().default('caldav'),
   label: z.string(),
   server_url: z.string(),
   username: z.string(),
@@ -1658,6 +1661,38 @@ export const CalendarAccountListResponseSchema = z.object({
 
 export type CalendarAccount = z.infer<typeof CalendarAccountResponseSchema>;
 export type CalendarSource = z.infer<typeof CalendarSourceResponseSchema>;
+
+// Work an upcoming calendar event, or a free stretch of time, calls for.
+export const TodaySuggestionSchema = z.object({
+  id: z.string(),
+  kind: z.enum([
+    'prepare_exam',
+    'submit',
+    'prepare_talk',
+    'prepare_meeting',
+    'meeting_notes',
+    'link_project',
+    'time_block',
+  ]),
+  status: z.enum(['pending', 'accepted', 'dismissed']),
+  auto_added: z.boolean(),
+  title: z.string(),
+  event_title: z.string().nullable().optional(),
+  event_start: z.string().nullable().optional(),
+  due_at: z.string().nullable().optional(),
+  block_start: z.string().nullable().optional(),
+  block_end: z.string().nullable().optional(),
+  todo_id: z.string().nullable().optional(),
+  note_id: z.string().nullable().optional(),
+  project_id: z.string().nullable().optional(),
+});
+
+export const TodaySuggestionListSchema = z.object({
+  suggestions: z.array(TodaySuggestionSchema),
+  auto_add: z.boolean(),
+});
+
+export type TodaySuggestion = z.infer<typeof TodaySuggestionSchema>;
 
 // Device data sources: folders a machine offers for reading through Home.
 export const DataSourceResponseSchema = z.object({

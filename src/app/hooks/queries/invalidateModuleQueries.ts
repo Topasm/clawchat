@@ -32,6 +32,8 @@ export function invalidateModuleQueries(queryClient: QueryClient, module?: strin
     invalidateExecutionTelemetry();
   } else if (module === 'notes') {
     queryClient.invalidateQueries({ queryKey: ['notes'] });
+  } else if (module === 'suggestions') {
+    queryClient.invalidateQueries({ queryKey: queryKeys.todaySuggestions });
   } else if (module === 'inbox_routings') {
     queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
   } else if (module === 'projects') {

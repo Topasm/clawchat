@@ -350,6 +350,31 @@ data class BriefingResponse(
     val date: String = "",
 )
 
+/** Work an upcoming calendar event, or a free stretch of time, calls for. */
+@Serializable
+data class TodaySuggestion(
+    val id: String,
+    /** prepare_exam | submit | prepare_talk | prepare_meeting | meeting_notes | link_project | time_block */
+    val kind: String = "",
+    /** pending, or accepted (kept for a day so it can be undone). */
+    val status: String = "pending",
+    @SerialName("auto_added") val autoAdded: Boolean = false,
+    val title: String = "",
+    @SerialName("event_title") val eventTitle: String? = null,
+    @SerialName("event_start") val eventStart: String? = null,
+    @SerialName("due_at") val dueAt: String? = null,
+    @SerialName("block_start") val blockStart: String? = null,
+    @SerialName("block_end") val blockEnd: String? = null,
+) {
+    val isAdded: Boolean get() = status == "accepted"
+}
+
+@Serializable
+data class TodaySuggestionList(
+    val suggestions: List<TodaySuggestion> = emptyList(),
+    @SerialName("auto_add") val autoAdd: Boolean = true,
+)
+
 // --- Devices ---
 
 @Serializable

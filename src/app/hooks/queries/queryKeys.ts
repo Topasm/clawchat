@@ -37,6 +37,7 @@ export const queryKeys = {
   taskExecutionTelemetry: ['task-execution-telemetry'] as const,
   messages: (id: string) => ['messages', id] as const,
   today: ['today'] as const,
+  todaySuggestions: ['today', 'suggestions'] as const,
   attachments: (ownerId: string) => ['attachments', ownerId] as const,
   adminOverview: ['admin', 'overview'] as const,
   adminAI: ['admin', 'ai'] as const,
