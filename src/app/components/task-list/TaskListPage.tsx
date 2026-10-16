@@ -9,7 +9,6 @@ import {
 import useProjectRootIds from '../../hooks/useProjectRootIds';
 import useTaskFilters from '../../hooks/useTaskFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
-import TaskFilterBar from '../tasks/TaskFilterBar';
 import TasksHeader, {
   matchesTasksStatusFilter,
   type TasksStatusFilter,
@@ -17,7 +16,6 @@ import TasksHeader, {
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
-import { translateUi } from '../../i18n';
 
 interface TaskListPageProps {
   statusFilter: TasksStatusFilter;
@@ -72,13 +70,7 @@ export default function TaskListPage({ statusFilter, onStatusFilterChange }: Tas
 
   return (
     <div>
-      <TasksHeader
-        todos={taskTodos}
-        statusFilter={statusFilter}
-        onStatusFilterChange={onStatusFilterChange}
-        subtitle={translateUi('{{count}} tasks', { count: filteredTodos.length })}
-      />
-      <TaskFilterBar />
+      <TasksHeader statusFilter={statusFilter} onStatusFilterChange={onStatusFilterChange} />
       <TaskListView
         todos={orderedTodos}
         allTodos={todos}

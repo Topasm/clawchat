@@ -736,17 +736,17 @@ private fun ThemeModeOption(
                     .clip(RoundedCornerShape(4.dp))
                     .background(
                         when (mode) {
-                            ThemeMode.Light -> Color(0xFFF7F8FA)
-                            ThemeMode.Dark -> Color(0xFF181B1F)
-                            ThemeMode.System -> Color(0xFFE3E6EA)
+                            ThemeMode.Light -> Color(0xFFFFFFFF)
+                            ThemeMode.Dark -> Color(0xFF1E1E20)
+                            ThemeMode.System -> Color(0xFFECECEF)
                         },
                     )
                     .border(
                         1.dp,
                         when (mode) {
-                            ThemeMode.Light -> Color(0xFFDDE1E6)
-                            ThemeMode.Dark -> Color(0xFF41464D)
-                            ThemeMode.System -> Color(0xFFC8CDD3)
+                            ThemeMode.Light -> Color(0xFFE6E6EA)
+                            ThemeMode.Dark -> Color(0xFF38383B)
+                            ThemeMode.System -> Color(0xFFAEAEB2)
                         },
                         RoundedCornerShape(4.dp),
                     ),

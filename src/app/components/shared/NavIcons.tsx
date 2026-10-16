@@ -54,6 +54,27 @@ export function TasksIcon({ size, className, label }: IconProps = {}) {
   );
 }
 
+export function TodayIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <path
+        d="M9 2l2.1 4.4 4.8.7-3.5 3.4.8 4.8L9 13l-4.2 2.3.8-4.8L2.1 7.1l4.8-.7z"
+        fill="currentColor"
+        strokeLinejoin="round"
+      />
+    </IconBase>
+  );
+}
+
+export function ProgressIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <circle cx="9" cy="9" r="6.5" />
+      <path d="M9 5.5V9l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
 export function ReviewIcon({ size, className, label }: IconProps = {}) {
   return (
     <IconBase size={size} className={navClassName(className)} label={label}>

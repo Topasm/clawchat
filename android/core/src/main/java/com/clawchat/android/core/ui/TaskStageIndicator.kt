@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -69,10 +68,10 @@ private fun TaskStageState.position(step: TaskStage): StepPosition = when {
 private fun stageSummary(state: TaskStageState, label: String): String =
     stringResource(R.string.task_stage_summary, state.stage.ordinal + 1, label)
 
-/** Amber for "needs input": the theme's tertiary is purple, which reads as a brand tint, not a wait. */
+/** Amber for "needs input": the theme's tertiary. */
 @Composable
 private fun needsInputColor(): Color =
-    if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) Color(0xFFE5A93B) else Color(0xFFB7791F)
+    MaterialTheme.colorScheme.tertiary
 
 /**
  * Colour of the current step's mark. In a list every row has a current step,

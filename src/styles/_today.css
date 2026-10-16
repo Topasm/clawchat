@@ -34,7 +34,9 @@
 }
 
 .cc-today-list {
-  border-top: 1px solid var(--cc-border-subtle);
+  display: flex;
+  flex-direction: column;
+  margin: 0 -8px;
 }
 
 .cc-link-btn {

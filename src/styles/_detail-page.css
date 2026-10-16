@@ -74,10 +74,10 @@
 }
 
 .cc-detail__section-title {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--cc-text-secondary);
   margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--cc-border);
+  color: var(--cc-link);
+  font-size: 13px;
+  font-weight: 700;
 }

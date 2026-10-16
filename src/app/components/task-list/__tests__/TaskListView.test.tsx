@@ -118,11 +118,11 @@ describe('TaskListView blocked rows', () => {
     expect(ahead).not.toHaveClass('cc-waiting-on--late');
   });
 
-  it('draws the five marks only for a task an agent is involved with', () => {
+  it('says where a task stands only once an agent is involved', () => {
     const telemetry = new Map<string, TaskExecutionTelemetryResponse>([
       ['todo-run', { task_id: 'todo-run', latest_run_status: 'running' } as never],
     ]);
-    const { container } = render(
+    render(
       <TaskListView
         todos={[todo({ id: 'todo-own' }), todo({ id: 'todo-run', title: 'Profile' })]}
         onOpenTask={vi.fn()}
@@ -130,8 +130,7 @@ describe('TaskListView blocked rows', () => {
         telemetryByTaskId={telemetry}
       />,
     );
-    expect(container.querySelectorAll('.cc-stage-dots__marks')).toHaveLength(1);
-    expect(screen.getByText('Captured')).toBeInTheDocument();
+    expect(screen.queryByText('Captured')).not.toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
   });
 });

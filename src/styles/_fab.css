@@ -1,17 +1,25 @@
 /* ============================================================
-   Floating Action Button — Mobile Only
+   Floating Action Button — the one place a new item starts.
+   On the desktop it sits at the foot of the page; on a phone it
+   clears the bottom bar.
    ============================================================ */
 
 .cc-fab {
-  position: fixed;
-  bottom: calc(70px + env(safe-area-inset-bottom));
-  right: 20px;
+  position: absolute;
+  right: 24px;
+  bottom: 26px;
   z-index: 90;
 }
 
+.cc-root--mobile .cc-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(70px + env(safe-area-inset-bottom));
+}
+
 .cc-fab__button {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--cc-primary);
   color: #fff;
@@ -20,8 +28,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--cc-shadow-drag);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--cc-primary) 35%, transparent);
   transition: transform 0.2s ease;
+}
+
+.cc-root--mobile .cc-fab__button {
+  width: 56px;
+  height: 56px;
 }
 
 .cc-fab__button:active {

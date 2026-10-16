@@ -4,170 +4,310 @@
 
 .cc-tasks-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
+  margin: 6px 0 18px;
 }
 
-.cc-tasks-header__actions {
+/* -- List view ------------------------------------------------
+   One line per task: a round check, the title, then grey words for where
+   it stands, its project, what it waits on and when it is due. No rules
+   between rows; the selected or hovered row is a raised surface.        */
+
+.cc-task-rows {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  margin: 0 -8px;
 }
 
-.cc-tasks-header__show-done {
-  display: inline-flex;
-  align-items: center;
+.cc-task-row {
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
-  color: var(--cc-text-secondary);
-  font-size: 13px;
+  padding: 0 8px;
+  border-radius: var(--cc-radius-md);
+  transition: background var(--cc-transition-fast);
+}
+
+.cc-task-row:hover {
+  background: var(--cc-hover-surface);
+}
+
+.cc-task-row:focus-within {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-task-row .cc-checkbox {
+  margin-top: 7px;
+}
+
+.cc-task-row__main {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.cc-tasks-header__actions .cc-segmented__option {
-  min-width: 68px;
-  padding: 7px 12px;
+.cc-task-row__main:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -2px;
+  border-radius: var(--cc-radius-sm);
 }
 
-/* -- List view ------------------------------------------------ */
-
-.cc-task-list {
-  overflow: hidden;
-  border-top: 1px solid var(--cc-border);
-  border-bottom: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-panel);
-  background: transparent;
+.cc-task-row__title {
+  padding-top: 3px;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
 }
 
-.cc-task-list__header,
-.cc-task-list__row {
-  display: grid;
-  grid-template-columns:
-    minmax(260px, 2.3fr) minmax(110px, 0.8fr) minmax(140px, 1fr)
-    minmax(90px, 0.6fr);
-  align-items: center;
-  min-width: 760px;
-}
-
-.cc-task-list__header {
-  min-height: 38px;
-  border-bottom: 1px solid var(--cc-border);
-  background: color-mix(in srgb, var(--cc-surface-secondary) 72%, var(--cc-background));
+.cc-task-row--done .cc-task-row__title {
   color: var(--cc-text-tertiary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-decoration: line-through;
 }
 
-.cc-task-list__header > span,
-.cc-task-list__row > span {
+.cc-task-row__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--cc-text-tertiary);
+  font-size: 12.5px;
+}
+
+.cc-task-row__meta > * {
   min-width: 0;
-  padding: 8px 12px;
+}
+
+.cc-task-row__steps {
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-task-row__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* A question or a failure is the one place a row's words take colour. */
+.cc-task-row__state--needs_input {
+  color: var(--cc-warning);
+  font-weight: 600;
+}
+
+.cc-task-row__state--failed {
+  color: var(--cc-error);
+  font-weight: 600;
+}
+
+.cc-task-row__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cc-success);
+}
+
+.cc-task-row__context {
   overflow: hidden;
+  max-width: 220px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cc-task-list__row {
-  min-height: 48px;
-  border-bottom: 1px solid color-mix(in srgb, var(--cc-border) 72%, transparent);
-  color: var(--cc-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.cc-task-list__row:last-child {
-  border-bottom: 0;
-}
-.cc-task-list__row:hover {
-  background: var(--cc-hover-surface);
-}
-.cc-task-list__row:focus-visible {
-  outline: 2px solid var(--cc-primary);
-  outline-offset: -2px;
-}
-.cc-task-list__row--done {
-  opacity: 0.68;
-}
-
-.cc-task-list__task {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--cc-text);
-}
-
-.cc-task-list__task input {
-  accent-color: var(--cc-primary);
-  cursor: pointer;
-}
-.cc-task-list__title {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.3;
-}
-.cc-task-list__title-line {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-.cc-task-list__task strong {
+.cc-task-row__waiting {
   overflow: hidden;
+  font-size: inherit;
   text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 600;
-}
-.cc-task-list__row--done .cc-task-list__task strong {
-  text-decoration: line-through;
+  white-space: nowrap;
 }
 
-.cc-task-list__branch {
-  width: 9px;
-  height: 9px;
-  flex: 0 0 auto;
-  border-bottom: 1px solid var(--cc-border);
-  border-left: 1px solid var(--cc-border);
+.cc-task-row__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
-.cc-task-list__overdue {
+.cc-task-row__due--overdue {
   color: var(--cc-error);
-  font-weight: 600;
+}
+
+.cc-task-row__flag {
+  flex: none;
+}
+
+.cc-task-row__due--overdue .cc-task-row__flag,
+.cc-task-row__flag {
+  color: var(--cc-error);
 }
 
 .cc-task-list__empty {
   display: grid;
   min-height: 240px;
   place-items: center;
-  border-top: 1px solid var(--cc-border);
-  border-bottom: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-panel);
-  color: var(--cc-text-secondary);
+  color: var(--cc-text-tertiary);
   font-size: 13px;
 }
 
-.cc-task-list__steps {
+/* "View ▾": the one control over the list. */
+.cc-task-view {
+  position: relative;
   flex: none;
-  color: var(--cc-text-tertiary);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 
-.cc-task-list__status {
+.cc-task-view__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--cc-radius-row);
+  background: none;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cc-task-view__trigger:hover,
+.cc-task-view__trigger[aria-expanded='true'] {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+}
+
+.cc-task-view__trigger--filtered {
+  color: var(--cc-link);
+}
+
+.cc-task-view__sort {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-task-view__chevron {
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-task-view__popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow-overlay);
+}
+
+.cc-task-view__search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.cc-task-view__search:focus {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: 1px;
+}
+
+.cc-task-view__group {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--cc-border);
 }
 
-/* What an active task waits on, named under its title. */
-.cc-task-list__waiting {
-  font-size: 11px;
+.cc-task-view__option,
+.cc-task-view__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-task-view__option:hover,
+.cc-task-view__toggle:hover {
+  background: var(--cc-hover-surface);
+}
+
+.cc-task-view__toggle input {
+  accent-color: var(--cc-primary);
+}
+
+.cc-task-view__mark {
+  width: 14px;
+  color: var(--cc-link);
+  font-style: normal;
+  text-align: center;
+}
+
+.cc-task-view__option[aria-checked='true'] .cc-task-view__mark::before {
+  content: '✓';
+}
+
+.cc-task-view__tags {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cc-task-view__tag {
+  padding: 2px 10px;
+  border: 0;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cc-task-view__tag[aria-pressed='true'] {
+  background: var(--cc-primary);
+  color: #fff;
+}
+
+.cc-task-view__clear {
+  align-self: flex-start;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: var(--cc-link);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
 }
 
 /* -- One task's flow ----------------------------------------- */
@@ -283,6 +423,9 @@
   min-height: 64px;
 }
 
+/* A box is two lines: the step, then one word on where it stands. Done is a
+   filled grey box with dim words, the step in progress has a blue edge, a
+   waiting step a thin one. */
 .cc-flow__box {
   position: relative;
   z-index: 1;
@@ -290,10 +433,15 @@
   align-items: center;
   gap: 6px;
   box-sizing: border-box;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
+  white-space: nowrap;
+}
+
+.cc-flow__box:hover {
+  border-color: var(--cc-text-tertiary);
 }
 
 .cc-flow__box--selected {
@@ -306,23 +454,93 @@
 }
 
 .cc-flow__box--done {
-  opacity: 0.6;
+  border-color: transparent;
+  background: var(--cc-surface-secondary);
 }
 
-.cc-flow__box--done .cc-flow__title {
-  text-decoration: line-through;
+.cc-flow__box--done .cc-flow__title,
+.cc-flow__box--done .cc-flow__label {
+  color: var(--cc-text-tertiary);
 }
 
 .cc-flow__box--active {
-  border-left: 3px solid var(--cc-primary);
+  border: 1.5px solid var(--cc-primary);
 }
 
-.cc-flow__box--blocked {
-  border-left: 3px solid var(--cc-warning);
-}
-
-.cc-flow__box--waiting .cc-flow__title {
+.cc-flow__box--active .cc-flow__meta {
   color: var(--cc-text-secondary);
+}
+
+.cc-flow__box--blocked .cc-flow__meta,
+.cc-flow__box--waiting .cc-flow__meta {
+  color: var(--cc-warning);
+}
+
+/* The lines of the flow: grey, turning in quarter-circles at a fork or join. */
+.cc-flow__line {
+  position: absolute;
+  height: 0;
+  margin-top: -0.75px;
+  border-top: 1.5px solid var(--cc-connector);
+  pointer-events: none;
+}
+
+.cc-flow__line--down {
+  width: 0;
+  height: auto;
+  margin-top: 0;
+  margin-left: -0.75px;
+  border-top: 0;
+  border-left: 1.5px solid var(--cc-connector);
+}
+
+.cc-flow__turn {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0 solid var(--cc-connector);
+  pointer-events: none;
+}
+
+/* Leaving the row: along the top edge and down the right (or up it). */
+.cc-flow__turn--out-down {
+  margin-top: -0.75px;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+  border-top-right-radius: 100%;
+}
+
+.cc-flow__turn--out-up {
+  margin-top: 0.75px;
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+  border-bottom-right-radius: 100%;
+}
+
+/* Arriving on the next row: down the left edge and along the bottom (or top). */
+.cc-flow__turn--in-down {
+  margin-top: 0.75px;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+  border-bottom-left-radius: 100%;
+}
+
+.cc-flow__turn--in-up {
+  margin-top: -0.75px;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+  border-top-left-radius: 100%;
+}
+
+.cc-flow__arrow {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin-top: -3.75px;
+  margin-left: -5px;
+  border-top: 1.5px solid var(--cc-connector);
+  border-right: 1.5px solid var(--cc-connector);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .cc-flow__box--proposed {
@@ -417,8 +635,8 @@
 
 .cc-flow__title {
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -426,7 +644,7 @@
 .cc-flow__meta {
   overflow: hidden;
   color: var(--cc-text-tertiary);
-  font-size: 12px;
+  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -458,27 +676,6 @@
   color: var(--cc-primary);
   font: inherit;
   cursor: pointer;
-}
-
-.cc-flow__line {
-  position: absolute;
-  height: 0;
-  border-top: 1.5px solid var(--cc-border-strong);
-}
-
-.cc-flow__line--down {
-  width: 0;
-  border-top: 0;
-  border-left: 1.5px solid var(--cc-border-strong);
-}
-
-.cc-flow__arrow {
-  position: absolute;
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 6px solid var(--cc-border-strong);
 }
 
 .cc-flow__tail {
@@ -896,25 +1093,11 @@
 }
 
 @media (max-width: 768px) {
-  .cc-tasks-header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
+  .cc-task-rows {
+    margin: 0;
   }
-  .cc-tasks-header__actions,
-  .cc-tasks-header__actions .cc-segmented,
-  .cc-tasks-header__status-filter,
-  .cc-tasks-header__view-filter {
-    width: 100%;
-  }
-  .cc-tasks-header__actions .cc-segmented__option {
-    min-width: 49px;
-    min-height: 36px;
-    padding: 6px 7px;
-    font-size: 11px;
-  }
-  .cc-task-list {
-    overflow-x: auto;
+  .cc-task-row {
+    padding: 0 2px;
   }
 
   .cc-dialog__content.cc-task-proposal {

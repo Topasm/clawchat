@@ -42,12 +42,15 @@
 }
 
 .cc-exec-panel__section-title {
-  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--cc-border);
+  color: var(--cc-link);
+  font-size: 13px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--cc-text-secondary);
-  margin-bottom: 10px;
 }
 
 .cc-exec-panel__run-fact {
@@ -188,7 +191,7 @@
 
 .cc-exec-panel__context-link {
   font-size: 13px;
-  color: var(--cc-primary);
+  color: var(--cc-link);
   cursor: pointer;
   font-weight: 500;
 }

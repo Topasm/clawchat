@@ -22,6 +22,10 @@ export const koreanUiTranslations: Record<string, string> = {
   'Remove this file?': '이 파일을 뺄까요?',
   'The uploaded copy of {{filename}} is deleted from Home. A path or note is only taken off the list.':
     '업로드한 {{filename}} 사본이 Home에서 지워집니다. 경로와 노트는 목록에서만 빠집니다.',
+  Progress: '진행',
+  '{{percent}}% done': '{{percent}}% 완료',
+  'Check {{count}}': '확인 {{count}}',
+  'Running {{count}}': '실행 {{count}}',
   Notes: '메모',
   'Long-press a note and drop it on a project. Tap a project to see its notes.':
     '메모를 길게 눌러 프로젝트에 놓으세요. 프로젝트를 누르면 모아 둔 메모를 볼 수 있습니다.',
