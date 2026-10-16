@@ -45,6 +45,25 @@ async function open(page: Page, path: string) {
     },
     [{ token, refreshToken }, API] as const,
   );
+  // Whether an AI provider is reachable depends on the machine (CI has no
+  // CLI, a developer's box may), and it decides whether the Inbox is listed
+  // and what the foot of the sidebar says. Pin both so every run draws the
+  // same shell.
+  await page.route('**/api/capabilities', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.ai = { ...body.ai, available: true, model: 'claude sonnet (via CLI)' };
+    body.features = { ...body.features, inbox_pipeline: true, agent_tasks: true };
+    await route.fulfill({ response, json: body });
+  });
+  await page.route('**/api/health', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...body, ai_connected: true, ai_model: 'claude sonnet (via CLI)' },
+    });
+  });
   await page.goto(path);
   await page.waitForLoadState('networkidle');
   // Let lazy chunks, fonts and list animations settle.
