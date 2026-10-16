@@ -35,9 +35,9 @@ export default function useTaskFilters(todos: TodoResponse[], filters: TaskFilte
         case 'title':
           return dir * a.title.localeCompare(b.title);
         case 'due_date': {
-          const da = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-          const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
-          return dir * (da - db);
+          // Without a deadline sorts last either way.
+          if (!a.due_date || !b.due_date) return Number(!a.due_date) - Number(!b.due_date);
+          return dir * (new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
         }
         case 'updated_at':
           return dir * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());

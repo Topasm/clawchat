@@ -75,7 +75,7 @@ import kotlinx.coroutines.flow.filter
 /**
  * What the Inbox just organized, each with its destination and an undo, then
  * what it was not sure about, each with two choices. A long press under
- * "Needs a look" starts picking several captures to file at once.
+ * "Couldn't sort" starts picking several captures to file at once.
  */
 @Composable
 internal fun InboxLists(

@@ -338,7 +338,7 @@ export const translationResources = {
         appName: 'ClawChat',
       },
       nav: {
-        inbox: 'Inbox',
+        inbox: '받은함',
         projects: '프로젝트',
         attention: '확인 필요',
         more: '더보기',

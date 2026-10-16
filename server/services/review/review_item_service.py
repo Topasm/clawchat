@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from domain.plan_proposal import PlanProposalStatus
 from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from exceptions import NotFoundError
 from models.artifact import Artifact, ArtifactRevision
@@ -79,6 +80,54 @@ async def set_subject_review_status(
     return item
 
 
+_LEGACY_PLAN_SUMMARY = "Review AI plan for "
+
+#: Proposals still waiting on a person; anything later is already settled.
+_OPEN_PROPOSAL_STATUSES = (PlanProposalStatus.DRAFT, PlanProposalStatus.STALE)
+
+
+async def close_task_plan_reviews(db: AsyncSession, todo_ids: list[str] | set[str]) -> int:
+    """Expire plan reviews of tasks that are done, deleted or now notes.
+
+    A plan for a finished or vanished task is nothing left to decide, so its
+    card leaves the review queue instead of waiting there. Call this before a
+    delete: the proposal loses its root link once the task row is gone.
+    """
+    ids = [todo_id for todo_id in todo_ids if todo_id]
+    if not ids:
+        return 0
+    proposals = list(
+        (
+            await db.execute(
+                select(PlanProposal).where(
+                    PlanProposal.root_task_id.in_(ids),
+                    PlanProposal.status.in_(_OPEN_PROPOSAL_STATUSES),
+                )
+            )
+        ).scalars()
+    )
+    if not proposals:
+        return 0
+    for proposal in proposals:
+        proposal.status = PlanProposalStatus.STALE
+    items = list(
+        (
+            await db.execute(
+                select(ReviewItem).where(
+                    ReviewItem.subject_type == ReviewSubjectType.PLAN_PROPOSAL,
+                    ReviewItem.subject_id.in_([proposal.id for proposal in proposals]),
+                    ReviewItem.status == ReviewStatus.PENDING,
+                )
+            )
+        ).scalars()
+    )
+    now = datetime.now(timezone.utc)
+    for item in items:
+        item.status = ReviewStatus.EXPIRED
+        item.reviewed_at = now
+    return len(items)
+
+
 async def get_review_item(db: AsyncSession, review_id: str) -> ReviewItem:
     item = await db.get(ReviewItem, review_id)
     if item is None:
@@ -118,8 +167,9 @@ async def build_review_response(
             if proposal and proposal.root_task_id
             else None
         )
-        title = root.title if root else "AI task plan"
-        description = "Review the proposed tasks and dependencies before applying."
+        title = root.title if root else None
+        # The client words the card in the reader's language.
+        description = None
         href = f"/tasks/{root.id}" if root else None
         if proposal:
             metadata = {
@@ -172,14 +222,19 @@ async def build_review_response(
         described = await data_source_service.describe_write(db, item.subject_id)
         if described is not None:
             title, description, metadata = described
+    summary = item.summary
+    if title and summary.startswith(_LEGACY_PLAN_SUMMARY):
+        # Older plan reviews stored an English sentence; the task name says it.
+        summary = title
     return ReviewItemResponse(
         **{
             column: getattr(item, column)
             for column in (
                 "id", "project_id", "subject_type", "subject_id", "status",
-                "summary", "risk_level", "requested_at", "reviewed_at", "review_note",
+                "risk_level", "requested_at", "reviewed_at", "review_note",
             )
         },
+        summary=summary,
         project_title=project.title if project else None,
         subject_title=title,
         subject_description=description,

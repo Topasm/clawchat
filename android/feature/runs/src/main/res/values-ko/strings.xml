@@ -17,7 +17,7 @@
     <string name="runs_filter_attention">확인 필요</string>
     <string name="runs_filter_recent">최근</string>
     <string name="runs_empty_title">이 보기에 실행이 없습니다</string>
-    <string name="runs_empty_description">작업을 위임하면 에이전트 실행 내역이 여기에 표시됩니다.</string>
+    <string name="runs_empty_description">작업을 AI에게 맡기면 실행 내역이 여기에 표시됩니다.</string>
     <string name="runs_refresh_action">새로고침</string>
     <string name="runs_attempt">시도 %1$d</string>
     <string name="runs_unscoped">범위 미지정</string>
@@ -37,7 +37,7 @@
     <string name="runs_resume_with_follow_up">후속 지시로 재개</string>
     <string name="runs_retry_agent">에이전트 실행 재시도</string>
     <string name="runs_review_result">결과 검토</string>
-    <string name="runs_cancel_run">실행 취소</string>
+    <string name="runs_cancel_run">실행 중단</string>
     <string name="runs_event_log">이벤트 로그</string>
     <string name="runs_event_log_description">제공자의 상태 신호와 수명 주기 변경입니다.</string>
     <string name="runs_no_events">아직 기록된 이벤트가 없습니다.</string>

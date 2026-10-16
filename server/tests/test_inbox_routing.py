@@ -188,6 +188,25 @@ async def test_acknowledging_clears_the_just_organized_list(client, auth_headers
     ] == []
 
 
+async def test_just_organized_shows_one_line_per_item(client, auth_headers):
+    created = await client.post(
+        "/api/todos",
+        headers=auth_headers,
+        json={"title": "Gpu 컴퓨팅 과제", "inbox_state": "captured"},
+    )
+    todo_id = created.json()["id"]
+    to_note = await client.post(f"/api/todos/{todo_id}/to-note", headers=auth_headers)
+    to_task = await client.post(
+        f"/api/notes/{to_note.json()['note_id']}/to-task", headers=auth_headers
+    )
+
+    items = (await client.get("/api/inbox/routings", headers=auth_headers)).json()["items"]
+    assert [item["id"] for item in items] == [to_task.json()["id"]]
+    # Clearing the list still clears the moves it folded away.
+    cleared = await client.post("/api/inbox/routings/acknowledge", headers=auth_headers)
+    assert cleared.json() == {"acknowledged": 2}
+
+
 def _ai(**classification) -> object:
     class Classifier:
         calls: list[str] = []

@@ -1,6 +1,6 @@
 import type { TaskExecutionTelemetryResponse, TodoResponse } from '../../types/api';
 import StorageLocationBadge from '../shared/StorageLocationBadge';
-import { formatDueDate } from '../../utils/formatters';
+import { formatDueDate, isOverdue } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
@@ -69,7 +69,7 @@ export default function TaskListView({
       <div className="cc-task-list__header" role="row">
         <span role="columnheader">{translateUi('Task')}</span>
         <span role="columnheader">{translateUi('Status')}</span>
-        <span role="columnheader">{translateUi('Project / tag')}</span>
+        <span role="columnheader">{translateUi('Project')}</span>
         <span role="columnheader">{translateUi('Due')}</span>
       </div>
       {todos.map((todo) => {
@@ -83,7 +83,6 @@ export default function TaskListView({
         const context =
           (todo.project_id ? projectTitles?.get(todo.project_id) : null) ||
           todo.project_label ||
-          todo.tags?.[0] ||
           (todo.parent_id ? todoById.get(todo.parent_id)?.title : null);
         return (
           <div
@@ -127,7 +126,7 @@ export default function TaskListView({
             <span
               role="cell"
               className={
-                todo.due_date && formatDueDate(todo.due_date) === 'Overdue'
+                todo.due_date && status !== 'completed' && isOverdue(todo.due_date)
                   ? 'cc-task-list__overdue'
                   : ''
               }

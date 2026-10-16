@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AllTasksPage from '../AllTasksPage';
 import {
   matchesTasksStatusFilter,
-  TASK_STATUS_FILTERS,
   type TasksStatusFilter,
 } from '../../components/tasks/TasksHeader';
 
@@ -31,12 +30,11 @@ function renderPage(entry = '/tasks') {
 }
 
 describe('AllTasksPage status flow', () => {
-  it('starts with all active work and keeps All last', () => {
+  it('starts with open work only', () => {
     renderPage();
 
     expect(screen.getByText(/List/)).toBeInTheDocument();
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
-    expect(TASK_STATUS_FILTERS).toEqual(['active', 'completed', 'all']);
     expect(matchesTasksStatusFilter('pending', 'active')).toBe(true);
     expect(matchesTasksStatusFilter('in_progress', 'active')).toBe(true);
     expect(matchesTasksStatusFilter('completed', 'active')).toBe(false);
@@ -54,7 +52,7 @@ describe('AllTasksPage status flow', () => {
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
   });
 
-  it('moves through task statuses with horizontal swipes', () => {
+  it('shows completed tasks too after a left swipe', () => {
     const { container } = renderPage();
     const page = container.querySelector('.cc-tasks-page');
     expect(page).not.toBeNull();
@@ -62,7 +60,11 @@ describe('AllTasksPage status flow', () => {
     fireEvent.touchStart(page!, { touches: [{ clientX: 240, clientY: 100 }] });
     fireEvent.touchEnd(page!, { changedTouches: [{ clientX: 120, clientY: 105 }] });
 
-    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('completed');
+    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('all');
+
+    fireEvent.touchStart(page!, { touches: [{ clientX: 120, clientY: 100 }] });
+    fireEvent.touchEnd(page!, { changedTouches: [{ clientX: 240, clientY: 105 }] });
+    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
   });
 
   it('opens the graph requested by a project deep link', async () => {

@@ -135,10 +135,10 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
           <div>
             <h2>{translateUi('Plan')}</h2>
             <p>
-              {project.completed_task_count}
-              {translateUi(' of ')}
-              {project.task_count}
-              {translateUi(' tasks completed')}
+              {translateUi('{{done}} of {{total}} tasks done', {
+                done: project.completed_task_count,
+                total: project.task_count,
+              })}
             </p>
           </div>
           <div className="cc-project-plan__view-actions">

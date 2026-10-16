@@ -10,6 +10,7 @@ import {
 } from '../../hooks/queries';
 import type { ArtifactResponse, ArtifactType } from '../../types/api';
 import { translateUi } from '../../i18n';
+import { formatDate } from '../../utils/formatters';
 const TYPES: Array<{
   value: ArtifactType;
   label: string;
@@ -97,7 +98,7 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
               <div className="cc-artifact-card__footer">
                 <span>
                   {translateUi('Updated ')}
-                  {new Date(artifact.updated_at).toLocaleDateString()}
+                  {formatDate(artifact.updated_at)}
                 </span>
                 <button type="button" className="cc-btn" onClick={() => openRevision(artifact)}>
                   {translateUi('\n                  Propose revision\n                ')}

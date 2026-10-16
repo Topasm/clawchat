@@ -34,8 +34,9 @@ export const useModuleStore = create<ModuleState>()((set) => ({
   kanbanFilters: {
     searchQuery: '',
     tags: [],
-    sortField: 'created_at' as const,
-    sortDirection: 'desc' as const,
+    // Nearest deadline first; tasks without one go last.
+    sortField: 'due_date' as const,
+    sortDirection: 'asc' as const,
   },
   setKanbanSearchQuery: (query) =>
     set((state) => ({ kanbanFilters: { ...state.kanbanFilters, searchQuery: query } })),
@@ -54,8 +55,8 @@ export const useModuleStore = create<ModuleState>()((set) => ({
       kanbanFilters: {
         searchQuery: '',
         tags: [],
-        sortField: 'created_at',
-        sortDirection: 'desc',
+        sortField: 'due_date',
+        sortDirection: 'asc',
       },
     }),
 }));

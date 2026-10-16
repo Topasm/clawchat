@@ -208,7 +208,7 @@ describe('InboxPage', () => {
     ];
     renderPage();
 
-    const review = screen.getByRole('region', { name: /Needs a look/ });
+    const review = screen.getByRole('region', { name: /Couldn't sort/ });
     const rows = within(review).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
     const busyRow = rows.find((row) => within(row).queryByText('Just captured'))!;

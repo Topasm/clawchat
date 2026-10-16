@@ -17,8 +17,13 @@
   gap: 10px;
 }
 
-.cc-tasks-header__status-filter .cc-segmented__option {
-  min-width: 58px;
+.cc-tasks-header__show-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .cc-tasks-header__actions .cc-segmented__option {

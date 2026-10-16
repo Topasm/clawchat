@@ -502,6 +502,7 @@ async def decide_run(
         if todo is not None and not _is_experiment_todo(todo):
             todo.status = TaskStatus.COMPLETED
             todo.completed_at = datetime.now(timezone.utc)
+            await review_item_service.close_task_plan_reviews(db, [todo.id])
         await _publish_approved_report(db, run=run, task=task, todo=todo)
         if run.provider == "paseo":
             from services.agents.paseo_execution_service import publish_adopted_output

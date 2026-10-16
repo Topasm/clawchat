@@ -5,6 +5,7 @@ import TaskProgressCard from './TaskProgressCard';
 import RunStatusCard from './RunStatusCard';
 import ChatPlanProposalCard from './ChatPlanProposalCard';
 import { translateUi } from '../../i18n';
+import { formatShortDateTime } from '../../utils/formatters';
 interface ActionCardProps {
   metadata: Record<string, unknown>;
   suppressTaskProgress?: boolean;
@@ -30,12 +31,7 @@ export default function ActionCard({ metadata, suppressTaskProgress = false }: A
           </span>
           <span className="cc-action-card__title">{metadata.event_title as string}</span>
           {eventStartTime ? (
-            <span className="cc-action-card__detail">
-              {new Date(eventStartTime).toLocaleString([], {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
-            </span>
+            <span className="cc-action-card__detail">{formatShortDateTime(eventStartTime)}</span>
           ) : null}
         </div>
         <button

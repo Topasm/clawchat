@@ -1,5 +1,6 @@
 import { useChatStore } from '../../stores/useChatStore';
 import { translateUi } from '../../i18n';
+import { formatShortDateTime } from '../../utils/formatters';
 interface Suggestion {
   start: string;
   end: string;
@@ -24,7 +25,6 @@ export default function SchedulingSuggestions({ suggestions, title }: Scheduling
       <div className="cc-action-card__content">
         <span className="cc-action-card__label">{translateUi('Suggested Times')}</span>
         {suggestions.map((s, i) => {
-          const startDate = new Date(s.start);
           return (
             <div key={i} className="cc-action-card__suggestion">
               <div
@@ -35,15 +35,7 @@ export default function SchedulingSuggestions({ suggestions, title }: Scheduling
                   gap: 8,
                 }}
               >
-                <span className="cc-action-card__detail">
-                  {startDate.toLocaleDateString([], {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  })}{' '}
-                  {translateUi('\n                  at ')}
-                  {startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                </span>
+                <span className="cc-action-card__detail">{formatShortDateTime(s.start)}</span>
                 <button
                   type="button"
                   className="cc-btn cc-btn--primary cc-action-card__schedule-btn"

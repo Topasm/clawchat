@@ -19,6 +19,7 @@ import TasksHeader, {
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
+import { translateUi } from '../../i18n';
 
 interface TaskListPageProps {
   viewMode: TasksViewMode;
@@ -100,7 +101,7 @@ export default function TaskListPage({
         onViewModeChange={onViewModeChange}
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
-        subtitle={`${filteredTodos.length} task${filteredTodos.length !== 1 ? 's' : ''} in a detailed list`}
+        subtitle={translateUi('{{count}} tasks', { count: filteredTodos.length })}
       />
       <TaskFilterBar />
       <TaskListView

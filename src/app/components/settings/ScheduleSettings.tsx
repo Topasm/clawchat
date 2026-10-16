@@ -8,6 +8,7 @@ import type { ScheduleSettingsResponse } from '../../types/schemas';
 import SettingsRow from '../shared/SettingsRow';
 import SettingsSection from '../shared/SettingsSection';
 import Toggle from '../shared/Toggle';
+import { formatShortDateTime } from '../../utils/formatters';
 
 type ScheduleUpdate = Partial<
   Pick<
@@ -65,7 +66,7 @@ function formatNext(iso: string | null | undefined, language: string): string | 
       minute: '2-digit',
     }).format(date);
   } catch {
-    return date.toLocaleString();
+    return formatShortDateTime(iso);
   }
 }
 

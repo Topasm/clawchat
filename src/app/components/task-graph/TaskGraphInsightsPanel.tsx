@@ -5,6 +5,7 @@ import type {
 } from '../../types/api';
 import { CloseIcon, ExternalLinkIcon, GraphIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import { appLocale } from '../../utils/formatters';
 interface TaskGraphHealthPanelProps {
   insights?: TaskGraphInsightsResponse;
   isLoading: boolean;
@@ -43,7 +44,7 @@ function formatCriticalPath(insights: TaskGraphInsightsResponse): string {
 function formatTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(appLocale(), {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -53,7 +54,7 @@ function formatTimestamp(value: string): string {
 function formatDeadline(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(appLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -105,8 +106,8 @@ export function TaskGraphHealthPanel({
     summary.issue_count === 0 ? 'healthy' : summary.is_healthy ? 'warning' : 'error';
   const healthLabel =
     summary.issue_count === 0
-      ? 'Healthy'
-      : `${summary.issue_count} ${summary.is_healthy ? 'warning' : 'issue'}${summary.issue_count === 1 ? '' : 's'}`;
+      ? translateUi('No issues')
+      : translateUi('{{count}} to check', { count: summary.issue_count });
   return (
     <section className="cc-task-insights" aria-label={translateUi('Graph execution insights')}>
       <div className="cc-task-insights__heading" data-health={healthTone}>

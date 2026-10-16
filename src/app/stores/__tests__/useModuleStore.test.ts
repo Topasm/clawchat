@@ -41,8 +41,8 @@ describe('useModuleStore', () => {
       expect(useModuleStore.getState().kanbanFilters).toEqual({
         searchQuery: '',
         tags: [],
-        sortField: 'created_at',
-        sortDirection: 'desc',
+        sortField: 'due_date',
+        sortDirection: 'asc',
       });
     });
   });

@@ -15,8 +15,8 @@
     <string name="review_risk">%1$s risk</string>
     <string name="review_subject_id">Subject %1$s</string>
     <string name="review_open_source">Open source</string>
-    <string name="review_decision_note">Decision note</string>
-    <string name="review_decision_note_hint">Optional context or requested changes</string>
+    <string name="review_decision_note">Requested changes</string>
+    <string name="review_decision_note_hint">What should change?</string>
     <string name="review_approve">Approve</string>
     <string name="review_request_changes">Request changes</string>
     <string name="review_reject">Reject</string>

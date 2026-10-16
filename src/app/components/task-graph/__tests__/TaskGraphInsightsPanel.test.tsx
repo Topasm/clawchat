@@ -93,7 +93,7 @@ describe('TaskGraphHealthPanel', () => {
     render(<TaskGraphHealthPanel insights={response} isLoading={false} isError={false} />);
 
     const panel = screen.getByRole('region', { name: 'Graph execution insights' });
-    expect(within(panel).getByText('1 issue')).toBeInTheDocument();
+    expect(within(panel).getByText('1 to check')).toBeInTheDocument();
     expect(within(panel).getByText('45m+')).toBeInTheDocument();
     expect(within(panel).getByText('Selected task may miss its deadline')).toBeInTheDocument();
   });
@@ -113,8 +113,8 @@ describe('TaskGraphHealthPanel', () => {
       />,
     );
 
-    expect(screen.getByText('1 warning')).toBeInTheDocument();
-    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
+    expect(screen.getByText('1 to check')).toBeInTheDocument();
+    expect(screen.queryByText('No issues')).not.toBeInTheDocument();
   });
 });
 

@@ -1,10 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  TASK_STATUS_FILTERS,
-  type TasksStatusFilter,
-  type TasksViewMode,
-} from '../components/tasks/TasksHeader';
+import { type TasksStatusFilter, type TasksViewMode } from '../components/tasks/TasksHeader';
 import { useTasksShortcuts } from '../keyboard';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import TaskListPage from '../components/task-list/TaskListPage';
@@ -87,12 +83,8 @@ export default function AllTasksPage() {
     touchStartY.current = null;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
 
-    const activeIndex = TASK_STATUS_FILTERS.indexOf(statusFilter);
-    if (dx < 0 && activeIndex < TASK_STATUS_FILTERS.length - 1) {
-      setStatusFilter(TASK_STATUS_FILTERS[activeIndex + 1]);
-    } else if (dx > 0 && activeIndex > 0) {
-      setStatusFilter(TASK_STATUS_FILTERS[activeIndex - 1]);
-    }
+    // Swipe left shows completed tasks too; swipe right hides them again.
+    setStatusFilter(dx < 0 ? 'all' : 'active');
   };
 
   return (

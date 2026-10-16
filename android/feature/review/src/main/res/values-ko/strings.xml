@@ -14,8 +14,8 @@
     <string name="review_risk">위험도: %1$s</string>
     <string name="review_subject_id">대상 %1$s</string>
     <string name="review_open_source">원본 열기</string>
-    <string name="review_decision_note">결정 메모</string>
-    <string name="review_decision_note_hint">선택적 설명 또는 요청할 변경 사항</string>
+    <string name="review_decision_note">변경 요청 내용</string>
+    <string name="review_decision_note_hint">무엇을 바꿀까요?</string>
     <string name="review_approve">승인</string>
     <string name="review_request_changes">변경 요청</string>
     <string name="review_reject">거부</string>

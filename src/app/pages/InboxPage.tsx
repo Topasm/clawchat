@@ -24,10 +24,11 @@ import useInboxPlacement from '../hooks/useInboxPlacement';
 import useInboxSections from '../hooks/useInboxSections';
 import type { ProjectFolderCandidate } from '../types/schemas';
 import { translateUi } from '../i18n';
+import { formatMonthDay } from '../utils/formatters';
 
 /**
  * The Inbox files captures by itself. What it just filed shows for a day with
- * an undo; what it was unsure about waits under "Needs a look" with two
+ * an undo; what it was unsure about waits under "Couldn't sort" with two
  * choices. The bar at the bottom adds to the Inbox.
  */
 export default function InboxPage() {
@@ -85,10 +86,7 @@ export default function InboxPage() {
           addToast(
             'success',
             translateUi('Added to tasks, due {{date}}', {
-              date: new Date(todo.due_date).toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              }),
+              date: formatMonthDay(todo.due_date),
             }),
           );
         }

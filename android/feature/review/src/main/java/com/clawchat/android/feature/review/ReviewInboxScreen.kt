@@ -308,7 +308,7 @@ private fun ReviewRow(item: ReviewItem, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (item.subjectTitle != null) {
+        if (item.subjectTitle != null && item.summary != item.subjectTitle) {
             Text(
                 text = item.summary,
                 style = MaterialTheme.typography.bodyMedium,
@@ -343,6 +343,8 @@ private fun ReviewDetail(
     var pendingConfirmationDecision by remember(item.id) {
         mutableStateOf<ReviewDecision?>(null)
     }
+    // The note says what to change, so it opens only once changes are asked for.
+    var requestingChanges by remember(item.id) { mutableStateOf(false) }
     val requestDecision: (ReviewDecision) -> Unit = { decision ->
         if (requiresReviewConfirmation(item.riskLevel, decision)) {
             pendingConfirmationDecision = decision
@@ -365,7 +367,11 @@ private fun ReviewDetail(
                         tone = item.riskLevel.tone,
                     )
                 }
-                Text(item.summary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    item.subjectTitle ?: item.summary,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 item.subjectDescription?.takeIf(String::isNotBlank)?.let {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text(it, style = MaterialTheme.typography.bodyMedium)
@@ -404,7 +410,7 @@ private fun ReviewDetail(
             }
         }
 
-        if (state.canDecideSelected) {
+        if (state.canDecideSelected && requestingChanges) {
             item {
                 OutlinedTextField(
                     value = note,
@@ -417,6 +423,8 @@ private fun ReviewDetail(
                     enabled = !isSubmitting,
                 )
             }
+        }
+        if (state.canDecideSelected) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
@@ -436,8 +444,14 @@ private fun ReviewDetail(
                     // A change to a shared file is approved or rejected as it stands.
                     if (item.subjectType != ReviewSubjectType.DATA_SOURCE_WRITE) {
                         OutlinedButton(
-                            onClick = { requestDecision(ReviewDecision.CHANGES_REQUESTED) },
-                            enabled = !isSubmitting,
+                            onClick = {
+                                if (requestingChanges) {
+                                    requestDecision(ReviewDecision.CHANGES_REQUESTED)
+                                } else {
+                                    requestingChanges = true
+                                }
+                            },
+                            enabled = !isSubmitting && (!requestingChanges || note.isNotBlank()),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.review_request_changes))

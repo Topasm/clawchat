@@ -7,6 +7,7 @@ import type { InboxRouting } from '../../types/schemas';
 import type { InboxMove } from '../../hooks/queries';
 import InboxDestinationMenu, { type InboxDestinationOption } from './InboxDestinationMenu';
 import { translateUi } from '../../i18n';
+import { formatMonthDay } from '../../utils/formatters';
 
 interface InboxQueueProps {
   /** What the Inbox filed in the last day, newest first. */
@@ -29,10 +30,6 @@ interface InboxQueueProps {
 /** Below this the Inbox filed the item anyway and marks it for a look. */
 const LOW_CONFIDENCE = 0.8;
 
-function shortDay(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 function folderName(folder: string | null): string | null {
   if (!folder) return null;
   return folder.split('/').filter(Boolean).pop() ?? null;
@@ -41,7 +38,7 @@ function folderName(folder: string | null): string | null {
 /**
  * The Inbox: what it just organized by itself, and the few captures it was not
  * sure about. A row's destination opens a small menu; Shift- or Cmd-click
- * selects rows under "Needs a look" to file several at once.
+ * selects rows under "Couldn't sort" to file several at once.
  */
 export default function InboxQueue({
   routings,
@@ -97,7 +94,7 @@ export default function InboxQueue({
     const parts: string[] = [];
     if (routing.kind === 'task') {
       if (routing.due_date) {
-        parts.push(translateUi('Due {{date}}', { date: shortDay(routing.due_date) }));
+        parts.push(translateUi('Due {{date}}', { date: formatMonthDay(routing.due_date) }));
       }
       const place =
         projectTitle(todoById.get(routing.todo_id ?? '')?.project_id) ??
@@ -187,7 +184,7 @@ export default function InboxQueue({
       {(review.length > 0 || routings.length > 0) && (
         <section className="cc-inbox-section" aria-labelledby="cc-inbox-review">
           <h2 className="cc-inbox-section__title" id="cc-inbox-review">
-            {translateUi('Needs a look')}
+            {translateUi("Couldn't sort")}
             <span className="cc-inbox-section__count">{review.length}</span>
           </h2>
           {selection.length > 0 && (
