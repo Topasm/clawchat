@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import type { ChatMessage } from '../../stores/useChatStore';
 import {
@@ -63,12 +63,12 @@ export default function ChatPanel({
   const workspaceScope = getChatWorkspaceScope();
   // Merge query messages with streaming messages
   const messages: ChatMessage[] = useMemo(() => {
-    const queryIds = new Set(queryMessages.map((m) => m._id));
+    const queryIds = new Set(queryMessages.map((message) => message._id));
     const onlyStreaming = streamingMessages.filter(
-      (m) =>
-        m.conversationId === conversationId &&
-        (!m.workspaceScope || m.workspaceScope === workspaceScope) &&
-        !queryIds.has(m._id),
+      (message) =>
+        message.conversationId === conversationId &&
+        (!message.workspaceScope || message.workspaceScope === workspaceScope) &&
+        !queryIds.has(message._id),
     );
     return [...onlyStreaming, ...queryMessages];
   }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
@@ -86,7 +86,7 @@ export default function ChatPanel({
   }, [conversationId, queryMessages, reconcileMessages]);
   const handleStartEdit = useCallback(
     (messageId: string) => {
-      const msg = messages.find((m) => m._id === messageId);
+      const msg = messages.find((message) => message._id === messageId);
       if (msg) {
         setEditingMessageId(messageId);
         setEditingText(msg.text);
@@ -281,12 +281,12 @@ export default function ChatPanel({
   }
   // Bottom variant (default): motion-animated height
   return (
-    <motion.div
+    <m.div
       className={`cc-chat-panel${isOpen ? '' : ' cc-chat-panel--collapsed'}`}
       animate={{ height: isOpen ? 360 : 58 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
       {isOpen ? openContent : closedContent}
-    </motion.div>
+    </m.div>
   );
 }

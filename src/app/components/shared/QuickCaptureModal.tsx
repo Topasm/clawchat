@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useTodosQuery, useCreateEvent, useCreateTodo, queryKeys } from '../../hooks/queries';
@@ -163,7 +163,7 @@ export default function QuickCaptureModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
+        <m.div
           className="cc-modal-overlay"
           onClick={onClose}
           initial={{ opacity: 0 }}
@@ -171,7 +171,7 @@ export default function QuickCaptureModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <motion.div
+          <m.div
             className="cc-modal cc-quick-capture"
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: -12, scale: 0.97 }}
@@ -181,7 +181,7 @@ export default function QuickCaptureModal({
           >
             {receipt ? (
               <div className="cc-quick-capture__receipt">
-                <motion.div
+                <m.div
                   className="cc-quick-capture__receipt-message"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -189,7 +189,7 @@ export default function QuickCaptureModal({
                 >
                   <CheckCircleIcon size={20} className="cc-quick-capture__receipt-icon" />
                   <span>{receipt}</span>
-                </motion.div>
+                </m.div>
                 <div className="cc-quick-capture__receipt-actions">
                   <button
                     type="button"
@@ -287,8 +287,8 @@ export default function QuickCaptureModal({
                 </div>
               </form>
             )}
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type RefObject } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ArrowDownIcon, RefreshIcon } from './Icons';
 
 interface PullToRefreshProps {
@@ -74,7 +74,7 @@ export default function PullToRefresh({ contentRef, onRefresh, disabled }: PullT
   const pastThreshold = pullDistance >= THRESHOLD;
 
   return (
-    <motion.div
+    <m.div
       className="cc-pull-indicator"
       style={{ top: refreshing ? 12 : pullDistance - 40 }}
       initial={{ opacity: 0 }}
@@ -86,6 +86,6 @@ export default function PullToRefresh({ contentRef, onRefresh, disabled }: PullT
       >
         {refreshing ? <RefreshIcon size={16} /> : <ArrowDownIcon size={16} />}
       </div>
-    </motion.div>
+    </m.div>
   );
 }

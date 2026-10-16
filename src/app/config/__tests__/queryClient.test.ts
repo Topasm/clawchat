@@ -31,6 +31,27 @@ describe('query cache persistence', () => {
     expect(roots.sort()).toEqual(['events', 'todos']);
   });
 
+  it('keeps the newest entries that fit the size limit', () => {
+    const scope = 'host:alpha';
+    queryClient.setQueryData(['events'], ['older'], { updatedAt: 1_000 });
+    queryClient.setQueryData(['todos'], ['newer'], { updatedAt: 2_000 });
+    const newest = { queryKey: ['todos'], data: ['newer'], updatedAt: 2_000 };
+    const onlyNewest = JSON.stringify({ version: 2, scope, entries: [newest] });
+
+    persistQueryCache(scope, new TextEncoder().encode(onlyNewest).byteLength);
+
+    expect(localStorage.getItem(getQueryCacheStorageKey(scope))).toBe(onlyNewest);
+  });
+
+  it('writes nothing when not even one entry fits', () => {
+    const scope = 'host:alpha';
+    queryClient.setQueryData(['todos'], ['x'.repeat(100)]);
+
+    persistQueryCache(scope, 64);
+
+    expect(localStorage.getItem(getQueryCacheStorageKey(scope))).toBeNull();
+  });
+
   it('isolates cached data between hosts', () => {
     queryClient.setQueryData(['todos'], [{ id: 'alpha' }]);
     persistQueryCache('host:alpha');

@@ -7,7 +7,7 @@ import {
   Separator as PanelResizeHandle,
   usePanelRef,
 } from 'react-resizable-panels';
-import type { PanelSize } from 'react-resizable-panels';
+import type { Layout as PanelLayout, LayoutChangedMeta, PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import ChatPanel from './chat-panel/ChatPanel';
@@ -24,6 +24,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import type { ConnectionStatus } from '../stores/useAuthStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import AnimatedOutlet from './AnimatedOutlet';
+import MotionProvider from './shared/MotionProvider';
 import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
 import ShortcutsHelp from './shared/ShortcutsHelp';
@@ -44,6 +45,7 @@ import useCommandPalette from '../hooks/useCommandPalette';
 import useProjectRootIds from '../hooks/useProjectRootIds';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
+import type { TodoResponse } from '../types/api';
 // --- SVG icon components ---
 import { InboxIcon, ChatIcon, TasksIcon, NavCalendarIcon, ReviewIcon } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
@@ -110,6 +112,7 @@ const attentionNavItem = { to: '/attention', labelKey: 'nav.attention', Icon: Re
 const SIDEBAR_RAIL_WIDTH = 48;
 const SIDEBAR_EXPANDED_MIN_WIDTH = 160;
 const DEFAULT_SIDEBAR_SIZE = 18;
+const NO_TODO_COUNTS = { inboxCount: 0, dueCount: 0, attentionBadgeCount: 0, openTaskCount: 0 };
 export default function Layout() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
@@ -127,10 +130,31 @@ export default function Layout() {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const quickCapture = useQuickCaptureStore();
+  const quickCaptureOpen = useQuickCaptureStore((state) => state.isOpen);
+  const quickCapturePlaceholder = useQuickCaptureStore((state) => state.placeholder);
+  const quickCaptureParentId = useQuickCaptureStore((state) => state.defaultParentId);
+  const openQuickCapture = useQuickCaptureStore((state) => state.open);
+  const closeQuickCapture = useQuickCaptureStore((state) => state.close);
   const serverUrl = useAuthStore((state) => state.serverUrl);
   const { data: capabilities } = useCapabilitiesQuery();
-  const { data: todos = [] } = useTodosQuery();
+  const projectRootIds = useProjectRootIds();
+  // Select the counts, not the list, so a todo edit that leaves every badge
+  // where it was does not re-render the whole shell.
+  const selectTodoCounts = useCallback(
+    (todos: TodoResponse[]) => {
+      const { inboxCount, dueCount, total } = getAttentionBadgeCounts(todos);
+      const openTaskCount = todos.filter(
+        (todo) =>
+          isTaskTodo(todo) &&
+          !projectRootIds.has(todo.id) &&
+          (todo.status === 'pending' || todo.status === 'in_progress'),
+      ).length;
+      return { inboxCount, dueCount, attentionBadgeCount: total, openTaskCount };
+    },
+    [projectRootIds],
+  );
+  const { data: { inboxCount, dueCount, attentionBadgeCount, openTaskCount } = NO_TODO_COUNTS } =
+    useTodosQuery(true, selectTodoCounts);
   const { data: pendingReviews = [] } = useReviewsQuery();
   const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   useEffect(() => {
@@ -171,12 +195,12 @@ export default function Layout() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable)
           return;
         e.preventDefault();
-        quickCapture.open();
+        openQuickCapture();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [quickCapture]);
+  }, [openQuickCapture]);
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   const { refresh } = useDataSync();
   // Offline queue: monitor network status and flush on reconnect
@@ -204,23 +228,6 @@ export default function Layout() {
   const connectionLabel = isFlushing
     ? t('connection.syncing')
     : t(CONNECTION_LABEL_KEYS[connectionStatus]);
-  // Badge counts
-  const {
-    inboxCount,
-    dueCount,
-    total: attentionBadgeCount,
-  } = useMemo(() => getAttentionBadgeCounts(todos), [todos]);
-  const projectRootIds = useProjectRootIds();
-  const openTaskCount = useMemo(
-    () =>
-      todos.filter(
-        (todo) =>
-          isTaskTodo(todo) &&
-          !projectRootIds.has(todo.id) &&
-          (todo.status === 'pending' || todo.status === 'in_progress'),
-      ).length,
-    [projectRootIds, todos],
-  );
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
       '/schedule': dueCount,
@@ -368,19 +375,22 @@ export default function Layout() {
   const chatPanelSize = useSettingsStore((s) => s.chatPanelSize);
   const setSidebarSize = useSettingsStore((s) => s.setSidebarSize);
   const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
-  const handleSidebarResize = useCallback(
-    (size: PanelSize) => {
-      const collapsed = size.inPixels <= SIDEBAR_RAIL_WIDTH + 1;
-      setSidebarCollapsed(collapsed);
-      if (!collapsed) setSidebarSize(size.asPercentage);
+  const handleSidebarResize = useCallback((size: PanelSize) => {
+    setSidebarCollapsed(size.inPixels <= SIDEBAR_RAIL_WIDTH + 1);
+  }, []);
+  // Save sizes once a drag ends, not on every frame of it: each save rewrites
+  // the persisted settings and re-renders the shell.
+  const handlePanelLayoutChanged = useCallback(
+    (layout: PanelLayout, meta: LayoutChangedMeta) => {
+      if (!meta.isUserInteraction) return;
+      const sidebar = layout.sidebar;
+      if (sidebar !== undefined && !sidebarPanelRef.current?.isCollapsed()) {
+        setSidebarSize(sidebar);
+      }
+      const chat = layout['chat-panel'];
+      if (chat !== undefined) setChatPanelSize(chat);
     },
-    [setSidebarSize],
-  );
-  const handleChatPanelResize = useCallback(
-    (size: PanelSize) => {
-      setChatPanelSize(size.asPercentage);
-    },
-    [setChatPanelSize],
+    [setChatPanelSize, setSidebarSize, sidebarPanelRef],
   );
   const showChatPanel = !chatBarHidden && chatPanel.isOpen;
   const mobileMainContent = (
@@ -404,116 +414,121 @@ export default function Layout() {
     </>
   );
   return (
-    <ChatPanelControllerProvider controller={chatPanel}>
-      <div
-        className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
-        style={cssVars(colors, fontSize)}
-      >
-        <UpdateNotification />
-        <ToastContainer />
-        <OfflineIndicator />
-        <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
-        <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
-        <QuickCaptureModal
-          isOpen={quickCapture.isOpen}
-          onClose={quickCapture.close}
-          placeholder={quickCapture.placeholder || undefined}
-          defaultParentId={quickCapture.defaultParentId}
-        />
+    <MotionProvider>
+      <ChatPanelControllerProvider controller={chatPanel}>
+        <div
+          className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
+          style={cssVars(colors, fontSize)}
+        >
+          <UpdateNotification />
+          <ToastContainer />
+          <OfflineIndicator />
+          <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
+          <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
+          <QuickCaptureModal
+            isOpen={quickCaptureOpen}
+            onClose={closeQuickCapture}
+            placeholder={quickCapturePlaceholder || undefined}
+            defaultParentId={quickCaptureParentId}
+          />
 
-        {isDesktop && simpleMode ? (
-          <Suspense fallback={null}>
-            <SimpleMode />
-          </Suspense>
-        ) : isMobile ? (
-          <>
-            {connectionStatus !== 'connected' && (
-              <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
-                <span className="cc-mobile-status-bar__dot" />
-                <span>
-                  {activeWorkspaceName} ·{' '}
-                  {isFlushing
-                    ? t('connection.syncing')
-                    : t(CONNECTION_LABEL_KEYS[connectionStatus])}
-                </span>
-                {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
-              </div>
-            )}
-            <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-              {mobileMainContent}
-            </div>
-            {/* The chat bar sits between the page and the tabs on every page but
-                chat; the button rides above it and steps aside while it is open. */}
-            {!chatPanel.isOpen && !onInboxPage && (
-              <FloatingActionButton aboveChatBar={!onChatPage} />
-            )}
-            <BottomNav
-              tabs={availableMobileTabs}
-              badges={{
-                '/inbox': navBadgeCounts['/inbox'],
-                '/attention': navBadgeCounts['/attention'],
-              }}
-            />
-          </>
-        ) : (
-          <PanelGroup orientation="horizontal" id="cc-layout">
-            <Panel
-              id="sidebar"
-              panelRef={sidebarPanelRef}
-              defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
-              minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
-              maxSize="250px"
-              collapsible
-              collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
-              onResize={handleSidebarResize}
-            >
-              {sidebar}
-            </Panel>
-            <PanelResizeHandle className="cc-resize-handle" />
-            <Panel id="content" minSize="30%">
-              <div className="cc-main">
-                <div className="cc-content" ref={contentRef}>
-                  <ErrorBoundary name="PageContent">
-                    <AnimatedOutlet />
-                  </ErrorBoundary>
+          {isDesktop && simpleMode ? (
+            <Suspense fallback={null}>
+              <SimpleMode />
+            </Suspense>
+          ) : isMobile ? (
+            <>
+              {connectionStatus !== 'connected' && (
+                <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
+                  <span className="cc-mobile-status-bar__dot" />
+                  <span>
+                    {activeWorkspaceName} ·{' '}
+                    {isFlushing
+                      ? t('connection.syncing')
+                      : t(CONNECTION_LABEL_KEYS[connectionStatus])}
+                  </span>
+                  {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
                 </div>
-                {!chatBarHidden && !chatPanel.isOpen && (
-                  <ChatPanel
-                    isOpen={false}
-                    conversationId={chatPanel.conversationId}
-                    onToggle={chatPanel.toggle}
-                    onSetConversationId={chatPanel.setConversationId}
-                    title={chatPanel.presentation.title}
-                    subtitle={chatPanel.presentation.subtitle}
-                  />
-                )}
+              )}
+              <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+                {mobileMainContent}
               </div>
-            </Panel>
-            {showChatPanel && (
-              <>
-                <PanelResizeHandle className="cc-resize-handle" />
-                <Panel
-                  id="chat-panel"
-                  defaultSize={`${chatPanelSize}%`}
-                  minSize="250px"
-                  maxSize="450px"
-                  onResize={handleChatPanelResize}
-                >
-                  <ChatPanel
-                    isOpen={true}
-                    conversationId={chatPanel.conversationId}
-                    onToggle={chatPanel.toggle}
-                    onSetConversationId={chatPanel.setConversationId}
-                    title={chatPanel.presentation.title}
-                    subtitle={chatPanel.presentation.subtitle}
-                    variant="side"
-                  />
-                </Panel>
-              </>
-            )}
-          </PanelGroup>
-        )}
-      </div>
-    </ChatPanelControllerProvider>
+              {/* The chat bar sits between the page and the tabs on every page but
+                chat; the button rides above it and steps aside while it is open. */}
+              {!chatPanel.isOpen && !onInboxPage && (
+                <FloatingActionButton aboveChatBar={!onChatPage} />
+              )}
+              <BottomNav
+                tabs={availableMobileTabs}
+                badges={{
+                  '/inbox': navBadgeCounts['/inbox'],
+                  '/attention': navBadgeCounts['/attention'],
+                }}
+              />
+            </>
+          ) : (
+            <PanelGroup
+              orientation="horizontal"
+              id="cc-layout"
+              onLayoutChanged={handlePanelLayoutChanged}
+            >
+              <Panel
+                id="sidebar"
+                panelRef={sidebarPanelRef}
+                defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
+                minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
+                maxSize="250px"
+                collapsible
+                collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
+                onResize={handleSidebarResize}
+              >
+                {sidebar}
+              </Panel>
+              <PanelResizeHandle className="cc-resize-handle" />
+              <Panel id="content" minSize="30%">
+                <div className="cc-main">
+                  <div className="cc-content" ref={contentRef}>
+                    <ErrorBoundary name="PageContent">
+                      <AnimatedOutlet />
+                    </ErrorBoundary>
+                  </div>
+                  {!chatBarHidden && !chatPanel.isOpen && (
+                    <ChatPanel
+                      isOpen={false}
+                      conversationId={chatPanel.conversationId}
+                      onToggle={chatPanel.toggle}
+                      onSetConversationId={chatPanel.setConversationId}
+                      title={chatPanel.presentation.title}
+                      subtitle={chatPanel.presentation.subtitle}
+                    />
+                  )}
+                </div>
+              </Panel>
+              {showChatPanel && (
+                <>
+                  <PanelResizeHandle className="cc-resize-handle" />
+                  <Panel
+                    id="chat-panel"
+                    defaultSize={`${chatPanelSize}%`}
+                    minSize="250px"
+                    maxSize="450px"
+                  >
+                    <ChatPanel
+                      isOpen={true}
+                      conversationId={chatPanel.conversationId}
+                      onToggle={chatPanel.toggle}
+                      onSetConversationId={chatPanel.setConversationId}
+                      title={chatPanel.presentation.title}
+                      subtitle={chatPanel.presentation.subtitle}
+                      variant="side"
+                    />
+                  </Panel>
+                </>
+              )}
+            </PanelGroup>
+          )}
+        </div>
+      </ChatPanelControllerProvider>
+    </MotionProvider>
   );
 }

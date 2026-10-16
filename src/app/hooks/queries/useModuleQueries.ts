@@ -47,7 +47,14 @@ function timestampTodoUpdate(data: TodoUpdate): TodoUpdate {
 // ---------------------------------------------------------------------------
 // Query hooks — fetch + validate, data lives in TanStack Query cache
 // ---------------------------------------------------------------------------
-export function useTodosQuery(enabled = true) {
+/**
+ * Pass a stable `select` to subscribe to something derived from the list (a
+ * count, one task); the component then re-renders only when that changes.
+ */
+export function useTodosQuery<TData = TodoResponse[]>(
+  enabled = true,
+  select?: (todos: TodoResponse[]) => TData,
+) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
     queryKey: queryKeys.todos,
@@ -57,6 +64,7 @@ export function useTodosQuery(enabled = true) {
       return z.array(TodoResponseSchema).parse(raw);
     },
     enabled: !!serverUrl && enabled,
+    select,
   });
 }
 export function useEventsQuery() {

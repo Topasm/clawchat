@@ -59,7 +59,7 @@ function removeStorageItem(key: string): void {
   }
 }
 
-function isPersistedQueryKey(queryKey: readonly unknown[]): boolean {
+export function isPersistedQueryKey(queryKey: readonly unknown[]): boolean {
   return typeof queryKey[0] === 'string' && PERSISTED_QUERY_ROOTS.has(queryKey[0]);
 }
 
@@ -74,7 +74,7 @@ export function getQueryCacheScope(input: QueryCacheScopeInput): string | null {
 }
 
 /** Persist only bounded offline-critical data for a single host. */
-export function persistQueryCache(scope: string | null): void {
+export function persistQueryCache(scope: string | null, maxBytes = CACHE_MAX_BYTES): void {
   if (!scope) return;
   try {
     const entries = queryClient
@@ -93,18 +93,26 @@ export function persistQueryCache(scope: string | null): void {
       }))
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
-    const payload: PersistedCache = { version: CACHE_VERSION, scope, entries };
-    let serialized = JSON.stringify(payload);
-    while (payload.entries.length > 0 && encodedSize(serialized) > CACHE_MAX_BYTES) {
-      payload.entries.pop();
-      serialized = JSON.stringify(payload);
+    // Serialize each entry once and keep the newest that fit, rather than
+    // re-serializing the whole payload after every dropped entry. The result
+    // is byte-for-byte what JSON.stringify(payload) would produce.
+    const header = `{"version":${CACHE_VERSION},"scope":${JSON.stringify(scope)},"entries":[`;
+    const footer = ']}';
+    let size = encodedSize(header) + encodedSize(footer);
+    const kept: string[] = [];
+    for (const entry of entries) {
+      const serialized = JSON.stringify(entry);
+      const entrySize = encodedSize(serialized) + (kept.length > 0 ? 1 : 0);
+      if (size + entrySize > maxBytes) break;
+      kept.push(serialized);
+      size += entrySize;
     }
 
-    if (payload.entries.length === 0) {
+    if (kept.length === 0) {
       removeStorageItem(cacheStorageKey(scope));
       return;
     }
-    localStorage.setItem(cacheStorageKey(scope), serialized);
+    localStorage.setItem(cacheStorageKey(scope), `${header}${kept.join(',')}${footer}`);
   } catch {
     // Storage may be unavailable or full. Runtime query data remains intact.
   }
