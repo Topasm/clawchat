@@ -34,6 +34,7 @@
 @import './_project-execution.css';
 @import './_kanban-filter.css';
 @import './_task-graph.css';
+@import './_detail-pane.css';
 @import './_task-stage.css';
 @import './_calendar.css';
 @import './_toast.css';

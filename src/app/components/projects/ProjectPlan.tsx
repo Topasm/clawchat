@@ -1,5 +1,4 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   resolveExecutionSkillId,
   useSkillsQuery,
@@ -21,6 +20,7 @@ import SegmentedControl from '../shared/SegmentedControl';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 import { describeTaskState } from '../task-list/TaskListView';
 import useOpenRunThread from '../../hooks/useOpenRunThread';
+import { useOpenTask } from '../../hooks/useTaskPane';
 import { useOptionalChatPanelController } from '../chat-panel/ChatPanelControllerContext';
 import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import { projectTaskAction } from './projectTaskAction';
@@ -56,7 +56,7 @@ function taskBreadcrumb(
 }
 
 export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPlanProps) {
-  const navigate = useNavigate();
+  const openTask = useOpenTask();
   const openRunThread = useOpenRunThread();
   const panel = useOptionalChatPanelController();
   const selectionKey = JSON.stringify([getChatWorkspaceScope(), project.id]);
@@ -210,7 +210,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
                       primaryAction.runId,
                       `${project.title} › ${selectedTask.title}`,
                     );
-                  } else navigate(`/tasks/${selectedTask.id}`);
+                  } else openTask(selectedTask.id);
                 }}
               >
                 {startExecution.isPending
@@ -247,7 +247,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
                     <button
                       type="button"
                       className="cc-btn cc-btn--ghost"
-                      onClick={() => navigate(`/tasks/${selectedTask.id}`)}
+                      onClick={() => openTask(selectedTask.id)}
                     >
                       {translateUi('Details')}
                     </button>

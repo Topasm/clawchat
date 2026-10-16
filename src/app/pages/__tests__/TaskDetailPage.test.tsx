@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
+import TaskDetail from '../../components/task-detail/TaskDetail';
 
 const mocks = vi.hoisted(() => ({
   projectDescription: null as string | null,
@@ -232,5 +233,35 @@ describe('TaskDetailPage project context', () => {
     expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
     expect(screen.queryByText(/^Skills/)).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Task title')).toBeVisible();
+  });
+
+  it('renders its menu into a host slot, with the host entries first', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const slot = document.createElement('span');
+    document.body.appendChild(slot);
+    const onSelect = vi.fn();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TaskDetail
+            taskId="todo-e65a"
+            menuSlot={slot}
+            extraMenuItems={[{ label: 'Open as page', onSelect }]}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const trigger = within(slot).getByRole('button', { name: 'More actions' });
+    fireEvent.click(trigger);
+    const items = within(slot)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent);
+    expect(items[0]).toBe('Open as page');
+    expect(items).toContain('Delete Task');
+    fireEvent.click(within(slot).getByRole('menuitem', { name: 'Open as page' }));
+    expect(onSelect).toHaveBeenCalled();
+    slot.remove();
   });
 });

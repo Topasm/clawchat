@@ -1,0 +1,114 @@
+/* The desktop right-hand pane: the task picked from a list, or the AI
+   conversation about it, behind one header. It shares the sidebar's surface
+   so the list in the middle reads as the page. */
+.cc-detail-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--cc-sidebar);
+  border-left: 1px solid var(--cc-border);
+}
+
+.cc-detail-pane__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--cc-border);
+  flex-shrink: 0;
+}
+
+.cc-detail-pane__segments {
+  display: inline-flex;
+  flex: 1;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-secondary);
+  max-width: 220px;
+}
+
+.cc-detail-pane__segment {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  background: transparent;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cc-detail-pane__segment:hover {
+  color: var(--cc-text);
+}
+
+.cc-detail-pane__segment--active {
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  box-shadow: 0 1px 2px var(--cc-shadow);
+}
+
+.cc-detail-pane__segment:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -2px;
+}
+
+.cc-detail-pane__kbd {
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-detail-pane__segment--active .cc-detail-pane__kbd {
+  color: var(--cc-text-secondary);
+}
+
+.cc-detail-pane__btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--cc-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cc-text-secondary);
+  transition: background var(--cc-transition-fast);
+}
+
+.cc-detail-pane__btn:hover {
+  background: var(--cc-hover-surface);
+  color: var(--cc-text);
+}
+
+.cc-detail-pane__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* The task page's own padding reads well in the pane; the chat fills it. */
+.cc-detail-pane__body > .cc-chat-panel--side {
+  flex: 1;
+}
+
+/* The row whose task is open beside the list stays raised. */
+.cc-task-row--selected,
+.cc-task-row--selected:hover {
+  background: var(--cc-selected-surface);
+}
+
+.cc-card--selected {
+  background: var(--cc-selected-surface);
+}

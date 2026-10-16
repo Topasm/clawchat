@@ -26,6 +26,8 @@ interface TaskCardProps {
   isSubTask?: boolean;
   subTaskCount?: number;
   isCompletedOverride?: boolean;
+  /** Open in the pane beside the list; the row stays raised. */
+  selected?: boolean;
 }
 export default function TaskCard({
   task,
@@ -36,6 +38,7 @@ export default function TaskCard({
   isSubTask,
   subTaskCount,
   isCompletedOverride,
+  selected = false,
 }: TaskCardProps) {
   const isCompleted = isCompletedOverride ?? task.status === 'completed';
   const { data: relationships } = useTaskRelationshipsQuery();
@@ -92,7 +95,8 @@ export default function TaskCard({
   return (
     <>
       <div
-        className={`cc-card cc-card--task${className ? ' ' + className : ''}${isSubTask ? ' cc-kanban__card--subtask' : ''}`}
+        className={`cc-card cc-card--task${className ? ' ' + className : ''}${isSubTask ? ' cc-kanban__card--subtask' : ''}${selected ? ' cc-card--selected' : ''}`}
+        aria-current={selected ? 'true' : undefined}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}

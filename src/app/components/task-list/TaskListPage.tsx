@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   useProjectsQuery,
   useTaskExecutionTelemetryQuery,
@@ -8,6 +7,7 @@ import {
 } from '../../hooks/queries';
 import useProjectRootIds from '../../hooks/useProjectRootIds';
 import useTaskFilters from '../../hooks/useTaskFilters';
+import { useOpenTask, useSelectedTaskId } from '../../hooks/useTaskPane';
 import { useModuleStore } from '../../stores/useModuleStore';
 import TasksHeader, {
   matchesTasksStatusFilter,
@@ -23,7 +23,8 @@ interface TaskListPageProps {
 }
 
 export default function TaskListPage({ statusFilter, onStatusFilterChange }: TaskListPageProps) {
-  const navigate = useNavigate();
+  const openTask = useOpenTask();
+  const selectedTaskId = useSelectedTaskId();
   const { data: todos = [] } = useTodosQuery();
   const filters = useModuleStore((state) => state.kanbanFilters);
   const { data: projects = [] } = useProjectsQuery();
@@ -76,7 +77,8 @@ export default function TaskListPage({ statusFilter, onStatusFilterChange }: Tas
         allTodos={todos}
         projectTitles={projectTitles}
         telemetryByTaskId={telemetryByTaskId}
-        onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
+        selectedTaskId={selectedTaskId}
+        onOpenTask={openTask}
         onToggleTask={(taskId) => {
           const todo = todos.find((candidate) => candidate.id === taskId);
           if (todo) {

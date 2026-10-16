@@ -26,6 +26,8 @@ interface ChatPanelProps {
   subtitle?: string;
   /** "bottom" (default, mobile) renders with motion height animation; "side" renders as a full-height side panel */
   variant?: 'bottom' | 'side';
+  /** The host draws the header (the task pane shares one with the task). */
+  hideHeader?: boolean;
 }
 export default function ChatPanel({
   isOpen,
@@ -35,6 +37,7 @@ export default function ChatPanel({
   title = 'Quick Chat',
   subtitle,
   variant = 'bottom',
+  hideHeader = false,
 }: ChatPanelProps) {
   const navigate = useNavigate();
   const isStreaming = useChatStore(
@@ -163,34 +166,36 @@ export default function ChatPanel({
   };
   const openContent = (
     <>
-      <div className="cc-chat-panel__header">
-        <span className="cc-chat-panel__header-copy">
-          <span className="cc-chat-panel__header-title">{translateUi(title)}</span>
-          {subtitle && <small>{subtitle}</small>}
-        </span>
-        <button
-          type="button"
-          className="cc-chat-panel__header-btn"
-          onClick={handlePopOut}
-          title={translateUi('Open full view')}
-          aria-label={translateUi('Open full chat view')}
-        >
-          <ExternalLinkIcon size={14} />
-        </button>
-        <button
-          type="button"
-          className="cc-chat-panel__header-btn"
-          onClick={onToggle}
-          title={variant === 'side' ? translateUi('Close') : translateUi('Minimize')}
-          aria-label={
-            variant === 'side'
-              ? translateUi('Close agent panel')
-              : translateUi('Minimize agent panel')
-          }
-        >
-          {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}
-        </button>
-      </div>
+      {!hideHeader && (
+        <div className="cc-chat-panel__header">
+          <span className="cc-chat-panel__header-copy">
+            <span className="cc-chat-panel__header-title">{translateUi(title)}</span>
+            {subtitle && <small>{subtitle}</small>}
+          </span>
+          <button
+            type="button"
+            className="cc-chat-panel__header-btn"
+            onClick={handlePopOut}
+            title={translateUi('Open full view')}
+            aria-label={translateUi('Open full chat view')}
+          >
+            <ExternalLinkIcon size={14} />
+          </button>
+          <button
+            type="button"
+            className="cc-chat-panel__header-btn"
+            onClick={onToggle}
+            title={variant === 'side' ? translateUi('Close') : translateUi('Minimize')}
+            aria-label={
+              variant === 'side'
+                ? translateUi('Close agent panel')
+                : translateUi('Minimize agent panel')
+            }
+          >
+            {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}
+          </button>
+        </div>
+      )}
       <AiSetupBanner className="cc-ai-setup-banner--panel" />
       <ChatPanelMessages
         conversationId={conversationId}
