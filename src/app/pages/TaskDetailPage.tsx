@@ -10,9 +10,6 @@ import {
   useDeleteTodo,
   useToggleTodoComplete,
   useLatestPlanProposalQuery,
-  useGeneratePlanProposal,
-  useApplyPlanProposal,
-  useDismissPlanProposal,
   useGetOrCreateProjectConversation,
   useProjectQuery,
   useTaskExecutionTelemetryQuery,
@@ -21,7 +18,6 @@ import {
 import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
-import PlanReviewDiff from '../components/shared/PlanReviewDiff';
 import TaskFlow from '../components/task-flow/TaskFlow';
 import TaskPaths from '../components/task-detail/TaskPaths';
 import TaskMoreMenu, { type TaskMenuItem } from '../components/task-detail/TaskMoreMenu';
@@ -98,9 +94,6 @@ export default function TaskDetailPage() {
   // on the project page instead of unfolding in the middle of this one.
   const [hostsOpen, setHostsOpen] = useState(false);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
-  const generatePlanMutation = useGeneratePlanProposal();
-  const applyPlanMutation = useApplyPlanProposal();
-  const dismissPlanMutation = useDismissPlanProposal();
   const getConversation = useGetOrCreateProjectConversation();
   const { data: telemetry = [] } = useTaskExecutionTelemetryQuery();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
@@ -158,26 +151,6 @@ export default function TaskDetailPage() {
     },
     [requestStatusChange, todos, toggleCompleteMutation],
   );
-  const handleApplyPlan = async (selectedIndices: number[]) => {
-    if (!taskId || !plan || plan.base_graph_revision === null) return;
-    await applyPlanMutation.mutateAsync({
-      todoId: taskId,
-      proposalId: plan.proposal_id,
-      baseGraphRevision: plan.base_graph_revision,
-      selectedIndices,
-      subtasks: plan.subtasks,
-    });
-  };
-  const handleDismissPlan = async () => {
-    if (!taskId || !plan) return;
-    await dismissPlanMutation.mutateAsync({ todoId: taskId, proposalId: plan.proposal_id });
-    useToastStore.getState().addToast('info', translateUi('Plan dismissed'));
-  };
-  const handleRegeneratePlan = async () => {
-    if (!taskId) return;
-    await generatePlanMutation.mutateAsync({ todoId: taskId });
-    applyPlanMutation.reset();
-  };
   if (!task) {
     return (
       <div className="cc-detail">
@@ -369,24 +342,9 @@ export default function TaskDetailPage() {
       )}
       {projectLoading && <p className="cc-exec-panel__hint">{translateUi('Loading project…')}</p>}
 
-      {hasPlan && (
-        <div className="cc-exec-panel__section">
-          <PlanReviewDiff
-            plan={plan}
-            onApply={handleApplyPlan}
-            onDismiss={handleDismissPlan}
-            onRegenerate={handleRegeneratePlan}
-            applyError={applyPlanMutation.error}
-            isApplying={applyPlanMutation.isPending}
-            isDismissing={dismissPlanMutation.isPending}
-            isRegenerating={generatePlanMutation.isPending}
-          />
-        </div>
-      )}
-
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">{translateUi('Flow')}</div>
-        <TaskFlow rootId={task.id} />
+        <TaskFlow rootId={task.id} plan={hasPlan ? plan : null} />
       </div>
 
       <TaskPaths taskId={task.id} />
