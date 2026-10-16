@@ -134,7 +134,10 @@ async def add_step(
     *,
     title: str,
     branch_from_id: str | None = None,
+    after_id: str | None = None,
 ) -> tuple[Todo, TaskStepChange, list[str]]:
+    if branch_from_id is not None and after_id is not None:
+        raise ValidationError("Give either branch_from_id or after_id, not both")
     await _require_parent(db, parent_id)
     siblings = await _steps(db, parent_id)
     by_id = {step.id: step for step in siblings}
@@ -145,15 +148,24 @@ async def add_step(
         _require_step(by_id, branch_from_id, "branch_from_id")
         prerequisites = _prerequisites(edges, branch_from_id)
         dependents = _dependents(edges, branch_from_id)
+    elif after_id is not None:
+        # Right after one step: what waited on it now waits on the new one.
+        _require_step(by_id, after_id, "after_id")
+        prerequisites = {after_id}
+        dependents = _dependents(edges, after_id)
+        edges -= {(source, after_id) for source in dependents}
     else:
-        # The flow's current ends: steps no other live step waits on.
-        live_ids = {
-            step.id for step in siblings if step.status != TaskStatus.CANCELLED
-        }
-        waited_on = {
-            target for source, target in edges if source in live_ids
-        }
-        prerequisites = live_ids - waited_on
+        # After the flow's current ends: ordered steps no other live step
+        # waits on. Steps with no order at all stay out of it; with nothing
+        # ordered yet the newest step starts the chain.
+        live = [step for step in siblings if step.status != TaskStatus.CANCELLED]
+        live_ids = {step.id for step in live}
+        live_edges = {(a, b) for a, b in edges if a in live_ids and b in live_ids}
+        ordered = {task_id for edge in live_edges for task_id in edge}
+        if ordered:
+            prerequisites = ordered - {target for _, target in live_edges}
+        else:
+            prerequisites = {live[-1].id} if live else set()
         dependents = set()
 
     step = await todo_service.create_todo(

@@ -1,91 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import { buildExecutionGraphLayout } from '../taskGraphLayout';
+import { layoutFlow } from '../taskGraphLayout';
 
-const tasks = [
-  { id: 'project', title: 'Project', sort_order: 0 },
-  { id: 'design', title: 'Design', parent_id: 'project', sort_order: 0 },
-  { id: 'build', title: 'Build', parent_id: 'project', sort_order: 1 },
-  { id: 'ship', title: 'Ship', parent_id: 'build', sort_order: 0 },
-];
+const node = (id: string, sortOrder: number) => ({ id, sortOrder });
+const edge = (before: string, after: string) => ({ before, after });
 
-const relationships = [
-  {
-    id: 'relationship-1',
-    source_task_id: 'build',
-    target_task_id: 'design',
-    type: 'depends_on',
-  },
-];
+function grid(layout: ReturnType<typeof layoutFlow>) {
+  return Object.fromEntries(layout.placements.map((p) => [p.id, [p.column, p.row]]));
+}
 
-describe('task graph layout', () => {
-  it('renders stored task-to-prerequisite relationships as prerequisite-to-task arrows', () => {
-    const layout = buildExecutionGraphLayout(tasks, relationships);
-    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
+describe('flow layout', () => {
+  it('keeps the main line on one row and drops a branch to the next row', () => {
+    const layout = layoutFlow(
+      [
+        node('read', 0),
+        node('kernel', 10),
+        node('profile', 20),
+        node('report', 30),
+        node('submit', 40),
+        node('papers', 50),
+      ],
+      [
+        edge('read', 'kernel'),
+        edge('kernel', 'profile'),
+        edge('kernel', 'report'),
+        edge('profile', 'submit'),
+        edge('report', 'submit'),
+      ],
+    );
 
-    expect(layout.edges).toContainEqual({
-      id: 'dependency:design:build',
-      sourceId: 'design',
-      targetId: 'build',
-      type: 'dependency',
+    expect(grid(layout)).toEqual({
+      read: [0, 0],
+      kernel: [1, 0],
+      profile: [2, 0],
+      report: [2, 1],
+      submit: [3, 0],
     });
-    expect(positions.get('build')!.x).toBeGreaterThan(positions.get('design')!.x);
+    expect(layout.unordered).toEqual(['papers']);
+    expect(layout).toMatchObject({ columns: 4, rows: 2 });
   });
 
-  it("places nodes with the caller's box size and gaps", () => {
-    const layout = buildExecutionGraphLayout(tasks, relationships, {
-      nodeWidth: 100,
-      nodeHeight: 40,
-      columnGap: 20,
-      rowGap: 10,
-      padding: 4,
-    });
-    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
+  it('puts the column by the longest chain, not by creation order', () => {
+    const layout = layoutFlow(
+      [node('late', 0), node('a', 10), node('b', 20)],
+      [edge('a', 'b'), edge('b', 'late'), edge('a', 'late')],
+    );
 
-    expect(positions.get('design')).toMatchObject({ x: 4 });
-    expect(positions.get('build')).toMatchObject({ x: 124 });
-    expect(layout.width).toBe(124 + 100 + 4);
+    expect(grid(layout)).toEqual({ a: [0, 0], b: [1, 0], late: [2, 0] });
   });
 
-  it('keeps cyclic dependency data visible with both directed edges', () => {
-    const layout = buildExecutionGraphLayout(
-      [
-        { id: 'a', title: 'A' },
-        { id: 'b', title: 'B' },
-      ],
-      [
-        { source_task_id: 'a', target_task_id: 'b', type: 'depends_on' },
-        { source_task_id: 'b', target_task_id: 'a', type: 'depends_on' },
-      ],
-    );
-
-    expect(new Set(layout.nodes.map((node) => node.id))).toEqual(new Set(['a', 'b']));
-    expect(new Set(layout.edges.map((edge) => edge.id))).toEqual(
-      new Set(['dependency:b:a', 'dependency:a:b']),
-    );
+  it('starts a lone step as the flow and leaves unlinked steps apart', () => {
+    expect(grid(layoutFlow([node('only', 0)], []))).toEqual({ only: [0, 0] });
+    const loose = layoutFlow([node('x', 0), node('y', 1)], []);
+    expect(loose.placements).toEqual([]);
+    expect(loose.unordered).toEqual(['x', 'y']);
   });
 
-  it('deduplicates repeated dependencies and ignores missing or self references', () => {
-    const layout = buildExecutionGraphLayout(
-      [
-        { id: 'a', title: 'A' },
-        { id: 'b', title: 'B' },
-      ],
-      [
-        { source_task_id: 'b', target_task_id: 'a', type: 'depends_on' },
-        { source_task_id: 'b', target_task_id: 'a', type: 'depends_on' },
-        { source_task_id: 'b', target_task_id: 'b', type: 'depends_on' },
-        { source_task_id: 'b', target_task_id: 'missing', type: 'depends_on' },
-        { source_task_id: 'b', target_task_id: 'a', type: 'related' },
-      ],
+  it('keeps cyclic data visible and ignores duplicate, self and missing edges', () => {
+    const layout = layoutFlow(
+      [node('a', 0), node('b', 1)],
+      [edge('a', 'b'), edge('b', 'a'), edge('a', 'b'), edge('a', 'a'), edge('a', 'missing')],
     );
 
-    expect(layout.edges).toEqual([
-      {
-        id: 'dependency:a:b',
-        sourceId: 'a',
-        targetId: 'b',
-        type: 'dependency',
-      },
-    ]);
+    expect(layout.placements.map((p) => p.id).sort()).toEqual(['a', 'b']);
+    expect(layout.edges).toEqual([edge('a', 'b'), edge('b', 'a')]);
   });
 });

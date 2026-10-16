@@ -54,7 +54,6 @@ const SKILL_LABELS: Record<string, string> = Object.fromEntries(
   SKILL_OPTIONS.map(({ id, label }) => [id, label]),
 );
 const AGENT_ASSIGNEES = ['planner', 'researcher', 'executor', 'openclaw'];
-const AGENT_INBOX_STATES = new Set(['questioning', 'planning', 'plan_ready']);
 function getDueCountdown(dueDate: string): {
   label: string;
   variant: 'overdue' | 'today' | 'upcoming';
@@ -211,20 +210,20 @@ export default function TaskDetailPage() {
   const hasAgentSkills = Boolean(
     task.enabled_skills?.length || (task.assignee && AGENT_ASSIGNEES.includes(task.assignee)),
   );
-  // Only work handed to an agent shows the five steps and the plan button;
-  // for a task you do yourself the top of the page is its due date and flow.
-  const isAgentTask = Boolean(
-    hasPlan ||
+  // A task is yours unless it was handed to AI (assignee) or AI already ran
+  // it. Only delegated work shows the five steps and the plan button; for
+  // your own task the top of the page is its due date and flow.
+  const isDelegated = Boolean(
+    task.assignee ||
     hasAgentSkills ||
     taskTelemetry?.latest_run_status ||
-    taskTelemetry?.pending_review_count ||
-    AGENT_INBOX_STATES.has(task.inbox_state ?? 'none'),
+    taskTelemetry?.pending_review_count,
   );
-  const planIsNext = isAgentTask && stage.stage === 'capture' && !stage.exception;
-  const organize = async (message: string) => {
+  const planIsNext = isDelegated && stage.stage === 'capture' && !stage.exception;
+  const organize = async () => {
     try {
       await apiClient.post(`/todos/${taskId}/organize`);
-      useToastStore.getState().addToast('info', translateUi(message));
+      useToastStore.getState().addToast('info', translateUi('Planning...'));
     } catch {
       useToastStore.getState().addToast('error', translateUi('Failed'));
     }
@@ -237,19 +236,28 @@ export default function TaskDetailPage() {
       useToastStore.getState().addToast('error', translateUi('Failed'));
     }
   };
+  const setAssignee = (assignee: string | null) => {
+    const previous = task.assignee ?? null;
+    updateTodoMutation.mutate({ id: task.id, data: { assignee } });
+    useToastStore
+      .getState()
+      .addToast('success', translateUi(assignee ? 'Delegated to AI' : 'Back to you'), {
+        duration: 5000,
+        action: {
+          label: translateUi('Undo'),
+          onClick: () => updateTodoMutation.mutate({ id: task.id, data: { assignee: previous } }),
+        },
+      });
+  };
   const canPlan = !hasPlan && !isTerminalTaskStatus(task.status);
   const menuItems: TaskMenuItem[] = [
     { label: translateUi('Discuss with agent'), onSelect: () => void discuss() },
     ...(canPlan && !planIsNext
-      ? [
-          isPlanned
-            ? { label: translateUi('Re-plan'), onSelect: () => void organize('Re-planning...') }
-            : {
-                label: translateUi('Plan this task'),
-                onSelect: () => void organize('Planning...'),
-              },
-        ]
+      ? [{ label: translateUi('Suggest steps'), onSelect: () => void organize() }]
       : []),
+    task.assignee
+      ? { label: translateUi('Do it myself'), onSelect: () => setAssignee(null) }
+      : { label: translateUi('Delegate'), onSelect: () => setAssignee('agent') },
     ...(project
       ? [{ label: translateUi('Where this runs'), onSelect: () => setHostsOpen(true) }]
       : []),
@@ -320,30 +328,18 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      {isAgentTask && (
+      {isDelegated && (
         <div className="cc-exec-panel__section cc-exec-panel__agent">
           <div className="cc-exec-panel__stage">
             <TaskStageIndicator state={stage} variant="bar" />
           </div>
-          {hasPlan && (
-            <PlanReviewDiff
-              plan={plan}
-              onApply={handleApplyPlan}
-              onDismiss={handleDismissPlan}
-              onRegenerate={handleRegeneratePlan}
-              applyError={applyPlanMutation.error}
-              isApplying={applyPlanMutation.isPending}
-              isDismissing={dismissPlanMutation.isPending}
-              isRegenerating={generatePlanMutation.isPending}
-            />
-          )}
           {planIsNext && canPlan && !isPlanned && (
             <button
               type="button"
               className="cc-btn cc-btn--primary"
-              onClick={() => void organize('Planning...')}
+              onClick={() => void organize()}
             >
-              {translateUi('Plan this task')}
+              {translateUi('Suggest steps')}
             </button>
           )}
           {hasAgentSkills && (
@@ -372,6 +368,21 @@ export default function TaskDetailPage() {
         </div>
       )}
       {projectLoading && <p className="cc-exec-panel__hint">{translateUi('Loading project…')}</p>}
+
+      {hasPlan && (
+        <div className="cc-exec-panel__section">
+          <PlanReviewDiff
+            plan={plan}
+            onApply={handleApplyPlan}
+            onDismiss={handleDismissPlan}
+            onRegenerate={handleRegeneratePlan}
+            applyError={applyPlanMutation.error}
+            isApplying={applyPlanMutation.isPending}
+            isDismissing={dismissPlanMutation.isPending}
+            isRegenerating={generatePlanMutation.isPending}
+          />
+        </div>
+      )}
 
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">{translateUi('Flow')}</div>

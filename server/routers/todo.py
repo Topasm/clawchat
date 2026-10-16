@@ -775,6 +775,7 @@ async def add_todo_step(
         todo_id,
         title=body.title,
         branch_from_id=body.branch_from_id,
+        after_id=body.after_id,
     )
     await db.commit()
     await db.refresh(step)

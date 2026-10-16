@@ -222,3 +222,60 @@ async def test_paths_are_listed_with_inherited_parent_paths(client, auth_headers
     assert deleted.status_code == 204
     listed = (await client.get(f"/api/todos/{child}/paths", headers=auth_headers)).json()
     assert [row["inherited"] for row in listed] == [True]
+
+
+@pytest.mark.asyncio
+async def test_unordered_steps_stay_out_of_an_appended_chain(client, auth_headers):
+    parent = await _task(client, auth_headers)
+    loose = []
+    for title in ("Find papers", "Request account"):
+        response = await client.post(
+            "/api/todos",
+            json={"title": title, "parent_id": parent, "inbox_state": "none"},
+            headers=auth_headers,
+        )
+        loose.append(response.json()["id"])
+
+    first = (await _step(client, auth_headers, parent, "Read"))["todo"]["id"]
+    second = (await _step(client, auth_headers, parent, "Write"))["todo"]["id"]
+
+    # Nothing was ordered, so the first step follows the newest one only;
+    # after that the chain grows from its own end.
+    assert await _edges(client, auth_headers) == {(first, loose[1]), (second, first)}
+
+
+@pytest.mark.asyncio
+async def test_after_id_attaches_after_the_chosen_branch_end(client, auth_headers):
+    parent = await _task(client, auth_headers)
+    start = (await _step(client, auth_headers, parent, "Start"))["todo"]["id"]
+    left = (await _step(client, auth_headers, parent, "Left"))["todo"]["id"]
+    right = (
+        await _step(client, auth_headers, parent, "Right", branch_from_id=left)
+    )["todo"]["id"]
+
+    tail = (await _step(client, auth_headers, parent, "Right 2", after_id=right))["todo"]["id"]
+
+    assert await _edges(client, auth_headers) == {
+        (left, start),
+        (right, start),
+        (tail, right),
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_cycle_is_refused_with_both_task_names(client, auth_headers):
+    parent = await _task(client, auth_headers)
+    read = (await _step(client, auth_headers, parent, "Read"))["todo"]["id"]
+    submit = (await _step(client, auth_headers, parent, "Submit"))["todo"]["id"]
+
+    response = await client.post(
+        "/api/task-relationships",
+        json={"source_task_id": read, "target_task_id": submit, "type": "depends_on"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["details"]["earlier_title"] == "Submit"
+    assert error["details"]["later_title"] == "Read"
+    assert "“Submit” would come before “Read”" in error["message"]

@@ -211,26 +211,9 @@
   min-height: 64px;
 }
 
-.cc-flow__edges {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.cc-flow__edges path {
-  fill: none;
-  stroke: var(--cc-border-strong);
-  stroke-width: 1.5;
-}
-
-.cc-flow__edges marker path {
-  fill: var(--cc-border-strong);
-  stroke: none;
-}
-
 .cc-flow__box {
-  position: absolute;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -311,7 +294,7 @@
 
 .cc-flow__title {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -320,24 +303,9 @@
 .cc-flow__meta {
   overflow: hidden;
   color: var(--cc-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.cc-flow__tail {
-  position: absolute;
-  padding-left: 10px;
-}
-
-.cc-flow__add {
-  width: 28px;
-  height: 28px;
-  border: 1px dashed var(--cc-border-strong);
-  border-radius: 50%;
-  background: none;
-  color: var(--cc-text-secondary);
-  cursor: pointer;
 }
 
 .cc-flow__input {
@@ -351,6 +319,76 @@
   color: var(--cc-text);
   font: inherit;
   font-size: 13px;
+}
+
+.cc-flow__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cc-flow__summary button {
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cc-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cc-flow__line {
+  position: absolute;
+  height: 0;
+  border-top: 1.5px solid var(--cc-border-strong);
+}
+
+.cc-flow__line--down {
+  width: 0;
+  border-top: 0;
+  border-left: 1.5px solid var(--cc-border-strong);
+}
+
+.cc-flow__arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--cc-border-strong);
+}
+
+.cc-flow__tail {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px dashed var(--cc-border-strong);
+  border-radius: var(--cc-radius-md);
+}
+
+.cc-flow__tail .cc-flow__input {
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+}
+
+.cc-flow__unordered {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cc-flow__unordered-label {
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-flow__unordered-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* -- Task paths and menu ------------------------------------- */

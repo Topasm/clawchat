@@ -30,7 +30,7 @@ const task = {
   source: null,
   source_id: null,
   idempotency_key: null,
-  assignee: null,
+  assignee: null as string | null,
   enabled_skills: null as string[] | null,
   inbox_state: 'none',
   estimated_minutes: null,
@@ -114,6 +114,7 @@ describe('TaskDetailPage project context', () => {
     mocks.persist.mockReset();
     task.recurrence_rule = null;
     task.enabled_skills = null;
+    task.assignee = null;
     mocks.projectPath = '/Users/test/papers';
     mocks.hostLabel = 'My Mac';
     mocks.projectError = false;
@@ -147,7 +148,7 @@ describe('TaskDetailPage project context', () => {
     expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
     // No five steps, no plan button, no machine line for work not handed to an agent.
     expect(document.querySelector('.cc-stage-bar')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Plan this task' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Suggest steps' })).not.toBeInTheDocument();
     expect(screen.queryByText('Runs on My Mac')).not.toBeInTheDocument();
   });
 
@@ -156,9 +157,29 @@ describe('TaskDetailPage project context', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
 
     expect(screen.getByRole('menuitem', { name: 'Discuss with agent' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Plan this task' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Suggest steps' })).toBeVisible();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Task' }));
     expect(mocks.deleteTodo).toHaveBeenCalledWith('todo-e65a');
+  });
+
+  it('delegates from the menu by setting the assignee', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
+
+    expect(mocks.updateTodo).toHaveBeenCalledWith({
+      id: 'todo-e65a',
+      data: { assignee: 'agent' },
+    });
+  });
+
+  it('treats a task with an assignee as delegated', () => {
+    task.assignee = 'agent';
+    renderPage();
+
+    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Do it myself' })).toBeVisible();
   });
 
   it('opens where this runs from the menu and resets it when switching tasks', () => {
@@ -180,7 +201,7 @@ describe('TaskDetailPage project context', () => {
     renderPage();
 
     expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Plan this task' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Suggest steps' })).toBeVisible();
     expect(screen.getByText('Runs on My Mac')).toBeVisible();
     expect(screen.getByText('/Users/test/papers')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));

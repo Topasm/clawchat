@@ -15,6 +15,9 @@ class TaskStepCreate(BaseModel):
     #: step forks from the same prerequisites as this sibling step, and the
     #: steps waiting on that sibling wait on the new one too.
     branch_from_id: str | None = None
+    #: Present, the new step goes right after this sibling (a branch end, say),
+    #: and the steps waiting on that sibling wait on the new one instead.
+    after_id: str | None = None
 
     @field_validator("title")
     @classmethod

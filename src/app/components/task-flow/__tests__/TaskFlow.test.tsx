@@ -87,7 +87,7 @@ describe('TaskFlow', () => {
     ]);
     expect(screen.queryByText('Unrelated')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Other task: Prepare data' })).toBeVisible();
-    expect(within(steps).getByText(/0\/1 steps/)).toBeVisible();
+    expect(within(steps).getByText(/1 inside/)).toBeVisible();
     expect(screen.getByText('Can do now 1 · Blocked 0')).toBeVisible();
   });
 
@@ -106,11 +106,13 @@ describe('TaskFlow', () => {
       parentId: 'hw',
       title: 'Profile',
       branchFromId: null,
+      afterId: null,
     });
     expect(mocks.addStep).toHaveBeenNthCalledWith(2, {
       parentId: 'hw',
       title: 'Draft report',
       branchFromId: 'submit',
+      afterId: null,
     });
     expect(input).toHaveValue('');
   });
@@ -139,5 +141,67 @@ describe('TaskFlow', () => {
       stepId: 'read',
       afterId: 'submit',
     });
+  });
+
+  it('folds more than three done steps at the start into one box', () => {
+    mocks.todos = [
+      todo('hw', { title: 'GPU homework' }),
+      ...['a', 'b', 'c', 'd'].map((id, index) =>
+        todo(id, { title: `Done ${id}`, parent_id: 'hw', sort_order: index, status: 'completed' }),
+      ),
+      todo('next', { title: 'Next one', parent_id: 'hw', sort_order: 9 }),
+    ];
+    mocks.relationships = [edge('b', 'a'), edge('c', 'b'), edge('d', 'c'), edge('next', 'd')];
+    renderFlow();
+
+    expect(screen.queryByText('Done a')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Done 4' }));
+    expect(screen.getByText('Done a')).toBeVisible();
+  });
+
+  it('keeps steps with no order apart from the flow', () => {
+    mocks.todos.push(todo('papers', { title: 'Find papers', parent_id: 'hw', sort_order: 99 }));
+    renderFlow();
+
+    const loose = screen.getByRole('list', { name: 'No order yet' });
+    expect(within(loose).getByText('Find papers')).toBeVisible();
+    expect(
+      within(screen.getByRole('list', { name: 'Steps' })).queryByText('Find papers'),
+    ).toBeNull();
+  });
+
+  it('continues the selected branch end on Enter when the flow has several', async () => {
+    mocks.todos.push(todo('report', { title: 'Report', parent_id: 'hw', sort_order: 30 }));
+    mocks.relationships.push(edge('report', 'kernel'));
+    mocks.addStep.mockResolvedValue({ todo: todo('new', { parent_id: 'hw' }) });
+    renderFlow();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Report/ }));
+    const input = screen.getByRole('textbox', { name: 'Next step' });
+    fireEvent.change(input, { target: { value: 'Polish' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() =>
+      expect(mocks.addStep).toHaveBeenCalledWith({
+        parentId: 'hw',
+        title: 'Polish',
+        branchFromId: null,
+        afterId: 'report',
+      }),
+    );
+  });
+
+  it('refuses a move that would loop through another task, saying why', () => {
+    // Read waits on "Prepare data"; make that outside task wait on Submit.
+    mocks.relationships.push(edge('data', 'submit'));
+    renderFlow();
+    const [read, , submit] = within(screen.getByRole('list', { name: 'Steps' })).getAllByRole(
+      'listitem',
+    );
+    const dataTransfer = { setData: vi.fn(), getData: () => 'submit', effectAllowed: '' };
+    fireEvent.dragStart(submit, { dataTransfer });
+    fireEvent.drop(read, { dataTransfer });
+
+    expect(mocks.moveStep).not.toHaveBeenCalled();
   });
 });

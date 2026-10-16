@@ -8,6 +8,7 @@ import {
   useToggleTodoComplete,
 } from '../../hooks/queries';
 import type { TodoResponse } from '../../types/api';
+import { useToastStore } from '../../stores/useToastStore';
 import { formatDueDate } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 import FlowCanvas, { type FlowEdge, type FlowNode, type FlowTone } from './FlowCanvas';
@@ -29,6 +30,8 @@ const TONE_LABELS: Record<FlowTone, string> = {
   proposed: '',
   excluded: '',
 };
+const DONE_GROUP = 'flow:done';
+const DONE_FOLD_AFTER = 3;
 
 function byOrder(left: TodoResponse, right: TodoResponse) {
   return (
@@ -37,15 +40,25 @@ function byOrder(left: TodoResponse, right: TodoResponse) {
   );
 }
 
-/** How many of a task's direct steps are done, for "3/5 steps". */
-export function stepProgress(todos: readonly TodoResponse[], parentId: string) {
-  const steps = todos.filter((todo) => todo.parent_id === parentId && todo.status !== 'cancelled');
-  return { done: steps.filter((todo) => todo.status === 'completed').length, total: steps.length };
+/** Whether `from` already waits, through any chain, on `to`. */
+function waitsOn(edges: readonly FlowEdge[], from: string, to: string): boolean {
+  const before = new Map<string, string[]>();
+  edges.forEach((edge) => before.set(edge.after, [...(before.get(edge.after) ?? []), edge.before]));
+  const seen = new Set<string>();
+  const pending = [from];
+  while (pending.length > 0) {
+    const id = pending.pop()!;
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    pending.push(...(before.get(id) ?? []));
+  }
+  return false;
 }
 
 /**
  * The steps of one task: its direct children as boxes and the order between
- * them as arrows. Steps typed in a row form a chain; Tab forks a branch.
+ * them as lines. Steps typed in a row form a chain; Tab forks a branch.
  */
 export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }: TaskFlowProps) {
   const navigate = useNavigate();
@@ -56,17 +69,19 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
   const toggle = useToggleTodoComplete();
   const [scopeId, setScopeId] = useState(rootId);
   const [localId, setLocalId] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
   const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Steps are appended after the flow's current end, which the server reads
-  // when the request lands; one at a time keeps a typed run a chain.
+  // Steps are placed by where the flow ends when the request lands, so they
+  // go one at a time; `anchor` carries a chosen branch end to the next step.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const anchor = useRef<string | null>(null);
   const selectedId = controlledId === undefined ? localId : controlledId;
   const select = (id: string | null) => (onSelect ? onSelect(id) : setLocalId(id));
 
   useEffect(() => {
     setScopeId(rootId);
     setLocalId(null);
+    setShowDone(false);
   }, [rootId]);
 
   const todoById = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
@@ -76,35 +91,32 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
   );
   const stepIds = useMemo(() => new Set(steps.map((step) => step.id)), [steps]);
   const childCount = useMemo(() => {
-    const counts = new Map<string, { done: number; total: number }>();
+    const counts = new Map<string, number>();
     for (const todo of todos) {
       if (!todo.parent_id || !stepIds.has(todo.parent_id) || todo.status === 'cancelled') continue;
-      const entry = counts.get(todo.parent_id) ?? { done: 0, total: 0 };
-      entry.total += 1;
-      if (todo.status === 'completed') entry.done += 1;
-      counts.set(todo.parent_id, entry);
+      counts.set(todo.parent_id, (counts.get(todo.parent_id) ?? 0) + 1);
     }
     return counts;
   }, [stepIds, todos]);
 
-  const { edges, outside, prerequisites } = useMemo(() => {
+  const { edges, allEdges, outside, prerequisites } = useMemo(() => {
     const inner: FlowEdge[] = [];
+    const every: FlowEdge[] = [];
     const outer = new Map<string, TodoResponse>();
     const before = new Map<string, string[]>();
     for (const relationship of relationships) {
-      if (relationship.type !== 'depends_on' || !stepIds.has(relationship.source_task_id)) continue;
-      const target = relationship.target_task_id;
-      before.set(relationship.source_task_id, [
-        ...(before.get(relationship.source_task_id) ?? []),
-        target,
-      ]);
-      if (stepIds.has(target)) inner.push({ before: target, after: relationship.source_task_id });
+      if (relationship.type !== 'depends_on') continue;
+      const { source_task_id: source, target_task_id: target } = relationship;
+      every.push({ before: target, after: source });
+      if (!stepIds.has(source)) continue;
+      before.set(source, [...(before.get(source) ?? []), target]);
+      if (stepIds.has(target)) inner.push({ before: target, after: source });
       else {
         const task = todoById.get(target);
         if (task) outer.set(task.id, task);
       }
     }
-    return { edges: inner, outside: [...outer.values()], prerequisites: before };
+    return { edges: inner, allEdges: every, outside: [...outer.values()], prerequisites: before };
   }, [relationships, stepIds, todoById]);
 
   const toneOf = (step: TodoResponse): FlowTone => {
@@ -117,20 +129,63 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
     return step.status === 'in_progress' ? 'active' : 'ready';
   };
 
-  const nodes: FlowNode[] = steps.map((step) => {
+  const allNodes: FlowNode[] = steps.map((step) => {
     const tone = toneOf(step);
     const inside = childCount.get(step.id);
     const meta = [
       translateUi(TONE_LABELS[tone]),
-      inside ? translateUi('{{done}}/{{total}} steps', inside) : '',
       step.due_date && tone !== 'done' ? formatDueDate(step.due_date) : '',
+      inside ? translateUi('{{count}} inside', { count: inside }) : '',
     ]
       .filter(Boolean)
       .join(' · ');
     return { id: step.id, title: step.title, meta, tone, sortOrder: step.sort_order ?? 0 };
   });
-  const canDoNow = nodes.filter((node) => node.tone === 'ready' || node.tone === 'active').length;
-  const blocked = nodes.filter((node) => node.tone === 'blocked').length;
+
+  // Done steps at the start of the flow stay, dimmed; past three they fold
+  // into one box. A done step only folds when everything before it is done.
+  const doneLead = new Set<string>();
+  const linked = new Set(edges.flatMap((edge) => [edge.before, edge.after]));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const node of allNodes) {
+      if (node.tone !== 'done' || doneLead.has(node.id) || !linked.has(node.id)) continue;
+      const before = edges.filter((edge) => edge.after === node.id).map((edge) => edge.before);
+      if (before.every((id) => doneLead.has(id))) {
+        doneLead.add(node.id);
+        grew = true;
+      }
+    }
+  }
+  const fold = !showDone && doneLead.size > DONE_FOLD_AFTER;
+  const nodes: FlowNode[] = fold
+    ? [
+        {
+          id: DONE_GROUP,
+          title: translateUi('Done {{count}}', { count: doneLead.size }),
+          tone: 'done',
+          sortOrder: -1,
+          fixed: true,
+        },
+        ...allNodes.filter((node) => !doneLead.has(node.id)),
+      ]
+    : allNodes;
+  const shownEdges: FlowEdge[] = fold
+    ? edges
+        .filter((edge) => !doneLead.has(edge.after))
+        .map((edge) => (doneLead.has(edge.before) ? { ...edge, before: DONE_GROUP } : edge))
+    : edges;
+
+  const canDoNow = allNodes.filter((node) => node.tone === 'ready' || node.tone === 'active');
+  const blocked = allNodes.filter((node) => node.tone === 'blocked').length;
+  const focusId = allNodes.find((node) => node.tone === 'active')?.id ?? canDoNow[0]?.id ?? null;
+  const ends = steps.filter(
+    (step) => linked.has(step.id) && !edges.some((edge) => edge.before === step.id),
+  );
+  const selectedEnd =
+    selectedId && ends.length > 1 && ends.some((step) => step.id === selectedId)
+      ? selectedId
+      : null;
 
   const trail: TodoResponse[] = [];
   for (let cursor = todoById.get(scopeId); cursor && trail.length < 12;) {
@@ -148,16 +203,47 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
         ? selectedId
         : lastStep?.id
       : null;
+    // With several branch ends, Enter continues the selected one.
+    if (!branch && selectedEnd) anchor.current = selectedEnd;
     const parentId = scopeId;
     setDraft('');
     queue.current = queue.current
       .catch(() => undefined)
-      .then(() => addStep.mutateAsync({ parentId, title, branchFromId }))
+      .then(async () => {
+        const afterId = branch ? null : anchor.current;
+        const result = await addStep.mutateAsync({ parentId, title, branchFromId, afterId });
+        anchor.current = afterId ? result.todo.id : null;
+        if (afterId) select(result.todo.id);
+      })
       .catch(() => undefined);
   };
 
+  const move = (id: string, afterId: string) => {
+    // The step leaves its place first, so only an outside chain can loop.
+    const others = allEdges.filter(
+      (edge) =>
+        !(
+          stepIds.has(edge.before) &&
+          stepIds.has(edge.after) &&
+          (edge.before === id || edge.after === id)
+        ),
+    );
+    if (waitsOn(others, afterId, id)) {
+      useToastStore.getState().addToast(
+        'warning',
+        translateUi('“{{earlier}}” would come before “{{later}}”', {
+          earlier: todoById.get(afterId)?.title ?? '',
+          later: todoById.get(id)?.title ?? '',
+        }),
+      );
+      return;
+    }
+    moveStep.mutate({ parentId: scopeId, stepId: id, afterId });
+  };
+
   const openOrDrill = (id: string) => {
-    if (childCount.has(id)) {
+    if (id === DONE_GROUP) setShowDone(true);
+    else if (childCount.has(id)) {
       setScopeId(id);
       select(null);
     } else if (id === selectedId) {
@@ -188,67 +274,67 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
       {steps.length > 0 && (
         <p className="cc-flow__summary">
           {translateUi('Can do now {{ready}} · Blocked {{blocked}}', {
-            ready: canDoNow,
+            ready: canDoNow.length,
             blocked,
           })}
+          {selectedId && stepIds.has(selectedId) && !childCount.has(selectedId) && (
+            <button type="button" onClick={() => navigate(`/tasks/${selectedId}`)}>
+              {translateUi('Open task')}
+            </button>
+          )}
         </p>
       )}
-      {steps.length > 0 && (
-        <FlowCanvas
-          nodes={nodes}
-          edges={edges}
-          ariaLabel={translateUi('Steps')}
-          selectedId={selectedId}
-          onSelect={openOrDrill}
-          onToggle={(id) => {
-            const step = todoById.get(id);
-            if (step) toggle.mutate({ id, currentStatus: step.status });
-          }}
-          onMove={(id, afterId) => moveStep.mutate({ parentId: scopeId, stepId: id, afterId })}
-          lead={
-            outside.length > 0 && (
-              <div className="cc-flow__lead">
-                {outside.map((task) => (
-                  <button key={task.id} type="button" onClick={() => navigate(`/tasks/${task.id}`)}>
-                    {translateUi('Other task: {{title}}', { title: task.title })}
-                  </button>
-                ))}
-              </div>
-            )
-          }
-          tail={
-            <button
-              type="button"
-              className="cc-flow__add"
-              aria-label={translateUi('Next step')}
-              onClick={() => inputRef.current?.focus()}
-            >
-              +
-            </button>
-          }
-        />
-      )}
-      <input
-        ref={inputRef}
-        className="cc-flow__input"
-        value={draft}
-        placeholder={translateUi(
-          steps.length > 0 ? 'Next step · Enter, branch · Tab' : 'First step · Enter',
-        )}
-        aria-label={translateUi('Next step')}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            submit(false);
-          } else if (event.key === 'Tab' && !event.shiftKey && draft.trim() && steps.length > 0) {
-            event.preventDefault();
-            submit(true);
-          } else if (event.key === 'Escape') {
-            select(null);
-          }
+      <FlowCanvas
+        nodes={nodes}
+        edges={shownEdges}
+        ariaLabel={translateUi('Steps')}
+        selectedId={selectedId}
+        focusId={focusId}
+        tailAfterId={selectedEnd}
+        onSelect={openOrDrill}
+        onToggle={(id) => {
+          const step = todoById.get(id);
+          if (step) toggle.mutate({ id, currentStatus: step.status });
         }}
+        onMove={move}
+        lead={
+          outside.length > 0 && (
+            <div className="cc-flow__lead">
+              {outside.map((task) => (
+                <button key={task.id} type="button" onClick={() => navigate(`/tasks/${task.id}`)}>
+                  {translateUi('Other task: {{title}}', { title: task.title })}
+                </button>
+              ))}
+            </div>
+          )
+        }
+        tail={
+          <input
+            className="cc-flow__input"
+            value={draft}
+            placeholder={translateUi('Next step')}
+            title={translateUi('Next step · Enter, branch · Tab')}
+            aria-label={translateUi('Next step')}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                submit(false);
+              } else if (
+                event.key === 'Tab' &&
+                !event.shiftKey &&
+                draft.trim() &&
+                steps.length > 0
+              ) {
+                event.preventDefault();
+                submit(true);
+              } else if (event.key === 'Escape') {
+                select(null);
+              }
+            }}
+          />
+        }
       />
     </section>
   );

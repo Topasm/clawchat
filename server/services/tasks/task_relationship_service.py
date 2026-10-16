@@ -185,10 +185,25 @@ async def _validate_candidate(
         )
         if existing_path is not None:
             cycle_task_ids = [source_task_id, *existing_path]
+            # Say what the edge would do in task names: the prerequisite would
+            # have to come before a task that already comes before it.
+            titles = dict(
+                (
+                    await db.execute(
+                        select(Todo.id, Todo.title).where(
+                            Todo.id.in_((source_task_id, target_task_id))
+                        )
+                    )
+                ).all()
+            )
+            earlier = titles.get(target_task_id, target_task_id)
+            later = titles.get(source_task_id, source_task_id)
             raise ValidationError(
-                "Dependency cycle detected",
+                f"Dependency cycle detected: “{earlier}” would come before “{later}”",
                 details={
                     "reason": "dependency_cycle",
+                    "earlier_title": earlier,
+                    "later_title": later,
                     "proposed_edge": {
                         "source_task_id": source_task_id,
                         "target_task_id": target_task_id,

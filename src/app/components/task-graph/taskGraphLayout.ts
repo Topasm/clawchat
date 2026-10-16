@@ -1,157 +1,125 @@
-export interface GraphLayoutSize {
-  nodeWidth: number;
-  nodeHeight: number;
-  columnGap: number;
-  rowGap: number;
-  padding: number;
-}
-
-const DEFAULT_SIZE: GraphLayoutSize = {
-  nodeWidth: 244,
-  nodeHeight: 118,
-  columnGap: 104,
-  rowGap: 28,
-  padding: 32,
-};
-
-export interface GraphTaskLike {
+export interface FlowLayoutNode {
   id: string;
-  title: string;
-  parent_id?: string | null;
-  sort_order?: number;
+  sortOrder?: number;
 }
 
-export interface GraphRelationshipLike {
-  id?: string;
-  source_task_id: string;
-  target_task_id: string;
-  type: string;
+/** `before` must finish before `after` starts. */
+export interface FlowLayoutEdge {
+  before: string;
+  after: string;
 }
 
-interface TaskGraphNodeLayout {
+export interface FlowPlacement {
   id: string;
-  x: number;
-  y: number;
+  column: number;
+  row: number;
 }
 
-interface TaskGraphEdgeLayout {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  type: 'dependency';
+export interface FlowLayout {
+  placements: FlowPlacement[];
+  /** Steps with no order to any other step; they sit apart from the flow. */
+  unordered: string[];
+  edges: FlowLayoutEdge[];
+  columns: number;
+  rows: number;
 }
 
-export interface TaskGraphLayout {
-  nodes: TaskGraphNodeLayout[];
-  edges: TaskGraphEdgeLayout[];
-  width: number;
-  height: number;
+function byOrder(a: FlowLayoutNode, b: FlowLayoutNode) {
+  return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id.localeCompare(b.id);
 }
 
-function taskOrder(a: GraphTaskLike, b: GraphTaskLike) {
-  const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
-  return sortDiff || a.title.localeCompare(b.title);
-}
-
-function canvasSize(
-  nodes: TaskGraphNodeLayout[],
-  size: GraphLayoutSize,
-): Pick<TaskGraphLayout, 'width' | 'height'> {
-  if (nodes.length === 0) return { width: 0, height: 0 };
-  return {
-    width: nodes.reduce((max, node) => Math.max(max, node.x + size.nodeWidth), 0) + size.padding,
-    height: nodes.reduce((max, node) => Math.max(max, node.y + size.nodeHeight), 0) + size.padding,
-  };
-}
-
-/** Layout the dependency DAG into execution stages using topological depth. */
-export function buildExecutionGraphLayout(
-  visibleTasks: GraphTaskLike[],
-  relationships: readonly GraphRelationshipLike[],
-  size: GraphLayoutSize = DEFAULT_SIZE,
-): TaskGraphLayout {
-  if (visibleTasks.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
-
-  const taskById = new Map(visibleTasks.map((task) => [task.id, task]));
-  const incomingCount = new Map(visibleTasks.map((task) => [task.id, 0]));
-  const outgoing = new Map<string, Set<string>>();
-  const edges: TaskGraphEdgeLayout[] = [];
-  const seenRelationships = new Set<string>();
-
-  relationships.forEach((relationship) => {
-    if (relationship.type !== 'depends_on') return;
-    const taskId = relationship.source_task_id;
-    const dependencyId = relationship.target_task_id;
-    const relationshipKey = `${taskId}:${dependencyId}`;
-    if (
-      dependencyId === taskId ||
-      !taskById.has(taskId) ||
-      !taskById.has(dependencyId) ||
-      seenRelationships.has(relationshipKey)
-    ) {
-      return;
-    }
-    seenRelationships.add(relationshipKey);
-    outgoing.set(dependencyId, (outgoing.get(dependencyId) ?? new Set()).add(taskId));
-    incomingCount.set(taskId, (incomingCount.get(taskId) ?? 0) + 1);
-    edges.push({
-      id: `dependency:${dependencyId}:${taskId}`,
-      sourceId: dependencyId,
-      targetId: taskId,
-      type: 'dependency',
-    });
+/**
+ * Place a flow's steps on a grid, left to right, from order alone.
+ *
+ * - Column: the longest chain of prerequisites before the step.
+ * - Row: a step's first (nearest) successor stays on its row, later successors
+ *   (branches) take the next free row below, and a join takes the topmost row
+ *   among the steps it follows, so the main line runs straight.
+ * - Steps with no order at all are listed apart, not stacked in column 1. A
+ *   lone step is the start of the flow, not unordered.
+ *
+ * Nothing about the layout is stored: the same order always lays out the same.
+ */
+export function layoutFlow(
+  nodes: readonly FlowLayoutNode[],
+  edges: readonly FlowLayoutEdge[],
+): FlowLayout {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const seen = new Set<string>();
+  const valid = edges.filter((edge) => {
+    const key = `${edge.before}>${edge.after}`;
+    if (edge.before === edge.after || !byId.has(edge.before) || !byId.has(edge.after)) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
+  const linked = new Set(valid.flatMap((edge) => [edge.before, edge.after]));
+  if (linked.size === 0 && nodes.length === 1) linked.add(nodes[0].id);
+  const flowNodes = nodes.filter((node) => linked.has(node.id)).sort(byOrder);
+  const unordered = nodes
+    .filter((node) => !linked.has(node.id))
+    .sort(byOrder)
+    .map((node) => node.id);
 
-  const depth = new Map(visibleTasks.map((task) => [task.id, 0]));
-  const queue = visibleTasks
-    .filter((task) => incomingCount.get(task.id) === 0)
-    .sort(taskOrder)
-    .map((task) => task.id);
-  const processed = new Set<string>();
-  let queueHead = 0;
-
-  while (queueHead < queue.length) {
-    const id = queue[queueHead++];
-    if (processed.has(id)) continue;
-    processed.add(id);
-    for (const targetId of outgoing.get(id) ?? []) {
-      depth.set(targetId, Math.max(depth.get(targetId) ?? 0, (depth.get(id) ?? 0) + 1));
-      const nextIncoming = (incomingCount.get(targetId) ?? 1) - 1;
-      incomingCount.set(targetId, nextIncoming);
-      if (nextIncoming === 0) queue.push(targetId);
-    }
+  const before = new Map<string, string[]>();
+  const after = new Map<string, FlowLayoutNode[]>();
+  for (const edge of valid) {
+    before.set(edge.after, [...(before.get(edge.after) ?? []), edge.before]);
+    after.set(edge.before, [...(after.get(edge.before) ?? []), byId.get(edge.after)!]);
   }
 
-  // Cycles cannot be topologically sorted. Keep them visible in fallback stages.
-  let fallbackDepth = Math.max(0, ...depth.values());
-  visibleTasks
-    .filter((task) => !processed.has(task.id))
-    .sort(taskOrder)
-    .forEach((task) => {
-      depth.set(task.id, fallbackDepth++);
-    });
+  // Column = longest prerequisite chain (Kahn's order over the flow).
+  const column = new Map(flowNodes.map((node) => [node.id, 0]));
+  const waiting = new Map(flowNodes.map((node) => [node.id, before.get(node.id)?.length ?? 0]));
+  const queue = flowNodes.filter((node) => waiting.get(node.id) === 0).map((node) => node.id);
+  const placed = new Set<string>();
+  for (let head = 0; head < queue.length; head += 1) {
+    const id = queue[head];
+    placed.add(id);
+    for (const next of after.get(id) ?? []) {
+      column.set(next.id, Math.max(column.get(next.id)!, column.get(id)! + 1));
+      waiting.set(next.id, waiting.get(next.id)! - 1);
+      if (waiting.get(next.id) === 0) queue.push(next.id);
+    }
+  }
+  // A cycle cannot be ordered; keep its steps visible to the right.
+  let fallback = Math.max(0, ...column.values()) + 1;
+  for (const node of flowNodes) {
+    if (!placed.has(node.id)) column.set(node.id, fallback++);
+  }
 
-  const columns = new Map<number, GraphTaskLike[]>();
-  visibleTasks.forEach((task) => {
-    const columnDepth = depth.get(task.id) ?? 0;
-    const column = columns.get(columnDepth) ?? [];
-    column.push(task);
-    columns.set(columnDepth, column);
-  });
-  columns.forEach((column) => column.sort(taskOrder));
+  // A step's "first" successor is the nearest one, so the longest chain is
+  // the straight line and a shortcut to a later step reads as the branch.
+  after.forEach((list) =>
+    list.sort((a, b) => column.get(a.id)! - column.get(b.id)! || byOrder(a, b)),
+  );
+  const ordered = flowNodes
+    .map((node) => node.id)
+    .sort((a, b) => column.get(a)! - column.get(b)! || byOrder(byId.get(a)!, byId.get(b)!));
+  const row = new Map<string, number>();
+  const taken = new Map<number, Set<number>>();
+  for (const id of ordered) {
+    const preds = (before.get(id) ?? []).filter((pred) => row.has(pred));
+    const leading = preds.filter((pred) => after.get(pred)?.[0]?.id === id);
+    let candidate =
+      leading.length > 0
+        ? Math.min(...leading.map((pred) => row.get(pred)!))
+        : preds.length > 0
+          ? Math.min(...preds.map((pred) => row.get(pred)!)) + 1
+          : 0;
+    const col = column.get(id)!;
+    const used = taken.get(col) ?? new Set<number>();
+    while (used.has(candidate)) candidate += 1;
+    row.set(id, candidate);
+    taken.set(col, used.add(candidate));
+  }
 
-  const nodes: TaskGraphNodeLayout[] = [];
-  [...columns.entries()]
-    .sort(([a], [b]) => a - b)
-    .forEach(([columnDepth, column]) => {
-      column.forEach((task, row) => {
-        nodes.push({
-          id: task.id,
-          x: size.padding + columnDepth * (size.nodeWidth + size.columnGap),
-          y: size.padding + row * (size.nodeHeight + size.rowGap),
-        });
-      });
-    });
-
-  return { nodes, edges, ...canvasSize(nodes, size) };
+  const placements = ordered.map((id) => ({ id, column: column.get(id)!, row: row.get(id)! }));
+  return {
+    placements,
+    unordered,
+    edges: valid,
+    columns: placements.length ? Math.max(...placements.map((p) => p.column)) + 1 : 0,
+    rows: placements.length ? Math.max(...placements.map((p) => p.row)) + 1 : 0,
+  };
 }

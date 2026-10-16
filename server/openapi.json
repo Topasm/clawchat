@@ -11432,6 +11432,17 @@
       },
       "TaskStepCreate": {
         "properties": {
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          },
           "branch_from_id": {
             "anyOf": [
               {

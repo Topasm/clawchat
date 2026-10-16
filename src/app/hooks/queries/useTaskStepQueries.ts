@@ -14,6 +14,22 @@ import { translateUi } from '../../i18n';
 import { queryKeys } from './queryKeys';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
+/** A refused loop reads as which step would come before which. */
+function stepError(error: unknown, fallback: string): string {
+  const details = (
+    error as {
+      response?: { data?: { error?: { details?: Record<string, unknown> } } };
+    }
+  )?.response?.data?.error?.details;
+  if (details?.reason === 'dependency_cycle' && details.earlier_title && details.later_title) {
+    return translateUi('“{{earlier}}” would come before “{{later}}”', {
+      earlier: String(details.earlier_title),
+      later: String(details.later_title),
+    });
+  }
+  return translateUi(fallback);
+}
+
 function refreshFlow(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.todos });
   void queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
@@ -51,14 +67,17 @@ export function useAddTaskStep() {
       parentId,
       title,
       branchFromId,
+      afterId,
     }: {
       parentId: string;
       title: string;
       branchFromId?: string | null;
+      afterId?: string | null;
     }): Promise<TaskStepResponse> => {
       const response = await apiClient.post(`/todos/${parentId}/steps`, {
         title,
         branch_from_id: branchFromId ?? null,
+        after_id: afterId ?? null,
       });
       return TaskStepResponseSchema.parse(response.data);
     },
@@ -88,11 +107,11 @@ export function useAddTaskStep() {
       );
       offerUndo(translateUi('Step added'), () => undo.mutate(result.change_id));
     },
-    onError: (_error, _variables, context) => {
+    onError: (_error: unknown, _variables, context) => {
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).filter((todo) => todo.id !== context?.optimisticId),
       );
-      useToastStore.getState().addToast('error', translateUi('Could not add the step'));
+      useToastStore.getState().addToast('error', stepError(_error, 'Could not add the step'));
     },
     onSettled: () => refreshFlow(queryClient),
   });
@@ -120,8 +139,8 @@ export function useMoveTaskStep() {
     },
     onSuccess: (result) =>
       offerUndo(translateUi('Step moved'), () => undo.mutate(result.change_id)),
-    onError: () =>
-      useToastStore.getState().addToast('error', translateUi('Could not move the step')),
+    onError: (error: unknown) =>
+      useToastStore.getState().addToast('error', stepError(error, 'Could not move the step')),
     onSettled: () => refreshFlow(queryClient),
   });
 }
