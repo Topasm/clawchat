@@ -27,6 +27,9 @@ object ReminderNotificationHelper {
     const val EXTRA_WORKSPACE_KEY = "workspace_key"
     const val EXTRA_NOTIFICATION_ID = "notification_id"
 
+    /** A progress bar that moves without saying how far along the work is. */
+    const val PROGRESS_INDETERMINATE = -1
+
     private const val CHANNEL_ID = "clawchat_reminders"
     private const val GROUP_KEY = "clawchat_reminders_group"
     private const val SUMMARY_NOTIFICATION_ID = 0x0C1A7
@@ -72,6 +75,14 @@ object ReminderNotificationHelper {
         extraAction: NotificationCompat.Action? = null,
         /** A quiet, pinned notification for work in progress, replaced by its result. */
         ongoing: Boolean = false,
+        /** Shown beside the app name in the header, such as where a run stands. */
+        subText: String? = null,
+        /** The longer text the expanded notification shows instead of [message]. */
+        bigText: String? = null,
+        /** A bar from 0 to 100, or [PROGRESS_INDETERMINATE] for one that only moves. */
+        progress: Int? = null,
+        /** When the work began; the header then counts the time since. */
+        startedAtMillis: Long? = null,
     ): Boolean {
         // A notification without a stable workspace cannot be routed safely,
         // and an unscoped delivery claim could suppress another workspace.
@@ -126,6 +137,17 @@ object ReminderNotificationHelper {
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setExtras(Bundle().apply { putString(EXTRA_WORKSPACE_KEY, workspaceKey) })
 
+        subText?.takeIf(String::isNotBlank)?.let(builder::setSubText)
+        bigText?.takeIf(String::isNotBlank)?.let {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(it))
+        }
+        when {
+            progress == PROGRESS_INDETERMINATE -> builder.setProgress(0, 0, true)
+            progress != null -> builder.setProgress(100, progress.coerceIn(0, 100), false)
+        }
+        startedAtMillis?.let {
+            builder.setWhen(it).setShowWhen(true).setUsesChronometer(true)
+        }
         extraAction?.let(builder::addAction)
 
         // Add "Mark Done" action for todo reminders

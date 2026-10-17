@@ -91,6 +91,7 @@ async def notify_run_state(
     *,
     review_id: str | None = None,
     risk_level: str | None = None,
+    reminder: bool = False,
     user_id: str = DEFAULT_USER_ID,
 ) -> None:
     """Push one ``run_state_changed`` event describing where a run is now.
@@ -104,11 +105,42 @@ async def notify_run_state(
     """
     if task is None:
         task = await db.get(AgentTask, run.agent_task_id)
+    payload = await _run_state_payload(
+        db, run, task, review_id=review_id, risk_level=risk_level, reminder=reminder
+    )
+    notify_after_commit(
+        db,
+        {"type": "run_state_changed", "data": payload},
+        user_id,
+        send_json=ws_manager.send_json,
+    )
+    # A phone without an open socket still hears about runs that need the user.
+    run_push.schedule(db, payload)
+    if task is not None:
+        await run_thread_service.post_run_update(
+            db, run, task, review_id=review_id, user_id=user_id
+        )
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+async def _run_state_payload(
+    db: AsyncSession,
+    run: AgentRun,
+    task: AgentTask | None,
+    *,
+    review_id: str | None = None,
+    risk_level: str | None = None,
+    reminder: bool = False,
+) -> dict[str, Any]:
     todo = (
         await db.get(Todo, task.todo_id) if task is not None and task.todo_id else None
     )
     title = todo.title if todo is not None else run.instruction_snapshot[:120]
     host_label = await execution_host_service.run_host_label(db, run)
+    chain = _skill_chain(task) if task is not None else None
     payload = {
         "host_label": host_label,
         "run_id": run.id,
@@ -128,19 +160,16 @@ async def notify_run_state(
         "is_adopted": run.is_adopted,
         "risk_level": risk_level,
         "review_id": review_id,
+        "started_at": _iso(run.started_at),
+        # Every transition stamps the heartbeat, so this tells one wait (or
+        # one review) apart from the next on the same run.
+        "status_since": _iso(run.heartbeat_at),
+        "reminder": reminder,
     }
-    notify_after_commit(
-        db,
-        {"type": "run_state_changed", "data": payload},
-        user_id,
-        send_json=ws_manager.send_json,
-    )
-    # A phone without an open socket still hears about runs that need the user.
-    run_push.schedule(db, payload)
-    if task is not None:
-        await run_thread_service.post_run_update(
-            db, run, task, review_id=review_id, user_id=user_id
-        )
+    if chain and len(chain) > 1 and task is not None:
+        payload["step"] = min(task.current_skill_index, len(chain) - 1) + 1
+        payload["step_count"] = len(chain)
+    return payload
 
 
 async def infer_project_id(db: AsyncSession, task: AgentTask) -> str | None:
@@ -334,6 +363,12 @@ async def update_progress(
     run.progress_message = message
     run.heartbeat_at = datetime.now(timezone.utc)
     await record_event(db, run, "progress", message, progress=progress)
+    # The phone's "working" notification moves its bar and step count too,
+    # but at most once a minute; the socket clients refetch on their own.
+    if run_push.progress_due(run.id):
+        task = await db.get(AgentTask, run.agent_task_id)
+        payload = await _run_state_payload(db, run, task)
+        run_push.schedule(db, {**payload, "progress_update": True})
 
 
 async def mark_waiting_review(

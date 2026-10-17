@@ -135,7 +135,7 @@ async def remind_waiting_runs(
             f"Still waiting for your input after {minutes} minutes",
             progress=run.progress,
         )
-        await agent_run_service.notify_run_state(db, run)
+        await agent_run_service.notify_run_state(db, run, reminder=True)
         reminded.append(run.id)
     return reminded
 
