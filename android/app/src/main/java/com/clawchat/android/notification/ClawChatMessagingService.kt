@@ -103,34 +103,27 @@ class ClawChatMessagingService : FirebaseMessagingService() {
         // "Finished" only replaces a "working" notice that is still up; a result
         // the user already approved from the queue needs no second buzz.
         if (status == "completed" && !isShowing(notificationId)) return
-        val headline = when (status) {
-            "running" -> getString(R.string.push_run_running)
-            "completed" -> getString(R.string.push_run_completed)
-            "waiting_input" -> getString(R.string.push_run_waiting_input)
-            "waiting_review" -> getString(R.string.push_run_waiting_review)
-            "failed" -> getString(R.string.push_run_failed)
-            else -> return
-        }
-        val task = data["title"]?.takeIf(String::isNotBlank) ?: getString(R.string.push_run_untitled)
-        val body = data["detail"]?.takeIf { status == "failed" && it.isNotBlank() }
-            ?.let { getString(R.string.push_run_failed_body, task, it) }
-            ?: task
-        // Only a low-risk result gets a button; everything else is opened and read.
+        val notice = runNotice(data) { id, args -> getString(id, *args) } ?: return
         val approve = data["review_id"]
-            ?.takeIf { status == "waiting_review" && data["risk_level"] == "low" }
+            ?.takeIf { notice.offerApprove }
             ?.let { reviewId -> approveAction(reviewId, runId, workspaceKey) }
         ReminderNotificationHelper.showReminderNotification(
             context = this,
             reminderType = "run",
             itemId = runId,
-            title = headline,
-            message = if (approve != null) getString(R.string.push_run_low_risk_body, task) else body,
+            title = notice.title,
+            message = notice.text,
             workspaceKey = workspaceKey,
-            deliveryKey = "run:$runId:$status",
+            deliveryKey = notice.deliveryKey,
+            deduplicate = notice.deduplicate,
             extraAction = approve,
             // Progress is one quiet, buttonless notification that the result
             // replaces, since the two share the run's notification id.
-            ongoing = status == "running",
+            ongoing = notice.ongoing,
+            subText = notice.subText,
+            bigText = notice.bigText,
+            progress = notice.progress,
+            startedAtMillis = notice.startedAtMillis,
         )
     }
 

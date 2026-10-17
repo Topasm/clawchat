@@ -45,6 +45,7 @@ def test_only_states_that_need_the_user_are_pushed():
         "title": "Draft the report",
         "todo_id": "todo_1",
         "conversation_id": "c1",
+        "push_key": "waiting_input@",
     }
     failed = run_push.push_data({**base, "status": "failed", "error": "boom"})
     assert failed["detail"] == "boom"
@@ -128,3 +129,98 @@ def test_progress_is_pushed_quietly_for_top_level_runs_only():
     for status in ("running", "completed", "cancelled"):
         assert run_push.push_data({**base, "status": status})["status"] == status
         assert run_push.push_data({**base, "status": status, "parent_task_id": "t2"}) is None
+
+
+def test_the_phone_gets_the_question_the_risk_and_the_run_s_place():
+    base = {"run_id": "run_1", "title": "GPU kernel profiling", "host_label": "MacBook"}
+    asking = run_push.push_data(
+        {**base, "status": "waiting_input", "progress_message": "Where should the figures go?"}
+    )
+    assert asking["detail"] == "Where should the figures go?"
+    review = run_push.push_data(
+        {**base, "status": "waiting_review", "risk_level": "medium", "result_summary": "Two figures"}
+    )
+    assert (review["risk_level"], review["detail"]) == ("medium", "Two figures")
+    running = run_push.push_data(
+        {
+            **base,
+            "status": "running",
+            "started_at": "2026-10-17T09:00:00+00:00",
+            "progress": 40,
+            "step": 3,
+            "step_count": 4,
+        }
+    )
+    assert running["host_label"] == "MacBook"
+    assert running["started_at_ms"] == "1792227600000"
+    assert (running["progress"], running["step"], running["step_count"]) == ("40", "3", "4")
+    naive = run_push.push_data({**base, "status": "running", "started_at": "2026-10-17T09:00:00"})
+    assert naive["started_at_ms"] == "1792227600000"
+    unstarted = run_push.push_data({**base, "status": "running", "progress": 0})
+    assert "started_at_ms" not in unstarted and "progress" not in unstarted
+
+
+class _Session:
+    async def __aenter__(self):
+        return None
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+async def test_a_second_wait_and_the_reminder_each_push_again():
+    fake = _FakePush()
+    run_push.configure(fake, lambda: _Session())
+
+    def waiting(since, *, reminder=False):
+        return {
+            "data": {
+                "run_id": "run_1",
+                "status": "waiting_input",
+                "title": "T",
+                "status_since": since,
+                "reminder": reminder,
+            }
+        }
+
+    await run_push.send_for_run_state("user", waiting("09:00"))
+    await run_push.send_for_run_state("user", waiting("09:00"))
+    await run_push.send_for_run_state("user", waiting("09:00", reminder=True))
+    await run_push.send_for_run_state("user", waiting("09:00", reminder=True))
+    await run_push.send_for_run_state("user", waiting("10:00"))
+    assert [item["data"].get("reminder") for item in fake.sent] == [None, "1", None]
+
+
+async def test_progress_reaches_the_phone_at_most_once_a_minute(monkeypatch):
+    fake = _FakePush()
+    run_push.configure(fake, lambda: _Session())
+    clock = [1000.0]
+    monkeypatch.setattr(run_push.time, "monotonic", lambda: clock[0])
+    start = {"data": {"run_id": "run_1", "status": "running", "title": "T", "status_since": "a"}}
+    tick = {"data": {**start["data"], "progress": 50, "progress_update": True}}
+
+    await run_push.send_for_run_state("user", start)
+    await run_push.send_for_run_state("user", tick)
+    assert not run_push.progress_due("run_1")
+    clock[0] += 61
+    assert run_push.progress_due("run_1")
+    await run_push.send_for_run_state("user", tick)
+    await run_push.send_for_run_state("user", tick)
+    assert [item["data"].get("progress_update") for item in fake.sent] == [None, "1"]
+
+
+async def test_a_skill_chain_run_reports_its_step(db_session, session_factory):
+    run_push.configure(_FakePush(), session_factory)
+    task = AgentTask(
+        id="task_steps",
+        task_type="research",
+        instruction="Profile the kernels",
+        agent_type="research",
+        skill_chain='["research", "summarize", "draft", "plan"]',
+    )
+    db_session.add(task)
+    await db_session.flush()
+    run = await agent_run_service.create_run(db_session, task, provider="openclaw")
+    task.current_skill_index = 2  # the executor is on the third skill
+    payload = await agent_run_service._run_state_payload(db_session, run, task)
+    assert (payload["step"], payload["step_count"]) == (3, 4)
