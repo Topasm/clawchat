@@ -74,6 +74,8 @@ const screens: Array<{ name: string; path: () => string }> = [
   { name: 'inbox', path: () => '/inbox' },
   { name: 'tasks', path: () => '/tasks' },
   { name: 'task', path: () => '/tasks/todo_visual_slides' },
+  // The desktop pane: the same task beside the list it was picked from.
+  { name: 'task-pane', path: () => '/tasks?task=todo_visual_slides' },
   { name: 'project', path: () => `/projects/${projectId}` },
   { name: 'attention', path: () => '/attention' },
 ];

@@ -89,6 +89,7 @@ export type { ReviewDecisionResult } from './useReviewQueries';
 export {
   useAgentRunsQuery,
   useAgentRunEventsQuery,
+  useActiveRunsQuery,
   useRunsAwaitingInputQuery,
   useCancelAgentRun,
   useRetryAgentRun,

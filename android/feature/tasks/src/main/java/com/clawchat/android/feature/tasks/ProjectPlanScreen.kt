@@ -95,7 +95,7 @@ fun ProjectPlanScreen(
         TopAppBar(title = { Text(state.project?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.projects_title),
             style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             navigationIcon = {
-                if (state.project == null && initialProjectId == null) com.clawchat.android.core.ui.NavigationMenuButton()
+                if (state.project == null && initialProjectId == null) com.clawchat.android.core.ui.HomeBackButton()
                 else IconButton(onClick = back, enabled = !state.busy) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.projects_back))
                 }

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { useTodosQuery } from '../../hooks/queries';
+import { useActiveRunsQuery, useTodosQuery } from '../../hooks/queries';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
 import {
@@ -11,6 +11,7 @@ import {
   GearIcon,
   InboxIcon,
   NavCalendarIcon,
+  ProgressIcon,
   ReviewIcon,
   SearchIcon,
   TasksIcon,
@@ -25,6 +26,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
   const container = useThemedPortalContainer();
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
+  const { data: activeRuns = [] } = useActiveRunsQuery();
   const setTheme = useSettingsStore((s) => s.setTheme);
   const theme = useSettingsStore((s) => s.theme);
   const go = (path: string) => {
@@ -75,8 +77,8 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   {translateUi(' Tasks\n                ')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/attention')}>
-                  <ReviewIcon className="cc-cmd-palette__item-icon" />
-                  {translateUi('Attention')}
+                  <ProgressIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Progress')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/search')}>
                   <SearchIcon className="cc-cmd-palette__item-icon" />
@@ -95,6 +97,25 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   {translateUi(' Settings\n                ')}
                 </Command.Item>
               </Command.Group>
+
+              {activeRuns.length > 0 && (
+                <Command.Group
+                  heading={translateUi('Running now')}
+                  className="cc-cmd-palette__group"
+                >
+                  {activeRuns.map((run) => (
+                    <Command.Item
+                      key={run.id}
+                      className="cc-cmd-palette__item"
+                      value={`run ${run.todo_title || run.instruction}`}
+                      onSelect={() => go(`/attention?view=runs&run_id=${run.id}`)}
+                    >
+                      <ReviewIcon className="cc-cmd-palette__item-icon" />
+                      {run.todo_title || run.instruction}
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+              )}
 
               <Command.Group heading="Actions" className="cc-cmd-palette__group">
                 <Command.Item className="cc-cmd-palette__item" onSelect={toggleTheme}>

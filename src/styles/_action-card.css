@@ -28,18 +28,51 @@
   flex-direction: column;
 }
 
+/* The step proposal stacks three lines -- kind and count, summary, button --
+   and never puts two things side by side, so a 240px panel cannot crush it. */
 .cc-action-card--plan {
   width: 100%;
+  min-width: 0;
+}
+
+.cc-action-card--plan-failed {
+  border-color: var(--cc-warning);
 }
 
 .cc-action-card__plan-heading {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.cc-action-card__plan-heading > div,
+.cc-action-card__kind {
+  font-weight: 600;
+  color: var(--cc-text);
+}
+
+.cc-action-card__count {
+  padding: 0 6px;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface);
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+}
+
+.cc-action-card__plan-summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--cc-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.cc-action-card--plan .cc-action-card__view-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 .cc-action-card__plan-status {
   display: flex;
   flex-direction: column;

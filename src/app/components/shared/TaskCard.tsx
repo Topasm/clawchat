@@ -1,7 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { TodoResponse } from '../../types/api';
 import { useTaskRelationshipsQuery } from '../../hooks/queries';
 import { getDependsOnCountBySource } from '../../utils/taskRelationships';
+import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
+import WaitingOnLine from './WaitingOnLine';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
 import StorageLocationBadge from './StorageLocationBadge';
@@ -26,6 +29,8 @@ interface TaskCardProps {
   isSubTask?: boolean;
   subTaskCount?: number;
   isCompletedOverride?: boolean;
+  /** Open in the pane beside the list; the row stays raised. */
+  selected?: boolean;
 }
 export default function TaskCard({
   task,
@@ -36,7 +41,9 @@ export default function TaskCard({
   isSubTask,
   subTaskCount,
   isCompletedOverride,
+  selected = false,
 }: TaskCardProps) {
+  const navigate = useNavigate();
   const isCompleted = isCompletedOverride ?? task.status === 'completed';
   const { data: relationships } = useTaskRelationshipsQuery();
   const dependencyCount =
@@ -92,7 +99,8 @@ export default function TaskCard({
   return (
     <>
       <div
-        className={`cc-card cc-card--task${className ? ' ' + className : ''}${isSubTask ? ' cc-kanban__card--subtask' : ''}`}
+        className={`cc-card cc-card--task${className ? ' ' + className : ''}${isSubTask ? ' cc-kanban__card--subtask' : ''}${selected ? ' cc-card--selected' : ''}`}
+        aria-current={selected ? 'true' : undefined}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}
@@ -109,6 +117,14 @@ export default function TaskCard({
               </span>
             )}
           </div>
+          {!isCompleted && isWaitingOnPrerequisite(task) && (
+            <WaitingOnLine
+              prerequisites={task.open_prerequisites}
+              dueDate={task.due_date}
+              onOpenTask={(id) => navigate(`/tasks/${id}`)}
+              className="cc-card__waiting"
+            />
+          )}
           <div className="cc-card__meta">
             <StorageLocationBadge item={task} />
             {task.due_date && <Badge variant="due" dueDate={task.due_date} />}

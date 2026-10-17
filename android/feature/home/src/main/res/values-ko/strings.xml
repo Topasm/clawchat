@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_search">검색</string>
+    <string name="home_inbox">받은함</string>
+    <string name="home_today">오늘</string>
+    <string name="home_schedule">일정</string>
+    <string name="home_tasks">작업</string>
+    <string name="home_progress">진행</string>
+    <string name="home_progress_counts">확인 %1$d · 실행 %2$d</string>
+    <string name="home_projects">프로젝트</string>
+    <string name="home_projects_all">모두 보기 ›</string>
+    <string name="home_chat">대화</string>
+    <string name="home_devices">기기</string>
+    <string name="home_settings">설정</string>
+    <string name="home_connected">Home 연결됨</string>
+    <string name="home_disconnected">연결 안 됨</string>
+    <string name="home_this_device">이 기기</string>
+    <string name="home_cd_new_task">새 작업</string>
+    <string name="home_cd_project_progress">%2$d개 중 %1$d개 완료</string>
+</resources>

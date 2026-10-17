@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
+import TaskDetail from '../../components/task-detail/TaskDetail';
+import { useToastStore } from '../../stores/useToastStore';
 
 const mocks = vi.hoisted(() => ({
   projectDescription: null as string | null,
@@ -13,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   projectPath: '/Users/test/papers' as string | null,
   hostLabel: 'My Mac' as string | null,
   projectError: false,
+  canRun: false,
+  runTask: vi.fn(),
 }));
 
 const task = {
@@ -49,6 +53,11 @@ vi.mock('../../hooks/queries', () => ({
   useToggleTodoComplete: () => ({ mutate: mocks.toggleTodo }),
   useLatestPlanProposalQuery: () => ({ data: null }),
   useTaskExecutionTelemetryQuery: () => ({ data: [] }),
+  useRunReadyTaskWithProjectDefaults: () => ({
+    runTask: mocks.runTask,
+    canRunTask: () => mocks.canRun,
+    isPending: false,
+  }),
   useGeneratePlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useApplyPlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useDismissPlanProposal: () => ({ mutateAsync: vi.fn() }),
@@ -116,6 +125,9 @@ describe('TaskDetailPage project context', () => {
     mocks.projectPath = '/Users/test/papers';
     mocks.hostLabel = 'My Mac';
     mocks.projectError = false;
+    mocks.canRun = false;
+    mocks.runTask.mockReset();
+    useToastStore.setState({ toasts: [] });
   });
 
   it('shows the original-document action from the project description first line', () => {
@@ -145,7 +157,7 @@ describe('TaskDetailPage project context', () => {
     expect(screen.getByText('Flow for todo-e65a')).toBeVisible();
     expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
     // No five steps, no plan button, no machine line for work not handed to an agent.
-    expect(document.querySelector('.cc-stage-bar')).toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Suggest steps' })).not.toBeInTheDocument();
     expect(screen.queryByText('Runs on My Mac')).not.toBeInTheDocument();
   });
@@ -171,11 +183,35 @@ describe('TaskDetailPage project context', () => {
     });
   });
 
+  it('says where delegated work runs, with Change and Undo', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
+
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast.message).toBe('Delegated to AI · Runs on My Mac');
+    expect(toast.action?.label).toBe('Change');
+    expect(toast.secondaryAction?.label).toBe('Undo');
+  });
+
+  it('offers to start delegated work as it stands, with suggesting steps beside it', () => {
+    task.assignee = 'agent';
+    mocks.canRun = true;
+    renderPage();
+
+    const start = screen.getByRole('button', { name: 'Start as is' });
+    expect(start).toHaveClass('cc-btn--primary');
+    expect(screen.getByRole('button', { name: 'Suggest steps' })).toHaveClass('cc-btn--ghost');
+    fireEvent.click(start);
+    expect(mocks.runTask).toHaveBeenCalledWith('todo-e65a');
+  });
+
   it('treats a task with an assignee as delegated', () => {
     task.assignee = 'agent';
     renderPage();
 
-    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-bar')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     expect(screen.getByRole('menuitem', { name: 'Do it myself' })).toBeVisible();
   });
@@ -198,7 +234,8 @@ describe('TaskDetailPage project context', () => {
     task.enabled_skills = ['research'];
     renderPage();
 
-    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-bar')).toBeNull();
     expect(screen.getByRole('button', { name: 'Suggest steps' })).toBeVisible();
     expect(screen.getByText('Runs on My Mac')).toBeVisible();
     expect(screen.getByText('/Users/test/papers')).toBeVisible();
@@ -232,5 +269,35 @@ describe('TaskDetailPage project context', () => {
     expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
     expect(screen.queryByText(/^Skills/)).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Task title')).toBeVisible();
+  });
+
+  it('renders its menu into a host slot, with the host entries first', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const slot = document.createElement('span');
+    document.body.appendChild(slot);
+    const onSelect = vi.fn();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TaskDetail
+            taskId="todo-e65a"
+            menuSlot={slot}
+            extraMenuItems={[{ label: 'Open as page', onSelect }]}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const trigger = within(slot).getByRole('button', { name: 'More actions' });
+    fireEvent.click(trigger);
+    const items = within(slot)
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent);
+    expect(items[0]).toBe('Open as page');
+    expect(items).toContain('Delete Task');
+    fireEvent.click(within(slot).getByRole('menuitem', { name: 'Open as page' }));
+    expect(onSelect).toHaveBeenCalled();
+    slot.remove();
   });
 });

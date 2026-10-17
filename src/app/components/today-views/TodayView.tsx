@@ -3,10 +3,13 @@ import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
 import { useToggleTodoComplete } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
+import { useOpenTask, useSelectedTaskId } from '../../hooks/useTaskPane';
 import { formatDate } from '../../utils/formatters';
 import TaskCard from '../shared/TaskCard';
+import AutoApprovedLine from './AutoApprovedLine';
 import EventCard from '../shared/EventCard';
 import TodaySuggestions from './TodaySuggestions';
+import TodayNext from './TodayNext';
 import { ChevronRightIcon } from '../shared/Icons';
 import { GearIcon, TodayIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
@@ -44,6 +47,8 @@ export default function TodayView({
   briefingLoading,
 }: TodayViewProps) {
   const navigate = useNavigate();
+  const openTask = useOpenTask();
+  const selectedTaskId = useSelectedTaskId();
   const toggleMutation = useToggleTodoComplete();
   const { isMobile } = usePlatform();
   const toggleTodoComplete = useCallback(
@@ -96,13 +101,17 @@ export default function TodayView({
       </div>
 
       <AiSetupBanner />
+      <AutoApprovedLine />
 
       <TodaySuggestions briefingSuggestions={briefingData?.suggestions} />
 
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 
       {!isLoading && !hasAnything && (
-        <p className="cc-today-empty">{translateUi('Nothing left today')}</p>
+        <>
+          <p className="cc-today-empty">{translateUi('Nothing left today')}</p>
+          <TodayNext />
+        </>
       )}
 
       {(events.length > 0 || visibleTasks.length > 0) && (
@@ -119,7 +128,8 @@ export default function TodayView({
               key={task.id}
               task={task}
               onToggle={() => toggleTodoComplete(task.id)}
-              onClick={() => navigate(`/tasks/${task.id}`)}
+              onClick={() => openTask(task.id)}
+              selected={task.id === selectedTaskId}
             />
           ))}
         </div>

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -32,6 +32,12 @@ class ScheduledJob(Base):
     rrule: Mapped[str] = mapped_column(Text, nullable=False)
     timezone: Mapped[str] = mapped_column(String, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # "Don't ask next time": a low-risk result (prose only, no tool call) is
+    # approved as it lands instead of waiting in Attention. Never covers a
+    # result that could have changed files or the vault.
+    auto_approve_low_risk: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     # None while the job is disabled or its rule has no further occurrences.
     next_run_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

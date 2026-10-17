@@ -4,6 +4,7 @@ import { useAgentRunsQuery, useRetryAgentRun } from '../../hooks/queries';
 import { translateUi } from '../../i18n';
 import { relativeTime } from '../../utils/formatters';
 import { agentName, describeTaskStage, getRunStage } from '../../utils/taskStage';
+import { runFailureReason } from '../../utils/runFailure';
 
 /**
  * Where this task's agent work is right now, and the thread it reports into.
@@ -34,6 +35,11 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
         {agentName(latest.provider)} · {describeTaskStage(stage)}
         {updatedAt ? ` · ${relativeTime(updatedAt)}` : ''}
       </p>
+      {latest.status === 'failed' && (
+        <p className="cc-exec-panel__run-failure" role="status">
+          {runFailureReason(latest.error)}
+        </p>
+      )}
       <span className="cc-task-progress__actions">
         {latest.status === 'waiting_input' && (
           <button type="button" className="cc-btn cc-btn--primary" onClick={openRun}>

@@ -5,6 +5,34 @@
   font-size: 14px;
 }
 
+/* What an automation adopted today without asking, and where to undo that. */
+.cc-today-auto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+.cc-today-auto__text {
+  flex: 1;
+  min-width: 0;
+}
+.cc-today-auto__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.cc-today-auto__action:hover {
+  color: var(--cc-text);
+}
+
 .cc-today-list {
   display: flex;
   flex-direction: column;
@@ -123,4 +151,40 @@
 .cc-today-suggestions__dismiss:hover {
   background: var(--cc-surface-secondary);
   color: var(--cc-text);
+}
+
+/* Once today is clear: the inbox to sort and what is due this week. */
+.cc-today-next {
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+  margin-top: -12px;
+}
+
+.cc-today-next__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border);
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-today-next__row:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-today-next__row > span:first-child {
+  flex: 1;
+}
+
+.cc-today-next__count {
+  color: var(--cc-text-tertiary);
+  font-size: 13px;
 }

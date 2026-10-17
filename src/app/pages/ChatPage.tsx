@@ -296,7 +296,7 @@ export default function ChatPage() {
         isStreaming={isStreaming}
         onStop={stopGeneration}
         draftKey={getChatDraftKey(conversationId)}
-        placeholder={translateUi('Type a message...')}
+        placeholder={translateUi('Type a message')}
         modeLabel={answerRun ? translateUi('Answering the agent') : undefined}
         onClearMode={answerRun ? () => setDismissedAnswerRunId(answerRun.id) : undefined}
       />

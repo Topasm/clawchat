@@ -755,6 +755,13 @@
   cursor: pointer;
 }
 
+/* Which machine a folder is on, when it is not this one. */
+.cc-task-paths__hint {
+  flex: none;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
 .cc-task-paths__size {
   flex: none;
   color: var(--cc-text-tertiary);

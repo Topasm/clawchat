@@ -2,22 +2,19 @@ package com.clawchat.android.navigation
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
-import com.clawchat.android.core.ui.icons.ClawIcons
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.BackHandler
-import kotlinx.coroutines.launch
-import com.clawchat.android.core.ui.LocalAttentionCount
-import com.clawchat.android.core.ui.LocalOpenNavigationMenu
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,55 +26,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.clawchat.android.core.ui.ClawMobileLayout
-import com.clawchat.android.core.ui.ClawMotion
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.clawchat.android.R
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.ReviewSubjectType
+import com.clawchat.android.core.data.repository.SearchType
+import com.clawchat.android.core.notification.PushStatus
+import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.ClawMotion
+import com.clawchat.android.core.ui.LocalNavigateHome
+import com.clawchat.android.core.ui.LocalPrimaryActionHost
+import com.clawchat.android.core.ui.PrimaryActionHost
+import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.feature.chat.ChatScreen
+import com.clawchat.android.feature.devices.DevicesScreen
+import com.clawchat.android.feature.home.HomeScreen
 import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
-import com.clawchat.android.feature.review.ReviewInboxScreen
-import com.clawchat.android.feature.runs.AgentRunsScreen
-import com.clawchat.android.feature.settings.SettingsScreen
-import com.clawchat.android.feature.tasks.TasksScreen
-import com.clawchat.android.feature.tasks.ProjectPlanScreen
 import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
 import com.clawchat.android.feature.progress.ProgressScreen
+import com.clawchat.android.feature.review.ReviewInboxScreen
+import com.clawchat.android.feature.runs.AgentRunsScreen
 import com.clawchat.android.feature.search.SearchScreen
-import com.clawchat.android.feature.devices.DevicesScreen
-import com.clawchat.android.R
-import com.clawchat.android.core.data.WorkspaceMode
-import com.clawchat.android.core.data.repository.SearchType
-import com.clawchat.android.core.notification.PushStatus
-
-internal fun plannerPrimaryRoute(currentRoute: String?): String? =
-    when (currentRoute) {
-        NavRoute.Projects.route -> NavRoute.Tasks.route
-        NavRoute.Today.route, NavRoute.Calendar.route -> NavRoute.Today.route
-        else -> currentRoute
-    }
+import com.clawchat.android.feature.settings.SettingsScreen
+import com.clawchat.android.feature.tasks.ProjectPlanScreen
+import com.clawchat.android.feature.tasks.TasksScreen
 
 /**
- * Whether [targetRoute] is the tab that also serves as the graph's start
- * destination (Inbox in server mode, Tasks in local mode). That entry
- * sits underneath every other tab's `popUpTo`, so it never actually gets
- * popped by the normal save/restore dance — navigating back to it with the
- * usual `saveState`/`restoreState` pair can then silently no-op instead of
- * restoring it. [startDestinationRoute] is compared with its query pattern
- * stripped, since a start destination with an optional argument (like Tasks)
- * registers its route as `tasks?todo_id={todo_id}`, not the bare `tasks` a
- * bottom-nav tap targets.
+ * The home list is the start destination of a configured workspace and every
+ * other screen is pushed on top of it, so Android's Back returns to Home and
+ * the "‹ Home" button in a top bar pops straight to it.
  */
-internal fun isStartDestinationTarget(targetRoute: String, startDestinationRoute: String?): Boolean =
-    targetRoute == startDestinationRoute?.substringBefore('?')
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClawChatNavGraph(
     isLoggedIn: Boolean,
@@ -90,15 +75,11 @@ fun ClawChatNavGraph(
     /** Destination a tapped notification asked for, or null. */
     deepLinkRoute: String? = null,
     onDeepLinkHandled: () -> Unit = {},
-    attentionCount: Int = 0,
     pushStatus: PushStatus = PushStatus.NOT_CONFIGURED,
 ) {
     val navController = rememberNavController()
     val startDestination = NavigationCapabilities.startRoute(workspaceMode)
-    val itemsByRoute = remember { allDrawerDestinations.associateBy(DrawerDestination::route) }
-    val drawerGroups = remember(workspaceMode) {
-        NavigationCapabilities.drawerGroups(workspaceMode).map { group -> group.mapNotNull(itemsByRoute::get) }
-    }
+    val primaryActions = remember { PrimaryActionHost() }
     var plannerPage by rememberSaveable { mutableStateOf(PlannerPage.TODAY) }
 
     val openConnectionSetup = {
@@ -125,35 +106,15 @@ fun ClawChatNavGraph(
         onDeepLinkHandled()
     }
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-    val currentBaseRoute = currentRoute?.substringBefore('?')
-    val selectedPrimaryRoute = if (currentBaseRoute == NavRoute.Calendar.route) NavRoute.Today.route else currentBaseRoute
-    val drawer = rememberDrawerState(DrawerValue.Closed)
-    val drawerScope = rememberCoroutineScope()
-    LaunchedEffect(workspaceMode) { drawer.close() }
-    val navigateToPrimary: (String) -> Unit = { route ->
-        when (route) {
-            NavRoute.Today.route -> plannerPage = PlannerPage.TODAY
-            NavRoute.Calendar.route -> plannerPage = PlannerPage.MONTH
-            else -> Unit
+    /** Home is normally underneath; after a deep link that popped it, push it fresh. */
+    val navigateHome: () -> Unit = {
+        if (!navController.popBackStack(NavRoute.Home.route, inclusive = false)) {
+            navController.navigate(NavRoute.Home.route) { launchSingleTop = true }
         }
-        if (
-            route != currentBaseRoute &&
-            NavigationCapabilities.canOpen(workspaceMode, route)
-        ) {
-            val targetIsStartDestination = isStartDestinationTarget(
-                route,
-                navController.graph.findStartDestination().route,
-            )
-            navController.navigate(route) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = !targetIsStartDestination
-                    inclusive = targetIsStartDestination
-                }
-                restoreState = !targetIsStartDestination
-                launchSingleTop = true
-            }
+    }
+    val open: (String) -> Unit = { route ->
+        if (NavigationCapabilities.canOpen(workspaceMode, route)) {
+            navController.navigate(route) { launchSingleTop = true }
         }
     }
     val navigateToReview: (String?) -> Unit = { reviewId ->
@@ -169,58 +130,33 @@ fun ClawChatNavGraph(
     val navigateToSearch: () -> Unit = {
         navController.navigate(NavRoute.Search.route)
     }
+    val openTask: (String) -> Unit = { todoId ->
+        navController.navigate(NavRoute.Tasks.destination(todoId)) { launchSingleTop = true }
+    }
+    val openRun: (String) -> Unit = { runId ->
+        // Review and Runs link to each other; keep one of each on the stack.
+        navController.navigate(NavRoute.Runs.destination(runId)) {
+            launchSingleTop = true
+            popUpTo(NavRoute.Runs.routePattern) { inclusive = true }
+        }
+    }
 
     CompositionLocalProvider(
-        LocalOpenNavigationMenu provides { drawerScope.launch { drawer.open() } },
-        LocalAttentionCount provides attentionCount,
-    ) {
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        // Button opens the drawer. Do not steal Android's edge-back or planner swipes.
-        gesturesEnabled = drawer.isOpen,
-        drawerContent = {
-            ModalDrawerSheet {
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
-                    Text(stringResource(R.string.nav_menu_title), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
-                    drawerGroups.forEachIndexed { index, group ->
-                    if (index > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    group.forEach { item ->
-                        NavigationDrawerItem(
-                            selected = item.route == selectedPrimaryRoute,
-                            onClick = { drawerScope.launch {
-                                drawer.close()
-                                if (item.route in NavigationCapabilities.secondaryRoutes(workspaceMode)) {
-                                    navController.navigate(item.route) { launchSingleTop = true }
-                                } else navigateToPrimary(item.route)
-                            } },
-                            icon = {
-                                Icon(
-                                    imageVector = item.icon,
-                                    // The row label already names this action for TalkBack.
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ClawMobileLayout.IconSize),
-                                )
-                            },
-                            label = {
-                                Text(
-                                    stringResource(item.labelRes),
-                                    fontWeight = if (item.route == selectedPrimaryRoute) FontWeight.SemiBold else FontWeight.Normal,
-                                )
-                            },
-                            badge = {
-                                if (item.route == NavRoute.Progress.route && attentionCount > 0) {
-                                    Badge { Text(if (attentionCount > 99) "99+" else attentionCount.toString()) }
-                                }
-                            },
-                        )
-                    }
-                    }
-                }
-            }
-        },
+        LocalNavigateHome provides navigateHome,
+        LocalPrimaryActionHost provides primaryActions,
     ) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            // The one + button: whichever list is showing says what it adds.
+            primaryActions.action?.let { action ->
+                ClawFab(
+                    onClick = action.onClick,
+                    contentDescription = action.contentDescription,
+                    modifier = Modifier.navigationBarsPadding(),
+                )
+            }
+        },
     ) { rootPadding ->
         NavHost(
             navController = navController,
@@ -235,17 +171,35 @@ fun ClawChatNavGraph(
             popExitTransition = { ClawMotion.navPopExit() },
         ) {
             composable(NavRoute.Onboarding.route) {
-                OnboardingScreen(
-                    onComplete = {
-                        navController.navigate(NavRoute.Inbox.route) {
-                            popUpTo(NavRoute.Onboarding.route) { inclusive = true }
-                        }
+                val toHome = {
+                    navController.navigate(NavRoute.Home.route) {
+                        popUpTo(NavRoute.Onboarding.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                OnboardingScreen(onComplete = toHome, onSkip = toHome)
+            }
+            composable(NavRoute.Home.route) {
+                HomeScreen(
+                    showServerFeatures = workspaceMode == WorkspaceMode.SERVER,
+                    isLocalOnly = workspaceMode == WorkspaceMode.LOCAL,
+                    onOpenInbox = { open(NavRoute.Inbox.route) },
+                    onOpenToday = {
+                        plannerPage = PlannerPage.TODAY
+                        open(NavRoute.Today.route)
                     },
-                    onSkip = {
-                        navController.navigate(NavRoute.Tasks.route) {
-                            popUpTo(NavRoute.Onboarding.route) { inclusive = true }
-                        }
+                    onOpenSchedule = {
+                        plannerPage = PlannerPage.MONTH
+                        open(NavRoute.Calendar.route)
                     },
+                    onOpenTasks = { open(NavRoute.Tasks.route) },
+                    onOpenProgress = { open(NavRoute.Progress.route) },
+                    onOpenProject = { projectId -> open(NavRoute.Projects.forProject(projectId)) },
+                    onOpenAllProjects = { open(NavRoute.Projects.route) },
+                    onOpenChat = { open(NavRoute.Chat.route) },
+                    onOpenDevices = { open(NavRoute.Devices.route) },
+                    onOpenSettings = { open(NavRoute.Settings.route) },
+                    onOpenSearch = navigateToSearch,
                 )
             }
             composable(NavRoute.Today.route) {
@@ -255,11 +209,7 @@ fun ClawChatNavGraph(
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
-                    onOpenTask = { todoId ->
-                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
-                            launchSingleTop = true
-                        }
-                    },
+                    onOpenTask = openTask,
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -288,11 +238,7 @@ fun ClawChatNavGraph(
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
-                    onOpenTask = { todoId ->
-                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
-                            launchSingleTop = true
-                        }
-                    },
+                    onOpenTask = openTask,
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -350,18 +296,8 @@ fun ClawChatNavGraph(
                     ProgressScreen(
                         onOpenSearch = navigateToSearch,
                         onOpenReview = { reviewId -> navigateToReview(reviewId) },
-                        onOpenRun = { runId ->
-                            // Review and Runs link to each other; keep one of each on the stack.
-                            navController.navigate(NavRoute.Runs.destination(runId)) {
-                                launchSingleTop = true
-                                popUpTo(NavRoute.Runs.routePattern) { inclusive = true }
-                            }
-                        },
-                        onOpenTask = { todoId ->
-                            navController.navigate(NavRoute.Tasks.destination(todoId)) {
-                                launchSingleTop = true
-                            }
-                        },
+                        onOpenRun = openRun,
+                        onOpenTask = openTask,
                     )
                 }
             }
@@ -412,20 +348,13 @@ fun ClawChatNavGraph(
                         initialReviewId = entry.arguments?.getString(NavRoute.Review.ARG_REVIEW_ID),
                         onOpenSubject = { review ->
                             val destination = when (review.subjectType) {
-                                com.clawchat.android.core.data.model.ReviewSubjectType.AGENT_RUN ->
-                                    NavRoute.Runs.destination(review.subjectId)
-                                com.clawchat.android.core.data.model.ReviewSubjectType.PLAN_PROPOSAL -> NavRoute.Inbox.route
+                                ReviewSubjectType.AGENT_RUN -> NavRoute.Runs.destination(review.subjectId)
+                                ReviewSubjectType.PLAN_PROPOSAL -> NavRoute.Inbox.route
                                 else -> NavRoute.Tasks.route
                             }
                             navController.navigate(destination) { launchSingleTop = true }
                         },
-                        onOpenRun = { runId ->
-                            // Review and Runs link to each other; keep one of each on the stack.
-                            navController.navigate(NavRoute.Runs.destination(runId)) {
-                                launchSingleTop = true
-                                popUpTo(NavRoute.Runs.routePattern) { inclusive = true }
-                            }
-                        },
+                        onOpenRun = openRun,
                     )
                 }
             }
@@ -500,10 +429,9 @@ fun ClawChatNavGraph(
         }
     }
     }
-    BackHandler(enabled = drawer.isOpen) { drawerScope.launch { drawer.close() } }
-    }
 }
 
+/** A server screen reached by deep link in a local workspace: offer the connection instead. */
 @Composable
 private fun ServerOnlyDestination(
     workspaceMode: WorkspaceMode,

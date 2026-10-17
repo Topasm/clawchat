@@ -351,6 +351,33 @@
   font-size: 11px;
 }
 
+/* What Home is running right now; amber once a run has stopped to ask,
+   red while a failure has not been looked at, and "Done" for a moment. */
+.cc-active-runs {
+  border-top: 0;
+}
+.cc-active-runs:disabled {
+  cursor: default;
+}
+.cc-active-runs--running .cc-connection-status__dot {
+  background: var(--cc-success);
+  animation: cc-worker-pulse 1.4s ease-in-out infinite;
+}
+.cc-active-runs--needs-answer .cc-connection-status__dot {
+  background: var(--cc-warning);
+}
+.cc-active-runs--needs-answer .cc-sidebar__label,
+.cc-active-runs--failed .cc-sidebar__label {
+  color: var(--cc-text);
+  font-weight: 600;
+}
+.cc-active-runs--failed .cc-connection-status__dot {
+  background: var(--cc-error);
+}
+.cc-active-runs--done .cc-connection-status__dot {
+  background: var(--cc-success);
+}
+
 /* What this machine is doing as a worker: idle, busy (pulsing), or not yet checked in. */
 .cc-worker-status {
   border-top: 0;
@@ -796,4 +823,11 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* "N more" under the capped project list: quiet, and opens all projects. */
+.cc-nav-item--more {
+  padding-left: 38px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
 }

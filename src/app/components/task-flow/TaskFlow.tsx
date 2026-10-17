@@ -23,6 +23,8 @@ interface TaskFlowProps {
   onSelect?: (id: string | null) => void;
   /** An AI plan for the root task, drawn as dashed boxes until it is added. */
   plan?: PlanProposalResponse | null;
+  /** Where a step opens; its own page by default. */
+  onOpenTask?: (id: string) => void;
 }
 
 const TONE_LABELS: Record<FlowTone, string> = {
@@ -69,8 +71,10 @@ export default function TaskFlow({
   selectedId: controlledId,
   onSelect,
   plan,
+  onOpenTask,
 }: TaskFlowProps) {
   const navigate = useNavigate();
+  const openTask = (id: string) => (onOpenTask ? onOpenTask(id) : navigate(`/tasks/${id}`));
   const { data: todos = [] } = useTodosQuery();
   const { data: relationships = [] } = useTaskRelationshipsQuery();
   const addStep = useAddTaskStep();
@@ -258,7 +262,7 @@ export default function TaskFlow({
       setScopeId(id);
       select(null);
     } else if (id === selectedId) {
-      navigate(`/tasks/${id}`);
+      openTask(id);
     } else {
       select(id);
     }
@@ -289,7 +293,7 @@ export default function TaskFlow({
             blocked,
           })}
           {selectedId && stepIds.has(selectedId) && !childCount.has(selectedId) && (
-            <button type="button" onClick={() => navigate(`/tasks/${selectedId}`)}>
+            <button type="button" onClick={() => openTask(selectedId)}>
               {translateUi('Open task')}
             </button>
           )}

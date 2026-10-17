@@ -26,7 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawExpand
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
@@ -321,12 +321,14 @@ internal fun TaskListView(
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
+    RegisterPrimaryAction("tasks", stringResource(R.string.tasks_cd_new_task)) { showCreateSheet = true }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.tasks_title),
@@ -346,12 +348,6 @@ internal fun TaskListView(
                     }
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = { showCreateSheet = true },
-                contentDescription = stringResource(R.string.tasks_cd_new_task),
             )
         },
     ) { padding ->
@@ -655,29 +651,28 @@ private fun TaskRow(
                 // Which prerequisite the row waits on, as the web list says it;
                 // the line goes away by itself once that task is completed.
                 val waitingOn = task.waitingOn()
-                if (waitingOn.isNotEmpty()) {
-                    val first = waitingOn.first().title
-                    Text(
-                        text = stringResource(
-                            R.string.tasks_waiting_on,
-                            if (waitingOn.size == 1) {
-                                first
-                            } else {
-                                stringResource(R.string.tasks_waiting_on_more, first, waitingOn.size - 1)
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     TaskStageDots(stage)
+                    if (waitingOn.isNotEmpty()) {
+                        val first = waitingOn.first().title
+                        // Being blocked is an order, not a problem: grey,
+                        // unless the blocked task is itself late.
+                        ClawStatusChip(
+                            text = stringResource(
+                                R.string.tasks_waiting_on,
+                                if (waitingOn.size == 1) {
+                                    first
+                                } else {
+                                    stringResource(R.string.tasks_waiting_on_more, first, waitingOn.size - 1)
+                                },
+                            ),
+                            tone = if (isPastDue(task.dueDate)) ClawTone.Warning else ClawTone.Default,
+                        )
+                    }
                     task.dueDate?.let {
                         ClawStatusChip(
                             text = localizedDateLabel(it),
@@ -696,6 +691,9 @@ private fun TaskRow(
         }
     }
 }
+
+private fun isPastDue(rawDate: String?): Boolean =
+    rawDate != null && runCatching { LocalDate.parse(rawDate).isBefore(LocalDate.now()) }.getOrDefault(false)
 
 /** List marker for an item that has not reached a workspace. */
 @Composable

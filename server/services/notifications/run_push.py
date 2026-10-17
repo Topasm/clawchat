@@ -23,6 +23,12 @@ logger = logging.getLogger(__name__)
 PUSH_STATUSES = frozenset(
     {AgentRunStatus.WAITING_INPUT, AgentRunStatus.WAITING_REVIEW, AgentRunStatus.FAILED}
 )
+#: Also pushed, silently: the phone keeps one quiet "working" notification per
+#: top-level run and swaps it for the result, so a pocket knows what Home is
+#: doing without a top bar. Nothing is sent for a sub-task's run.
+PROGRESS_STATUSES = frozenset(
+    {AgentRunStatus.RUNNING, AgentRunStatus.COMPLETED, AgentRunStatus.CANCELLED}
+)
 
 #: How many recent (run, status) pairs to remember for de-duplication.
 _SENT_MEMORY = 512
@@ -51,7 +57,12 @@ def push_data(payload: dict[str, Any]) -> dict[str, str] | None:
     """The FCM data for a ``run_state_changed`` payload, or None when it needs no push."""
     status = str(payload.get("status") or "")
     run_id = payload.get("run_id")
-    if not run_id or status not in PUSH_STATUSES:
+    if not run_id:
+        return None
+    if status in PROGRESS_STATUSES:
+        if payload.get("parent_task_id"):
+            return None
+    elif status not in PUSH_STATUSES:
         return None
     data = {
         "type": "run_state",
@@ -59,7 +70,7 @@ def push_data(payload: dict[str, Any]) -> dict[str, str] | None:
         "run_id": str(run_id),
         "title": str(payload.get("title") or "")[:200],
     }
-    for key in ("todo_id", "conversation_id", "review_id"):
+    for key in ("todo_id", "conversation_id", "review_id", "risk_level"):
         value = payload.get(key)
         if value:
             data[key] = str(value)
@@ -115,6 +126,7 @@ def _reset_for_tests() -> None:
 
 
 __all__ = [
+    "PROGRESS_STATUSES",
     "PUSH_STATUSES",
     "configure",
     "enabled",

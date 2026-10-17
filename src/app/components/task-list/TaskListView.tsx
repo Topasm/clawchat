@@ -4,9 +4,13 @@ import Checkbox from '../shared/Checkbox';
 import { FlagIcon } from '../shared/Icons';
 import { formatDueDate, isOverdue } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
+import WaitingOnLine from '../shared/WaitingOnLine';
 import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
 import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
+/** A prerequisite with one of these on it is in progress, not merely waited on. */
+const ACTIVE_RUN = new Set<string | null | undefined>(['queued', 'starting', 'running']);
+
 interface TaskListViewProps {
   todos: TodoResponse[];
   /** Every task, so a row can count its steps even when they are filtered out. */
@@ -16,6 +20,8 @@ interface TaskListViewProps {
   /** Project titles by id, for the row's second line. */
   projectTitles?: Map<string, string>;
   telemetryByTaskId?: Map<string, TaskExecutionTelemetryResponse>;
+  /** The task open in the pane beside the list; its row stays raised. */
+  selectedTaskId?: string | null;
 }
 
 /**
@@ -63,6 +69,7 @@ export default function TaskListView({
   onToggleTask,
   projectTitles,
   telemetryByTaskId,
+  selectedTaskId,
 }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
   const steps = new Map<string, { done: number; total: number }>();
@@ -101,15 +108,31 @@ export default function TaskListView({
           (state.stage !== 'capture' && state.stage !== 'done' && !done);
         const running = state.stage === 'run' && !state.exception && !blocked && !done;
         const overdue = Boolean(todo.due_date) && !done && isOverdue(todo.due_date!);
+        const open = () => onOpenTask(todo.id);
         return (
           <div
             key={todo.id}
-            className={`cc-task-row cc-task-row--${state.stage}${done ? ' cc-task-row--done' : ''}`}
+            className={`cc-task-row cc-task-row--${state.stage}${done ? ' cc-task-row--done' : ''}${todo.id === selectedTaskId ? ' cc-task-row--selected' : ''}`}
             role="listitem"
+            aria-current={todo.id === selectedTaskId ? 'true' : undefined}
             style={depth > 0 ? { marginLeft: depth * 22 } : undefined}
           >
             <Checkbox checked={done} onChange={() => onToggleTask(todo.id)} />
-            <button type="button" className="cc-task-row__main" onClick={() => onOpenTask(todo.id)}>
+            {/* The row is a button in all but tag: the prerequisite's name
+                inside it is a button of its own, and a button cannot nest. */}
+            <div
+              role="button"
+              tabIndex={0}
+              className="cc-task-row__main"
+              onClick={open}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  open();
+                }
+              }}
+            >
               <span className="cc-task-row__title">{todo.title}</span>
               <span className="cc-task-row__meta">
                 {steps.has(todo.id) && (
@@ -130,22 +153,13 @@ export default function TaskListView({
                     {context}
                   </span>
                 )}
-                {blocked && (
-                  <small
-                    className="cc-task-row__waiting"
-                    title={waitingOn.map((entry) => entry.title).join(', ')}
-                  >
-                    {translateUi('Waiting on {{title}}', {
-                      title:
-                        waitingOn.length === 1
-                          ? waitingOn[0].title
-                          : translateUi('{{title}} +{{count}}', {
-                              title: waitingOn[0].title,
-                              count: waitingOn.length - 1,
-                            }),
-                    })}
-                  </small>
-                )}
+                <WaitingOnLine
+                  prerequisites={waitingOn}
+                  dueDate={todo.due_date}
+                  isRunning={(id) => ACTIVE_RUN.has(telemetryByTaskId?.get(id)?.latest_run_status)}
+                  onOpenTask={onOpenTask}
+                  className="cc-task-row__waiting"
+                />
                 {todo.due_date && (
                   <span
                     className={`cc-task-row__due${overdue ? ' cc-task-row__due--overdue' : ''}`}
@@ -156,7 +170,7 @@ export default function TaskListView({
                 )}
                 <StorageLocationBadge item={todo} />
               </span>
-            </button>
+            </div>
           </div>
         );
       })}

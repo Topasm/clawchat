@@ -20,6 +20,8 @@ export interface ScheduledJobInput {
   rrule: string;
   timezone: string;
   enabled: boolean;
+  /** "Don't ask next time": low-risk results skip Attention. */
+  auto_approve_low_risk?: boolean;
 }
 
 function serverMessage(error: unknown, fallback: string): string {
@@ -43,6 +45,8 @@ function useJobMutation<TVariables, TResult>(
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.scheduledJobs });
+      // Review cards carry the job's "don't ask next time" setting.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
     },
   });
 }

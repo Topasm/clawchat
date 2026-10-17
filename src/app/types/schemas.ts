@@ -1598,6 +1598,7 @@ export const ScheduledJobResponseSchema = z.object({
   rrule: z.string(),
   timezone: z.string(),
   enabled: z.boolean(),
+  auto_approve_low_risk: z.boolean(),
   next_run_at: z.string().nullable(),
   conversation_id: z.string().nullable(),
   last_run_at: z.string().nullable(),

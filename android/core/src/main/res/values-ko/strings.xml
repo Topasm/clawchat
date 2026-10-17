@@ -3,7 +3,8 @@
     <string name="common_cancel">취소</string>
     <string name="common_ok">확인</string>
     <string name="common_swipe_delete">삭제</string>
-    <string name="navigation_open_menu">탐색 메뉴 열기</string>
+    <string name="navigation_back_home">홈</string>
+    <string name="navigation_back_home_description">홈으로 돌아가기</string>
     <string name="error_workspace_unconfigured">기기 내 작업 공간을 선택하거나 서버에 연결하세요.</string>
     <string name="error_workspace_changed">저장하기 전에 작업 공간이 변경되었습니다.</string>
     <string name="error_server_feature_required">이 기능을 사용하려면 작업 공간 서버에 연결해야 합니다.</string>

@@ -21,9 +21,11 @@ export function projectProgress(
 export default function SidebarProjects({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const { data: projects = [] } = useProjectsQuery();
-  const listed = projects
-    .filter((project) => project.status === 'active' || project.status === 'planned')
-    .slice(0, MAX_SIDEBAR_PROJECTS);
+  const current = projects.filter(
+    (project) => project.status === 'active' || project.status === 'planned',
+  );
+  const listed = current.slice(0, MAX_SIDEBAR_PROJECTS);
+  const hidden = current.length - listed.length;
   return (
     <div className="cc-sidebar__section" aria-label={t('nav.projects')}>
       <NavLink
@@ -57,6 +59,14 @@ export default function SidebarProjects({ collapsed }: { collapsed: boolean }) {
           </NavLink>
         );
       })}
+      {/* Past the cap the rest are still a click away, never silently gone. */}
+      {hidden > 0 && !collapsed && (
+        <NavLink to="/projects" end className="cc-nav-item cc-nav-item--more">
+          <span className="cc-sidebar__label">
+            {translateUi('{{count}} more', { count: hidden })}
+          </span>
+        </NavLink>
+      )}
     </div>
   );
 }

@@ -219,7 +219,7 @@ async def test_create_todo_in_a_task_thread_waits_for_graph_review(
     assert metadata["proposal_kind"] == "add_task"
     assert metadata["todo_id"] == parent.id
     assert [task.title for task in payload.subtasks] == ["Child"]
-    assert "Apply the graph change" in text
+    assert text.endswith("?") and "as a step under" in text
     assert (
         await db_session.execute(select(Todo).where(Todo.title == "Child"))
     ).scalar_one_or_none() is None

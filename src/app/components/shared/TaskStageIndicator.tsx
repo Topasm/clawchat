@@ -14,6 +14,8 @@ interface TaskStageIndicatorProps {
   variant?: 'dots' | 'bar';
   /** Replaces the step's own word in the dots variant, e.g. "Blocked". */
   label?: string;
+  /** Dots variant: draw the five marks. Off for a task no agent is on. */
+  marks?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export default function TaskStageIndicator({
   state,
   variant = 'dots',
   label,
+  marks = true,
 }: TaskStageIndicatorProps) {
   const current = TASK_STAGES.indexOf(state.stage);
   const tone = state.cancelled ? 'cancelled' : (state.exception ?? 'current');
@@ -37,16 +40,18 @@ export default function TaskStageIndicator({
   if (variant === 'dots') {
     return (
       <span className={`cc-stage-dots cc-stage-dots--${tone}`} title={summary}>
-        <span className="cc-stage-dots__marks" aria-hidden="true">
-          {TASK_STAGES.map((stage, index) => (
-            <i
-              key={stage}
-              className={`cc-stage-dots__mark cc-stage-dots__mark--${
-                index < current ? 'past' : index === current ? 'current' : 'next'
-              }`}
-            />
-          ))}
-        </span>
+        {marks && (
+          <span className="cc-stage-dots__marks" aria-hidden="true">
+            {TASK_STAGES.map((stage, index) => (
+              <i
+                key={stage}
+                className={`cc-stage-dots__mark cc-stage-dots__mark--${
+                  index < current ? 'past' : index === current ? 'current' : 'next'
+                }`}
+              />
+            ))}
+          </span>
+        )}
         <span className="cc-stage-dots__label">{label ?? describeTaskStage(state)}</span>
       </span>
     );

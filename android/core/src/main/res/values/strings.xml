@@ -3,7 +3,8 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_ok">OK</string>
     <string name="common_swipe_delete">Delete</string>
-    <string name="navigation_open_menu">Open navigation menu</string>
+    <string name="navigation_back_home">Home</string>
+    <string name="navigation_back_home_description">Back to Home</string>
     <string name="error_workspace_unconfigured">Choose an on-device workspace or connect a server first.</string>
     <string name="error_workspace_changed">The workspace changed before this action could be saved.</string>
     <string name="error_server_feature_required">This feature requires a connected workspace.</string>

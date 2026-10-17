@@ -12,10 +12,13 @@ export interface Toast {
   type: ToastType;
   message: string;
   action?: ToastAction;
+  /** A second, quieter choice after the action ("Change · Undo"). */
+  secondaryAction?: ToastAction;
 }
 
 interface AddToastOptions {
   action?: ToastAction;
+  secondaryAction?: ToastAction;
   duration?: number;
 }
 
@@ -34,7 +37,16 @@ export const useToastStore = create<ToastState>()((set) => ({
     const id = `toast-${++nextId}`;
     const duration = options?.duration ?? 3500;
     set((state) => ({
-      toasts: [...state.toasts, { id, type, message, action: options?.action }],
+      toasts: [
+        ...state.toasts,
+        {
+          id,
+          type,
+          message,
+          action: options?.action,
+          secondaryAction: options?.secondaryAction,
+        },
+      ],
     }));
     setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));

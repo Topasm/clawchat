@@ -22,7 +22,7 @@ export default function ChatInput({
   isStreaming,
   onStop,
   draftKey,
-  placeholder = 'Type a message...',
+  placeholder,
   editingMessageId,
   editingText,
   onCancelEdit,

@@ -14,6 +14,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useWorkerStore } from '../../stores/useWorkerStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { translateUi } from '../../i18n';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import FileDropZone, { useAttachmentUploader } from '../shared/FileDropZone';
 
 /** Decide a pasted string's kind from its shape: a URL, a vault note, or a folder. */
@@ -25,10 +26,18 @@ export function detectPathKind(text: string): TodoPathKind {
   return 'device';
 }
 
+/** The row's first word says what kind of thing it points at, never where. */
 function kindLabel(path: TodoPathResponse): string {
   if (path.kind === 'url') return translateUi('Web');
-  if (path.kind === 'vault') return 'vault';
-  return path.host_label || translateUi('This device');
+  if (path.kind === 'vault') return translateUi('Note');
+  return translateUi('Folder');
+}
+
+/** A folder on a named machine says so; one with no machine is this device's. */
+function whereHint(path: TodoPathResponse, thisHostId: string | null): string | null {
+  if (path.kind !== 'device') return null;
+  if (path.host_id && thisHostId && path.host_id === thisHostId) return null;
+  return path.host_label ? translateUi('On {{host}}', { host: path.host_label }) : null;
 }
 
 export function formatFileSize(bytes: number): string {
@@ -58,8 +67,12 @@ async function openPath(path: TodoPathResponse) {
 /**
  * Everything a task's work refers to, in one list: folders and notes by
  * path, web links, and files uploaded to Home (a photo from the phone's
- * share sheet has no path anywhere). A step shows its parent's paths dimmed,
- * and a top-level task its project's folders, so they are not typed twice.
+ * share sheet has no path anywhere). Every row starts with its kind in
+ * words, so an uploaded copy and a path that only points somewhere are never
+ * confused. The task's own rows come first; what a step inherits from its
+ * parent, or a top-level task from its project, sits dimmed at the bottom,
+ * so nothing is typed twice. Taking an uploaded file off the list asks once,
+ * since the copy on Home goes with it; a path is only taken off the list.
  */
 export default function TaskPaths({ taskId }: { taskId: string }) {
   const { data: paths = [] } = useTodoPathsQuery(taskId);
@@ -72,12 +85,16 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
   const { isDesktop } = usePlatform();
   const thisHostId = useWorkerStore((state) => state.hostId);
   const [draft, setDraft] = useState('');
+  const [removing, setRemoving] = useState<AttachmentResponse | null>(null);
+  const own = paths.filter((path) => !path.inherited);
+  const inherited = paths.filter((path) => path.inherited);
 
   const openAttachment = (attachment: AttachmentResponse) => {
     const url = serverUrl ? `${serverUrl}${attachment.url}` : attachment.url;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
   const removeAttachment = async (attachment: AttachmentResponse) => {
+    setRemoving(null);
     try {
       await deleteAttachment.mutateAsync({ id: attachment.id, ownerId: taskId });
     } catch {
@@ -106,31 +123,13 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
       <div className="cc-exec-panel__section-title">{translateUi('Resources')}</div>
       {(paths.length > 0 || attachments.length > 0) && (
         <ul className="cc-task-paths__list">
-          {paths.map((path) => (
-            <li
-              key={`${path.inherited ? 'inherited' : 'own'}:${path.id}`}
-              className={path.inherited ? 'cc-task-paths__item--inherited' : undefined}
-            >
-              <span className="cc-task-paths__kind">{kindLabel(path)}</span>
-              <button
-                type="button"
-                className="cc-task-paths__path"
-                title={path.path}
-                onClick={() => void openPath(path)}
-              >
-                {path.label || path.path}
-              </button>
-              {!path.inherited && (
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--ghost cc-btn--compact"
-                  aria-label={translateUi('Remove')}
-                  onClick={() => deletePath.mutate(path)}
-                >
-                  ×
-                </button>
-              )}
-            </li>
+          {own.map((path) => (
+            <PathRow
+              key={`own:${path.id}`}
+              path={path}
+              hint={whereHint(path, thisHostId)}
+              onRemove={() => deletePath.mutate(path)}
+            />
           ))}
           {attachments.map((attachment) => (
             <li key={`file:${attachment.id}`}>
@@ -147,12 +146,17 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
               <button
                 type="button"
                 className="cc-btn cc-btn--ghost cc-btn--compact"
-                aria-label={translateUi('Remove')}
-                onClick={() => void removeAttachment(attachment)}
+                aria-label={translateUi('Remove {{filename}} from the list', {
+                  filename: attachment.filename,
+                })}
+                onClick={() => setRemoving(attachment)}
               >
                 ×
               </button>
             </li>
+          ))}
+          {inherited.map((path) => (
+            <PathRow key={`inherited:${path.id}`} path={path} hint={whereHint(path, thisHostId)} />
           ))}
         </ul>
       )}
@@ -185,6 +189,57 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
         )}
       </div>
       <FileDropZone todoId={taskId} compact />
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        title={translateUi('Remove this file?')}
+        description={translateUi(
+          'The uploaded copy of {{filename}} is deleted from Home. A path or note is only taken off the list.',
+          { filename: removing?.filename ?? '' },
+        )}
+        confirmLabel={translateUi('Remove')}
+        onConfirm={() => removing && void removeAttachment(removing)}
+      />
     </section>
+  );
+}
+
+/** One path: its kind, the path itself, where it lives, and a remove for the task's own. */
+function PathRow({
+  path,
+  hint,
+  onRemove,
+}: {
+  path: TodoPathResponse;
+  hint: string | null;
+  onRemove?: () => void;
+}) {
+  return (
+    <li className={path.inherited ? 'cc-task-paths__item--inherited' : undefined}>
+      <span className="cc-task-paths__kind">{kindLabel(path)}</span>
+      <button
+        type="button"
+        className="cc-task-paths__path"
+        title={path.path}
+        onClick={() => void openPath(path)}
+      >
+        {path.label || path.path}
+      </button>
+      {hint && <span className="cc-task-paths__hint">{hint}</span>}
+      {onRemove && (
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-btn--compact"
+          aria-label={translateUi('Remove {{path}} from the list', {
+            path: path.label || path.path,
+          })}
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      )}
+    </li>
   );
 }

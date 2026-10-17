@@ -68,6 +68,10 @@ object ReminderNotificationHelper {
         workspaceKey: String,
         deliveryKey: String? = null,
         deduplicate: Boolean = true,
+        /** One extra button, such as approving a low-risk agent result in place. */
+        extraAction: NotificationCompat.Action? = null,
+        /** A quiet, pinned notification for work in progress, replaced by its result. */
+        ongoing: Boolean = false,
     ): Boolean {
         // A notification without a stable workspace cannot be routed safely,
         // and an unscoped delivery claim could suppress another workspace.
@@ -110,14 +114,19 @@ object ReminderNotificationHelper {
             .setSmallIcon(R.drawable.ic_stat_clawchat)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(if (ongoing) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(!ongoing)
+            .setOngoing(ongoing)
+            .setOnlyAlertOnce(ongoing)
+            .setSilent(ongoing)
+            .setCategory(if (ongoing) NotificationCompat.CATEGORY_PROGRESS else NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
             .setDeleteIntent(buildDismissPendingIntent(context, notificationId))
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setExtras(Bundle().apply { putString(EXTRA_WORKSPACE_KEY, workspaceKey) })
+
+        extraAction?.let(builder::addAction)
 
         // Add "Mark Done" action for todo reminders
         if (
@@ -186,7 +195,8 @@ object ReminderNotificationHelper {
         )
     }
 
-    private fun notificationId(workspaceKey: String, itemId: String): Int =
+    /** The id a notification for this item carries, so an action can dismiss it. */
+    fun notificationId(workspaceKey: String, itemId: String): Int =
         "$workspaceKey:$itemId".hashCode()
 
     private fun buildDismissPendingIntent(context: Context, notificationId: Int): PendingIntent {

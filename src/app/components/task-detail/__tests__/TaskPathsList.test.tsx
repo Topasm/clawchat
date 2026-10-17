@@ -61,19 +61,29 @@ describe('TaskPaths as the one resources list', () => {
     mocks.upload.mockClear();
   });
 
-  it('lists uploaded files next to paths under one heading', () => {
+  it('lists uploaded files next to paths under one heading, each row saying its kind', () => {
     render(<TaskPaths taskId="task-1" />);
     expect(screen.getByRole('region', { name: 'Resources' })).toBeInTheDocument();
     expect(screen.getByText('~/postech/GPU_Computing/hw3')).toBeInTheDocument();
-    expect(screen.getByText('File')).toBeInTheDocument();
+    // The task's own file first, in words; the folder the parent lends sits
+    // dimmed below it and says which machine it is on.
+    const kinds = screen.getAllByText(/^(File|Note|Folder|Web)$/).map((el) => el.textContent);
+    expect(kinds).toEqual(['File', 'Folder']);
+    expect(screen.getByText('On Lab Mac')).toBeInTheDocument();
+    expect(screen.getByText('~/postech/GPU_Computing/hw3').closest('li')).toHaveClass(
+      'cc-task-paths__item--inherited',
+    );
     expect(screen.getByText('notice.png')).toBeInTheDocument();
     expect(screen.getByText('2.0 KB')).toBeInTheDocument();
     expect(screen.getByText('Drop files here or click to browse')).toBeInTheDocument();
   });
 
-  it('removes an uploaded file from the same row', async () => {
+  it('removes an uploaded file from the same row, asking once', async () => {
     render(<TaskPaths taskId="task-1" />);
     // The inherited path has no remove button; the file's is the only one.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove notice.png from the list' }));
+    // The uploaded copy goes with it, so the list asks before deleting.
+    expect(mocks.deleteAttachment).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(mocks.deleteAttachment).toHaveBeenCalledWith({ id: 'att-1', ownerId: 'task-1' });
   });

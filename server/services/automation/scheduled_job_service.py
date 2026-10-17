@@ -147,6 +147,7 @@ async def build_response(db: AsyncSession, job: ScheduledJob) -> ScheduledJobRes
         rrule=job.rrule,
         timezone=job.timezone,
         enabled=job.enabled,
+        auto_approve_low_risk=job.auto_approve_low_risk,
         next_run_at=_utc(job.next_run_at) if job.next_run_at else None,
         conversation_id=job.conversation_id,
         last_run_at=_utc(job.last_run_at) if job.last_run_at else None,
@@ -180,6 +181,7 @@ async def create_job(db: AsyncSession, body: ScheduledJobCreate) -> ScheduledJob
         rrule=body.rrule.strip(),
         timezone=body.timezone,
         enabled=body.enabled,
+        auto_approve_low_risk=body.auto_approve_low_risk,
         created_at=now,
         updated_at=now,
     )
@@ -213,6 +215,8 @@ async def update_job(
         job.timezone = body.timezone
     if "enabled" in fields and body.enabled is not None:
         job.enabled = body.enabled
+    if "auto_approve_low_risk" in fields and body.auto_approve_low_risk is not None:
+        job.auto_approve_low_risk = body.auto_approve_low_risk
     if fields & {"rrule", "timezone", "enabled"}:
         _validated_schedule(job.rrule, job.timezone, _utc(job.created_at))
         job.next_run_at = _next_run(job, _now())
