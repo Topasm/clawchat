@@ -1,68 +1,24 @@
 package com.clawchat.android.navigation
 
+import com.clawchat.android.core.data.WorkspaceMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlannerNavigationTest {
-
-    @Test fun `project detail pattern still maps to tasks navigation`() {
-        assertEquals(NavRoute.Tasks.route, plannerPrimaryRoute(NavRoute.Projects.routePattern.substringBefore('?')))
-        assertEquals(true, NavigationCapabilities.canOpen(
-            com.clawchat.android.core.data.WorkspaceMode.SERVER, "projects?project_id=p&task_id=t"))
-        assertEquals(false, NavigationCapabilities.canOpen(
-            com.clawchat.android.core.data.WorkspaceMode.LOCAL, "projects?project_id=p&task_id=t"))
+    @Test
+    fun `today and schedule are two rows that open the same planner`() {
+        for (mode in listOf(WorkspaceMode.LOCAL, WorkspaceMode.SERVER)) {
+            val rows = NavigationCapabilities.homeRoutes(mode)
+            assertTrue(NavRoute.Today.route in rows)
+            assertTrue(NavRoute.Calendar.route in rows)
+            assertEquals(rows.indexOf(NavRoute.Today.route) + 1, rows.indexOf(NavRoute.Calendar.route))
+        }
     }
 
     @Test
-    fun `all planner pages select the single schedule primary destination`() {
-        assertEquals(
-            NavRoute.Today.route,
-            plannerPrimaryRoute(NavRoute.Today.route),
-        )
-        assertEquals(
-            NavRoute.Today.route,
-            plannerPrimaryRoute(NavRoute.Calendar.route),
-        )
-        assertEquals(
-            NavRoute.Today.route,
-            plannerPrimaryRoute(NavRoute.Today.route),
-        )
-    }
-
-    @Test
-    fun `planner page does not change unrelated primary destinations`() {
-        assertEquals(
-            NavRoute.Tasks.route,
-            plannerPrimaryRoute(NavRoute.Tasks.route),
-        )
-        assertEquals(
-            NavRoute.Progress.route,
-            plannerPrimaryRoute(NavRoute.Progress.route),
-        )
-    }
-
-    // Regression: tapping the tab that is also the graph's start destination
-    // (Inbox in server mode) after visiting another tab silently did
-    // nothing, because the normal saveState/restoreState popUpTo never
-    // actually pops the start destination's own back-stack entry.
-    @Test
-    fun `a bare start destination is recognised regardless of query pattern`() {
-        assertEquals(true, isStartDestinationTarget(NavRoute.Inbox.route, NavRoute.Inbox.route))
-        assertEquals(false, isStartDestinationTarget(NavRoute.Tasks.route, NavRoute.Inbox.route))
-    }
-
-    @Test
-    fun `a start destination with an optional argument still matches its bare tab route`() {
-        // Local mode's start destination registers as "tasks?todo_id={todo_id}",
-        // but the bottom-nav tap always targets the bare "tasks" route.
-        assertEquals(
-            true,
-            isStartDestinationTarget(NavRoute.Tasks.route, NavRoute.Tasks.routePattern),
-        )
-    }
-
-    @Test
-    fun `a null start destination route matches nothing`() {
-        assertEquals(false, isStartDestinationTarget(NavRoute.Progress.route, null))
+    fun `project detail pattern still maps to the projects screen`() {
+        assertEquals(true, NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "projects?project_id=p&task_id=t"))
+        assertEquals(false, NavigationCapabilities.canOpen(WorkspaceMode.LOCAL, "projects?project_id=p&task_id=t"))
     }
 }

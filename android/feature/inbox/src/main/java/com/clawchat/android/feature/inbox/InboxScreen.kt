@@ -110,8 +110,8 @@ fun InboxScreen(
                     )
                 },
                 navigationIcon = {
-                    if (com.clawchat.android.core.ui.LocalOpenNavigationMenu.current != null) {
-                        com.clawchat.android.core.ui.NavigationMenuButton()
+                    if (com.clawchat.android.core.ui.LocalNavigateHome.current != null) {
+                        com.clawchat.android.core.ui.HomeBackButton()
                     } else IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,

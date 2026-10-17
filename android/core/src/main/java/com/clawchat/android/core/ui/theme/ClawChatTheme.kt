@@ -9,6 +9,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -247,12 +248,16 @@ fun ClawChatTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = ClawTypography,
-        shapes = ClawShapes,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalClawSemanticColors provides if (darkTheme) ClawSemanticColors.Dark else ClawSemanticColors.Light,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = ClawTypography,
+            shapes = ClawShapes,
+            content = content,
+        )
+    }
 }
 
 /** Compose sees a themed wrapper, so the activity is found by unwrapping it. */

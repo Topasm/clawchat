@@ -5,6 +5,9 @@ import android.net.Uri
 /** Sealed hierarchy of all navigation destinations in the app. */
 sealed class NavRoute(val route: String) {
     data object Onboarding : NavRoute("onboarding")
+
+    /** The list every other screen is one tap from; the start destination once a workspace exists. */
+    data object Home : NavRoute("home")
     data object Today : NavRoute("today")
     data object Calendar : NavRoute("calendar")
     data object Chat : NavRoute("chat") {
@@ -54,6 +57,9 @@ sealed class NavRoute(val route: String) {
         val routePattern = "$route?$ARG_PROJECT_ID={$ARG_PROJECT_ID}&$ARG_TASK_ID={$ARG_TASK_ID}"
         fun destination(projectId: String, taskId: String): String =
             "$route?$ARG_PROJECT_ID=${Uri.encode(projectId)}&$ARG_TASK_ID=${Uri.encode(taskId)}"
+
+        /** Opens one project, with Back leaving the project rather than its list. */
+        fun forProject(projectId: String): String = "$route?$ARG_PROJECT_ID=${Uri.encode(projectId)}"
     }
     data object Settings : NavRoute("settings")
 }

@@ -91,7 +91,7 @@ fun ProgressScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.progress_title),
