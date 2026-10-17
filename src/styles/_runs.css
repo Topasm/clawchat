@@ -221,6 +221,14 @@
   background: color-mix(in srgb, var(--cc-error) 8%, transparent);
   color: var(--cc-error);
 }
+/* The run's own words, kept under Details for whoever needs them. */
+.cc-run-card__raw-error {
+  margin: 6px 0 0;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .cc-run-card textarea {
   width: 100%;
   box-sizing: border-box;

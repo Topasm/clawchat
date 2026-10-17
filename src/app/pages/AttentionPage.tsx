@@ -12,8 +12,13 @@ import { useAgentRunsQuery, useReviewsQuery, useRunsAwaitingInputQuery } from '.
 import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
 import type { ReviewStatus } from '../types/api';
 import { translateUi } from '../i18n';
+import { relativeTime } from '../utils/formatters';
+import { describeTaskStage, getRunStage } from '../utils/taskStage';
 
 const EXECUTING = new Set(['queued', 'starting', 'running']);
+const FINISHED = new Set(['completed', 'failed', 'cancelled']);
+/** Recent runs are a glance at what just ended; the full log is "All runs". */
+const RECENT_RUNS = 5;
 type AttentionView = 'now' | 'runs' | 'history';
 const VIEWS: Array<{ value: AttentionView; label: string }> = [
   { value: 'now', label: 'Needs you' },
@@ -58,8 +63,14 @@ export default function AttentionPage() {
     [approvedAgentRun?.reviewId, reviews],
   );
   const decisions = useMemo(() => runs.filter(needsRecoveryDecision), [runs]);
-  const executingCount = useMemo(
-    () => runs.filter((run) => EXECUTING.has(run.status)).length,
+  const executing = useMemo(() => runs.filter((run) => EXECUTING.has(run.status)), [runs]);
+  // What just ended, minus the failures already listed above for a decision.
+  const recent = useMemo(
+    () =>
+      runs
+        .filter((run) => FINISHED.has(run.status) && !needsRecoveryDecision(run))
+        .sort((a, b) => (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at))
+        .slice(0, RECENT_RUNS),
     [runs],
   );
   const isLoading = loadingInput || loadingReviews || loadingRuns;
@@ -77,6 +88,11 @@ export default function AttentionPage() {
       if (next === 'now') params.delete('view');
       else params.set('view', next);
       params.delete('run_id');
+    });
+  const openRun = (runId: string) =>
+    updateParams((params) => {
+      params.set('view', 'runs');
+      params.set('run_id', runId);
     });
 
   return (
@@ -154,19 +170,14 @@ export default function AttentionPage() {
       {view === 'now' &&
         (isLoading ? (
           <div className="cc-project-workspace__loading">{translateUi('Loading…')}</div>
-        ) : total === 0 ? (
-          <EmptyState
-            icon={<CheckCircleIcon size={28} />}
-            message={
-              executingCount > 0
-                ? translateUi('Nothing needs you right now. {{count}} runs in progress.', {
-                    count: executingCount,
-                  })
-                : translateUi('Nothing needs you right now.')
-            }
-          />
         ) : (
           <>
+            {total === 0 && (
+              <EmptyState
+                icon={<CheckCircleIcon size={28} />}
+                message={translateUi('Nothing needs you right now.')}
+              />
+            )}
             {questions.length > 0 && (
               <section
                 className="cc-attention-section"
@@ -236,10 +247,57 @@ export default function AttentionPage() {
                 </div>
               </section>
             )}
-            {executingCount > 0 && (
-              <p className="cc-attention-page__footnote">
-                {translateUi('{{count}} runs in progress.', { count: executingCount })}
-              </p>
+            {executing.length > 0 && (
+              <section className="cc-attention-section" aria-label={translateUi('Running')}>
+                <h2 className="cc-attention-section__title cc-attention-section__title--quiet">
+                  {translateUi('Running')}
+                  <span className="cc-section__count">{executing.length}</span>
+                </h2>
+                <div className="cc-run-list">
+                  {executing.map((run) => (
+                    <RunCard
+                      key={run.id}
+                      run={run}
+                      expanded={expandedRun === run.id}
+                      onToggle={() => toggleRun(run.id)}
+                      onReview={() => undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {recent.length > 0 && (
+              <section className="cc-attention-section" aria-label={translateUi('Recent runs')}>
+                <h2 className="cc-attention-section__title cc-attention-section__title--quiet">
+                  {translateUi('Recent runs')}
+                  <button
+                    type="button"
+                    className="cc-link-btn cc-attention-section__more"
+                    onClick={() => showView('runs')}
+                  >
+                    {translateUi('All runs')}
+                  </button>
+                </h2>
+                <ul className="cc-attention-recent">
+                  {recent.map((run) => (
+                    <li key={run.id}>
+                      <button
+                        type="button"
+                        className="cc-attention-recent__row"
+                        onClick={() => openRun(run.id)}
+                      >
+                        <span className="cc-attention-recent__title">
+                          {run.todo_title || run.instruction_snapshot}
+                        </span>
+                        <span className="cc-attention-recent__fact">
+                          {describeTaskStage(getRunStage(run))} ·{' '}
+                          {relativeTime(run.updated_at ?? run.created_at)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </>
         ))}

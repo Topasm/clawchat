@@ -11,6 +11,7 @@ import {
   GearIcon,
   InboxIcon,
   NavCalendarIcon,
+  ProgressIcon,
   ReviewIcon,
   SearchIcon,
   TasksIcon,
@@ -76,8 +77,8 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   {translateUi(' Tasks\n                ')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/attention')}>
-                  <ReviewIcon className="cc-cmd-palette__item-icon" />
-                  {translateUi('Attention')}
+                  <ProgressIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Progress')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/search')}>
                   <SearchIcon className="cc-cmd-palette__item-icon" />

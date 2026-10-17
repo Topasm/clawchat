@@ -112,3 +112,26 @@
 .cc-card--selected {
   background: var(--cc-selected-surface);
 }
+
+/* Narrow desktop (13-inch): the pane slides over the list instead of
+   squeezing it, and a click beside it closes it. */
+.cc-detail-pane-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cc-detail-pane-overlay__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.cc-detail-pane-overlay__sheet {
+  position: relative;
+  width: min(520px, 92vw);
+  height: 100%;
+  box-shadow: var(--cc-shadow-overlay);
+}

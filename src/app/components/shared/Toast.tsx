@@ -16,16 +16,20 @@ export default function Toast({ toast }: { toast: ToastData }) {
         <ToastTypeIcon type={toast.type} />
       </span>
       <span className="cc-toast__message">{toast.message}</span>
-      {toast.action && (
-        <button
-          className="cc-toast__action"
-          onClick={() => {
-            toast.action!.onClick();
-            removeToast(toast.id);
-          }}
-        >
-          {toast.action.label}
-        </button>
+      {[toast.action, toast.secondaryAction].map(
+        (action, index) =>
+          action && (
+            <button
+              key={index}
+              className="cc-toast__action"
+              onClick={() => {
+                action.onClick();
+                removeToast(toast.id);
+              }}
+            >
+              {action.label}
+            </button>
+          ),
       )}
       <button
         className="cc-toast__close"

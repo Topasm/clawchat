@@ -13,6 +13,7 @@ import {
   useLatestPlanProposalQuery,
   useProjectQuery,
   useTaskExecutionTelemetryQuery,
+  useRunReadyTaskWithProjectDefaults,
   queryKeys,
 } from '../../hooks/queries';
 import apiClient from '../../services/apiClient';
@@ -123,6 +124,7 @@ export default function TaskDetail({
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const openTaskChat = useOpenTaskChat(useOptionalChatPanelController());
   const { data: telemetry = [] } = useTaskExecutionTelemetryQuery();
+  const runner = useRunReadyTaskWithProjectDefaults(Boolean(task?.assignee));
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
   const [title, setTitle] = useState(task?.title ?? '');
@@ -229,17 +231,39 @@ export default function TaskDetail({
   const setAssignee = (assignee: string | null) => {
     const previous = task.assignee ?? null;
     updateTodoMutation.mutate({ id: task.id, data: { assignee } });
-    useToastStore
-      .getState()
-      .addToast('success', translateUi(assignee ? 'Delegated to AI' : 'Back to you'), {
-        duration: 5000,
-        action: {
-          label: translateUi('Undo'),
-          onClick: () => updateTodoMutation.mutate({ id: task.id, data: { assignee: previous } }),
-        },
-      });
+    const undo = {
+      label: translateUi('Undo'),
+      onClick: () => updateTodoMutation.mutate({ id: task.id, data: { assignee: previous } }),
+    };
+    // Handing work over says where it will run, and that place can be changed
+    // right there; Undo stays as the second choice.
+    const host = assignee ? project?.execution_host_label : null;
+    useToastStore.getState().addToast(
+      'success',
+      host
+        ? translateUi('Delegated to AI · Runs on {{host}}', { host })
+        : translateUi(assignee ? 'Delegated to AI' : 'Back to you'),
+      host
+        ? {
+            duration: 6000,
+            action: { label: translateUi('Change'), onClick: () => setHostsOpen(true) },
+            secondaryAction: undo,
+          }
+        : { duration: 5000, action: undo },
+    );
   };
   const canPlan = !hasPlan && !isTerminalTaskStatus(task.status);
+  // Delegated, with no plan waiting to be checked and nothing in the way: the
+  // next step is to start it as it stands. Suggesting steps first stays beside.
+  const canStartAsIs =
+    isDelegated &&
+    Boolean(task.assignee) &&
+    !hasPlan &&
+    !isPlanned &&
+    !taskTelemetry?.latest_run_status &&
+    !isTerminalTaskStatus(task.status) &&
+    !task.open_prerequisites?.length &&
+    runner.canRunTask(task.id);
   const menuItems: TaskMenuItem[] = [
     { label: translateUi('Discuss with agent'), onSelect: () => void discuss() },
     ...(canPlan && !planIsNext
@@ -338,14 +362,28 @@ export default function TaskDetail({
 
       {isDelegated && (
         <div className="cc-exec-panel__section cc-exec-panel__agent">
-          {planIsNext && canPlan && !isPlanned && (
-            <button
-              type="button"
-              className="cc-btn cc-btn--primary"
-              onClick={() => void organize()}
-            >
-              {translateUi('Suggest steps')}
-            </button>
+          {(canStartAsIs || (planIsNext && canPlan && !isPlanned)) && (
+            <div className="cc-exec-panel__agent-actions">
+              {canStartAsIs && (
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--primary"
+                  disabled={runner.isPending}
+                  onClick={() => void runner.runTask(task.id)}
+                >
+                  {translateUi('Start as is')}
+                </button>
+              )}
+              {planIsNext && canPlan && !isPlanned && (
+                <button
+                  type="button"
+                  className={`cc-btn ${canStartAsIs ? 'cc-btn--ghost' : 'cc-btn--primary'}`}
+                  onClick={() => void organize()}
+                >
+                  {translateUi('Suggest steps')}
+                </button>
+              )}
+            </div>
           )}
           {hasAgentSkills && (
             <div className="cc-exec-panel__agent-status">

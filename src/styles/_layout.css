@@ -824,3 +824,10 @@
     transform: none;
   }
 }
+
+/* "N more" under the capped project list: quiet, and opens all projects. */
+.cc-nav-item--more {
+  padding-left: 38px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}

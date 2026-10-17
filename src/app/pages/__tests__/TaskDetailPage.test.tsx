@@ -4,6 +4,7 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
 import TaskDetail from '../../components/task-detail/TaskDetail';
+import { useToastStore } from '../../stores/useToastStore';
 
 const mocks = vi.hoisted(() => ({
   projectDescription: null as string | null,
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   projectPath: '/Users/test/papers' as string | null,
   hostLabel: 'My Mac' as string | null,
   projectError: false,
+  canRun: false,
+  runTask: vi.fn(),
 }));
 
 const task = {
@@ -50,6 +53,11 @@ vi.mock('../../hooks/queries', () => ({
   useToggleTodoComplete: () => ({ mutate: mocks.toggleTodo }),
   useLatestPlanProposalQuery: () => ({ data: null }),
   useTaskExecutionTelemetryQuery: () => ({ data: [] }),
+  useRunReadyTaskWithProjectDefaults: () => ({
+    runTask: mocks.runTask,
+    canRunTask: () => mocks.canRun,
+    isPending: false,
+  }),
   useGeneratePlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useApplyPlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useDismissPlanProposal: () => ({ mutateAsync: vi.fn() }),
@@ -117,6 +125,9 @@ describe('TaskDetailPage project context', () => {
     mocks.projectPath = '/Users/test/papers';
     mocks.hostLabel = 'My Mac';
     mocks.projectError = false;
+    mocks.canRun = false;
+    mocks.runTask.mockReset();
+    useToastStore.setState({ toasts: [] });
   });
 
   it('shows the original-document action from the project description first line', () => {
@@ -170,6 +181,29 @@ describe('TaskDetailPage project context', () => {
       id: 'todo-e65a',
       data: { assignee: 'agent' },
     });
+  });
+
+  it('says where delegated work runs, with Change and Undo', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
+
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast.message).toBe('Delegated to AI · Runs on My Mac');
+    expect(toast.action?.label).toBe('Change');
+    expect(toast.secondaryAction?.label).toBe('Undo');
+  });
+
+  it('offers to start delegated work as it stands, with suggesting steps beside it', () => {
+    task.assignee = 'agent';
+    mocks.canRun = true;
+    renderPage();
+
+    const start = screen.getByRole('button', { name: 'Start as is' });
+    expect(start).toHaveClass('cc-btn--primary');
+    expect(screen.getByRole('button', { name: 'Suggest steps' })).toHaveClass('cc-btn--ghost');
+    fireEvent.click(start);
+    expect(mocks.runTask).toHaveBeenCalledWith('todo-e65a');
   });
 
   it('treats a task with an assignee as delegated', () => {

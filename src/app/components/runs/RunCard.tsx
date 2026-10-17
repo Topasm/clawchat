@@ -14,6 +14,7 @@ import { skillChainLabel } from '../../utils/skillLabels';
 import { formatTime, relativeTime } from '../../utils/formatters';
 import { agentName, getRunStage } from '../../utils/taskStage';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
+import { runFailureReason } from '../../utils/runFailure';
 
 const ACTIVE_STATUSES = new Set(['queued', 'starting', 'running', 'waiting_input']);
 
@@ -111,7 +112,8 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           <span>{run.progress_message}</span>
         </div>
       )}
-      {run.error && <p className="cc-run-card__error">{run.error}</p>}
+      {/* Why it stopped, in words; what the agent actually raised is under Details. */}
+      {run.error && <p className="cc-run-card__error">{runFailureReason(run.error)}</p>}
       {run.result_summary && <pre className="cc-run-card__result">{run.result_summary}</pre>}
       {pendingTool && <ToolRequestPanel runId={run.id} request={pendingTool} />}
       {answering && (
@@ -190,6 +192,7 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
       {expanded && (
         <>
           <p className="cc-run-card__external">{details.join(' · ')}</p>
+          {run.error && <pre className="cc-run-card__raw-error">{run.error}</pre>}
           <RunEventLog runId={run.id} />
         </>
       )}

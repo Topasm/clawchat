@@ -152,3 +152,39 @@
   background: var(--cc-surface-secondary);
   color: var(--cc-text);
 }
+
+/* Once today is clear: the inbox to sort and what is due this week. */
+.cc-today-next {
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+  margin-top: -12px;
+}
+
+.cc-today-next__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border);
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-today-next__row:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-today-next__row > span:first-child {
+  flex: 1;
+}
+
+.cc-today-next__count {
+  color: var(--cc-text-tertiary);
+  font-size: 13px;
+}

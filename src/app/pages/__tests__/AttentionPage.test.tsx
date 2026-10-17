@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentRunResponse, ReviewItemResponse } from '../../types/api';
@@ -121,15 +121,25 @@ describe('AttentionPage', () => {
     queryMocks.runs.mockReturnValue({ data: [], isLoading: false });
   });
 
-  it('says so when nothing has stopped for the user, counting what is still running', () => {
+  it('says so when nothing has stopped for the user, and lists what is running and just ended', () => {
     queryMocks.runs.mockReturnValue({
-      data: [run({ id: 'run-9', status: 'running' })],
+      data: [
+        run({ id: 'run-9', status: 'running', todo_title: 'Draft the abstract' }),
+        run({
+          id: 'run-8',
+          status: 'completed',
+          is_adopted: true,
+          todo_title: 'Summarize notes',
+        }),
+      ],
       isLoading: false,
     });
     renderPage();
-    expect(
-      screen.getByText('Nothing needs you right now. 1 runs in progress.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Nothing needs you right now.')).toBeInTheDocument();
+    const running = screen.getByRole('region', { name: 'Running' });
+    expect(within(running).getByText('Draft the abstract')).toBeInTheDocument();
+    const recent = screen.getByRole('region', { name: 'Recent runs' });
+    expect(within(recent).getByText('Summarize notes')).toBeInTheDocument();
   });
 
   it('groups questions, reviews and failed runs, each acted on in place', () => {

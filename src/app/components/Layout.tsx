@@ -18,6 +18,7 @@ import useChatPanel from '../hooks/useChatPanel';
 import { useOpenTaskChat, useToggleContextChat } from '../hooks/useContextChat';
 import { useCloseTaskPane, useOpenTask, useSelectedTaskId } from '../hooks/useTaskPane';
 import usePlatform from '../hooks/usePlatform';
+import useMediaQuery from '../hooks/useMediaQuery';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
 import useNetworkStatus from '../hooks/useNetworkStatus';
@@ -139,6 +140,9 @@ const primaryNavItems: NavItem[] = [
 ];
 const RUN_EXECUTING = new Set(['queued', 'starting', 'running']);
 /** The name of the screen a path shows, as the sidebar prints it. */
+/** Below this width the task pane covers the list rather than sitting beside it. */
+const NARROW_DESKTOP_QUERY = '(max-width: 1439px)';
+
 export function screenName(pathname: string, t: (key: string) => string): string {
   const first = pathname.split('/')[1] ?? '';
   const keys: Record<string, string> = {
@@ -173,6 +177,9 @@ export default function Layout() {
   // The right-hand pane on desktop: the task picked from a list (?task=<id>)
   // or the AI conversation, one slot with a segmented header choosing which.
   const selectedTaskId = useSelectedTaskId();
+  // On a 13-inch screen a third column squeezes the list, so the pane opens
+  // over it instead of beside it.
+  const paneOverlays = useMediaQuery(NARROW_DESKTOP_QUERY);
   const closeTaskPane = useCloseTaskPane();
   const openTask = useOpenTask();
   const openTaskChat = useOpenTaskChat(chatPanel);
@@ -518,6 +525,21 @@ export default function Layout() {
       ? `${translateUi('AI')} · ${screenName(location.pathname, t)}`
       : chatPanel.presentation.title;
   const showTaskPane = !onChatPage && !isMobile && Boolean(selectedTaskId);
+  const taskPane = selectedTaskId && (
+    <TaskPane
+      taskId={selectedTaskId}
+      mode={paneMode}
+      onModeChange={setPane}
+      onOpenTask={openTask}
+      onClose={closePane}
+      chat={{
+        conversationId: chatPanel.conversationId,
+        onSetConversationId: chatPanel.setConversationId,
+        title: chatPanel.presentation.title,
+        subtitle: chatPanel.presentation.subtitle,
+      }}
+    />
+  );
   const showChatPanel = !onChatPage && chatPanel.isOpen && !showTaskPane;
   const aiToggle = !onChatPage && !chatPanel.isOpen && (
     <button
@@ -600,82 +622,82 @@ export default function Layout() {
               />
             </>
           ) : (
-            <PanelGroup
-              orientation="horizontal"
-              id="cc-layout"
-              onLayoutChanged={handlePanelLayoutChanged}
-            >
-              <Panel
-                id="sidebar"
-                panelRef={sidebarPanelRef}
-                defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
-                minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
-                maxSize="250px"
-                collapsible
-                collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
-                onResize={handleSidebarResize}
+            <>
+              <PanelGroup
+                orientation="horizontal"
+                id="cc-layout"
+                onLayoutChanged={handlePanelLayoutChanged}
               >
-                {sidebar}
-              </Panel>
-              <PanelResizeHandle className="cc-resize-handle" />
-              <Panel id="content" minSize="30%">
-                <div className={`cc-main${aiToggle ? ' cc-main--ai-toggle' : ''}`}>
-                  {aiToggle}
-                  <div className="cc-content" ref={contentRef}>
-                    <ErrorBoundary name="PageContent">
-                      <AnimatedOutlet />
-                    </ErrorBoundary>
+                <Panel
+                  id="sidebar"
+                  panelRef={sidebarPanelRef}
+                  defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
+                  minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
+                  maxSize="250px"
+                  collapsible
+                  collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
+                  onResize={handleSidebarResize}
+                >
+                  {sidebar}
+                </Panel>
+                <PanelResizeHandle className="cc-resize-handle" />
+                <Panel id="content" minSize="30%">
+                  <div className={`cc-main${aiToggle ? ' cc-main--ai-toggle' : ''}`}>
+                    {aiToggle}
+                    <div className="cc-content" ref={contentRef}>
+                      <ErrorBoundary name="PageContent">
+                        <AnimatedOutlet />
+                      </ErrorBoundary>
+                    </div>
+                    {!chatPanel.isOpen && <FloatingActionButton />}
                   </div>
-                  {!chatPanel.isOpen && <FloatingActionButton />}
+                </Panel>
+                {showTaskPane && !paneOverlays && (
+                  <>
+                    <PanelResizeHandle className="cc-resize-handle" />
+                    <Panel
+                      id="task-pane"
+                      defaultSize={`${taskPaneSize}%`}
+                      minSize="460px"
+                      maxSize="640px"
+                    >
+                      {taskPane}
+                    </Panel>
+                  </>
+                )}
+                {showChatPanel && (
+                  <>
+                    <PanelResizeHandle className="cc-resize-handle" />
+                    <Panel
+                      id="chat-panel"
+                      defaultSize={`${chatPanelSize}%`}
+                      minSize="250px"
+                      maxSize="450px"
+                    >
+                      <ChatPanel
+                        isOpen={true}
+                        conversationId={chatPanel.conversationId}
+                        onToggle={chatPanel.toggle}
+                        onSetConversationId={chatPanel.setConversationId}
+                        title={panelTitle}
+                        subtitle={chatPanel.presentation.subtitle}
+                        variant="side"
+                      />
+                    </Panel>
+                  </>
+                )}
+              </PanelGroup>
+              {showTaskPane && paneOverlays && (
+                <div className="cc-detail-pane-overlay">
+                  <div
+                    className="cc-detail-pane-overlay__scrim"
+                    aria-hidden="true"
+                    onClick={closePane}
+                  />
+                  <div className="cc-detail-pane-overlay__sheet">{taskPane}</div>
                 </div>
-              </Panel>
-              {showTaskPane && selectedTaskId && (
-                <>
-                  <PanelResizeHandle className="cc-resize-handle" />
-                  <Panel
-                    id="task-pane"
-                    defaultSize={`${taskPaneSize}%`}
-                    minSize="460px"
-                    maxSize="640px"
-                  >
-                    <TaskPane
-                      taskId={selectedTaskId}
-                      mode={paneMode}
-                      onModeChange={setPane}
-                      onOpenTask={openTask}
-                      onClose={closePane}
-                      chat={{
-                        conversationId: chatPanel.conversationId,
-                        onSetConversationId: chatPanel.setConversationId,
-                        title: chatPanel.presentation.title,
-                        subtitle: chatPanel.presentation.subtitle,
-                      }}
-                    />
-                  </Panel>
-                </>
               )}
-              {showChatPanel && (
-                <>
-                  <PanelResizeHandle className="cc-resize-handle" />
-                  <Panel
-                    id="chat-panel"
-                    defaultSize={`${chatPanelSize}%`}
-                    minSize="250px"
-                    maxSize="450px"
-                  >
-                    <ChatPanel
-                      isOpen={true}
-                      conversationId={chatPanel.conversationId}
-                      onToggle={chatPanel.toggle}
-                      onSetConversationId={chatPanel.setConversationId}
-                      title={panelTitle}
-                      subtitle={chatPanel.presentation.subtitle}
-                      variant="side"
-                    />
-                  </Panel>
-                </>
-              )}
-            </PanelGroup>
+            </>
           )}
         </div>
       </ChatPanelControllerProvider>

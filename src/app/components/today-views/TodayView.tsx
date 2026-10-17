@@ -9,6 +9,7 @@ import TaskCard from '../shared/TaskCard';
 import AutoApprovedLine from './AutoApprovedLine';
 import EventCard from '../shared/EventCard';
 import TodaySuggestions from './TodaySuggestions';
+import TodayNext from './TodayNext';
 import { ChevronRightIcon } from '../shared/Icons';
 import { GearIcon, TodayIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
@@ -107,7 +108,10 @@ export default function TodayView({
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 
       {!isLoading && !hasAnything && (
-        <p className="cc-today-empty">{translateUi('Nothing left today')}</p>
+        <>
+          <p className="cc-today-empty">{translateUi('Nothing left today')}</p>
+          <TodayNext />
+        </>
       )}
 
       {(events.length > 0 || visibleTasks.length > 0) && (
