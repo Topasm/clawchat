@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Event
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -81,11 +81,13 @@ fun CalendarScreen(
         localizedDateFormatter(locale, "MMMMdEEEE")
     }
 
+    RegisterPrimaryAction("calendar", stringResource(R.string.calendar_new_entry)) { editing = EditorTarget(null) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         state.visibleMonth.format(monthLabelFormatter),
@@ -111,12 +113,6 @@ fun CalendarScreen(
                     }
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = { editing = EditorTarget(null) },
-                contentDescription = stringResource(R.string.calendar_new_entry),
             )
         },
     ) { padding ->

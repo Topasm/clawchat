@@ -47,7 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawListSection
@@ -99,12 +99,14 @@ fun WeekScreen(
         if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(pending.token)
     }
 
+    RegisterPrimaryAction("week", stringResource(R.string.week_cd_capture_task)) { showCreateSheet = true }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.week_title),
@@ -113,12 +115,6 @@ fun WeekScreen(
                     )
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = { showCreateSheet = true },
-                contentDescription = stringResource(R.string.week_cd_capture_task),
             )
         },
     ) { padding ->

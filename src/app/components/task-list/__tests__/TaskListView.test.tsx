@@ -63,6 +63,21 @@ describe('TaskListView', () => {
     expect(screen.queryByText(/Waiting on/)).not.toBeInTheDocument();
     expect(screen.queryByText('Blocked')).not.toBeInTheDocument();
   });
+
+  it('keeps the row of the task open beside the list raised', () => {
+    const { container } = render(
+      <TaskListView
+        todos={[todo({ id: 'todo-open' }), todo({ id: 'todo-other', title: 'Other' })]}
+        onOpenTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        selectedTaskId="todo-open"
+      />,
+    );
+    const rows = container.querySelectorAll('.cc-task-row');
+    expect(rows[0]).toHaveClass('cc-task-row--selected');
+    expect(rows[0]).toHaveAttribute('aria-current', 'true');
+    expect(rows[1]).not.toHaveClass('cc-task-row--selected');
+  });
 });
 
 describe('TaskListView blocked rows', () => {

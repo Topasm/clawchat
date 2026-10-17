@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title" translatable="false">ClawChat</string>
+    <string name="home_search">Search</string>
+    <string name="home_inbox">Inbox</string>
+    <string name="home_today">Today</string>
+    <string name="home_schedule">Schedule</string>
+    <string name="home_tasks">Tasks</string>
+    <string name="home_progress">Progress</string>
+    <string name="home_progress_counts">Check %1$d · Running %2$d</string>
+    <string name="home_projects">Projects</string>
+    <string name="home_projects_all">See all ›</string>
+    <string name="home_chat">Chat</string>
+    <string name="home_devices">Devices</string>
+    <string name="home_settings">Settings</string>
+    <string name="home_connected">Home connected</string>
+    <string name="home_disconnected">Disconnected</string>
+    <string name="home_this_device">This device</string>
+    <string name="home_cd_new_task">New task</string>
+    <string name="home_cd_project_progress">Done: %1$d/%2$d</string>
+</resources>

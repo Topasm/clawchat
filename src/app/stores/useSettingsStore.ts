@@ -54,6 +54,8 @@ interface SettingsState {
   simpleMode: boolean;
   sidebarSize: number;
   chatPanelSize: number;
+  /** Width of the desktop task pane, as a share of the window. */
+  taskPaneSize: number;
 
   // Notifications
   notificationsEnabled: boolean;
@@ -92,6 +94,7 @@ interface SettingsState {
   setSimpleMode: (v: boolean) => void;
   setSidebarSize: (v: number) => void;
   setChatPanelSize: (v: number) => void;
+  setTaskPaneSize: (v: number) => void;
   setNotificationsEnabled: (v: boolean) => void;
   setReminderSound: (v: boolean) => void;
   setSaveHistory: (v: boolean) => void;
@@ -126,6 +129,7 @@ const APPLICATION_DEFAULT_SETTINGS = {
   simpleMode: false,
   sidebarSize: 18,
   chatPanelSize: 30,
+  taskPaneSize: 36,
 
   notificationsEnabled: true,
   reminderSound: true,
@@ -233,6 +237,7 @@ export const useSettingsStore = create<SettingsState>()(
       setSimpleMode: (simpleMode) => set({ simpleMode }),
       setSidebarSize: (sidebarSize) => set({ sidebarSize }),
       setChatPanelSize: (chatPanelSize) => set({ chatPanelSize }),
+      setTaskPaneSize: (taskPaneSize) => set({ taskPaneSize }),
 
       setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
       setReminderSound: (reminderSound) => set({ reminderSound }),

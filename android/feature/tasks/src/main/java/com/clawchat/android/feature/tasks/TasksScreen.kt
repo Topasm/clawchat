@@ -26,7 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawExpand
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
@@ -321,12 +321,14 @@ internal fun TaskListView(
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
+    RegisterPrimaryAction("tasks", stringResource(R.string.tasks_cd_new_task)) { showCreateSheet = true }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.tasks_title),
@@ -346,12 +348,6 @@ internal fun TaskListView(
                     }
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = { showCreateSheet = true },
-                contentDescription = stringResource(R.string.tasks_cd_new_task),
             )
         },
     ) { padding ->

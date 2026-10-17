@@ -3,6 +3,7 @@ import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
 import { useToggleTodoComplete } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
+import { useOpenTask, useSelectedTaskId } from '../../hooks/useTaskPane';
 import { formatDate } from '../../utils/formatters';
 import TaskCard from '../shared/TaskCard';
 import AutoApprovedLine from './AutoApprovedLine';
@@ -45,6 +46,8 @@ export default function TodayView({
   briefingLoading,
 }: TodayViewProps) {
   const navigate = useNavigate();
+  const openTask = useOpenTask();
+  const selectedTaskId = useSelectedTaskId();
   const toggleMutation = useToggleTodoComplete();
   const { isMobile } = usePlatform();
   const toggleTodoComplete = useCallback(
@@ -121,7 +124,8 @@ export default function TodayView({
               key={task.id}
               task={task}
               onToggle={() => toggleTodoComplete(task.id)}
-              onClick={() => navigate(`/tasks/${task.id}`)}
+              onClick={() => openTask(task.id)}
+              selected={task.id === selectedTaskId}
             />
           ))}
         </div>

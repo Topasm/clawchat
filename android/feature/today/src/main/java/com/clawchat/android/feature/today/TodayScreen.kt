@@ -68,7 +68,7 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodaySuggestion
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawIconTile
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
@@ -174,12 +174,14 @@ internal fun TodayContent(
         state.todayTodos.isNotEmpty() ||
         state.todayEvents.isNotEmpty()
 
+    RegisterPrimaryAction("today", stringResource(R.string.today_cd_capture_task), onQuickAdd)
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.today_title),
@@ -196,12 +198,6 @@ internal fun TodayContent(
                     }
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = { onQuickAdd() },
-                contentDescription = stringResource(R.string.today_cd_capture_task),
             )
         },
     ) { padding ->

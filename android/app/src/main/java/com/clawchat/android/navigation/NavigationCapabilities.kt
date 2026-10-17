@@ -5,49 +5,40 @@ import com.clawchat.android.core.data.WorkspaceMode
 /**
  * One policy for every navigation surface. Keeping route availability out of
  * the composables prevents a local-only workspace from accidentally exposing a
- * server feature through the drawer, a search hit, or a deep link.
+ * server feature through the home list, a search hit, or a deep link.
  */
 internal object NavigationCapabilities {
     /**
-     * The drawer in two groups split by a divider: where work comes in and gets
-     * done, then where it is organised, followed and set up.
+     * The rows of the home list, top to bottom: where work comes in, the
+     * day and the calendar, the tasks, then what is being followed and set up.
+     * Settings is always last.
      */
-    fun drawerGroups(mode: WorkspaceMode): List<List<String>> = when (mode) {
+    fun homeRoutes(mode: WorkspaceMode): List<String> = when (mode) {
         WorkspaceMode.SERVER -> listOf(
-            listOf(NavRoute.Inbox.route, NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Chat.route),
-            listOf(NavRoute.Projects.route, NavRoute.Progress.route, NavRoute.Devices.route, NavRoute.Search.route, NavRoute.Settings.route),
+            NavRoute.Inbox.route,
+            NavRoute.Today.route,
+            NavRoute.Calendar.route,
+            NavRoute.Tasks.route,
+            NavRoute.Progress.route,
+            NavRoute.Projects.route,
+            NavRoute.Chat.route,
+            NavRoute.Devices.route,
+            NavRoute.Settings.route,
         )
         WorkspaceMode.LOCAL -> listOf(
-            listOf(NavRoute.Tasks.route, NavRoute.Today.route),
-            listOf(NavRoute.Search.route, NavRoute.Settings.route),
+            NavRoute.Today.route,
+            NavRoute.Calendar.route,
+            NavRoute.Tasks.route,
+            NavRoute.Settings.route,
         )
         WorkspaceMode.UNCONFIGURED -> emptyList()
     }
 
-    fun drawerRoutes(mode: WorkspaceMode): List<String> = drawerGroups(mode).flatten()
-    private val localPrimaryRoutes = listOf(
-        NavRoute.Tasks.route,
-        NavRoute.Today.route,
-    )
-
-    private val localSecondaryRoutes = listOf(
+    /** Reached from every workspace that has a home list. */
+    private val commonRoutes = listOf(
+        NavRoute.Home.route,
         NavRoute.Search.route,
-        NavRoute.Settings.route,
-    )
-
-    private val serverPrimaryRoutes = listOf(
-        NavRoute.Inbox.route,
-        NavRoute.Projects.route,
-        NavRoute.Tasks.route,
-        NavRoute.Today.route,
-        NavRoute.Chat.route,
-    )
-
-    private val serverSecondaryRoutes = listOf(
-        NavRoute.Progress.route,
-        NavRoute.Devices.route,
-        NavRoute.Search.route,
-        NavRoute.Settings.route,
+        NavRoute.Onboarding.route,
     )
 
     /** Detail routes opened from attention rows or existing deep links. */
@@ -56,33 +47,14 @@ internal object NavigationCapabilities {
         NavRoute.Runs.route,
     )
 
-    private val plannerRoutes = setOf(NavRoute.Today.route, NavRoute.Calendar.route)
+    private val localAllowedRoutes = (homeRoutes(WorkspaceMode.LOCAL) + commonRoutes).toSet()
 
-    private val localAllowedRoutes = (
-        localPrimaryRoutes + localSecondaryRoutes + plannerRoutes + NavRoute.Onboarding.route
-        ).toSet()
-
-    private val serverAllowedRoutes = (
-        serverPrimaryRoutes + serverSecondaryRoutes + serverInternalRoutes +
-            plannerRoutes + NavRoute.Onboarding.route
-        ).toSet()
+    private val serverAllowedRoutes =
+        (homeRoutes(WorkspaceMode.SERVER) + serverInternalRoutes + commonRoutes).toSet()
 
     fun startRoute(mode: WorkspaceMode): String = when (mode) {
         WorkspaceMode.UNCONFIGURED -> NavRoute.Onboarding.route
-        WorkspaceMode.LOCAL -> NavRoute.Tasks.route
-        WorkspaceMode.SERVER -> NavRoute.Inbox.route
-    }
-
-    fun primaryRoutes(mode: WorkspaceMode): List<String> = when (mode) {
-        WorkspaceMode.UNCONFIGURED -> emptyList()
-        WorkspaceMode.LOCAL -> localPrimaryRoutes
-        WorkspaceMode.SERVER -> serverPrimaryRoutes
-    }
-
-    fun secondaryRoutes(mode: WorkspaceMode): List<String> = when (mode) {
-        WorkspaceMode.UNCONFIGURED -> emptyList()
-        WorkspaceMode.LOCAL -> localSecondaryRoutes
-        WorkspaceMode.SERVER -> serverSecondaryRoutes
+        WorkspaceMode.LOCAL, WorkspaceMode.SERVER -> NavRoute.Home.route
     }
 
     fun canOpen(mode: WorkspaceMode, route: String): Boolean {

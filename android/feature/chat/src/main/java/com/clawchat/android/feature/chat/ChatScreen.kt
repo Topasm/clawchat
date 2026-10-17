@@ -82,7 +82,7 @@ import com.clawchat.android.core.data.model.RunUpdate
 import com.clawchat.android.core.data.model.TaskDelegation
 import com.clawchat.android.core.ui.TaskStageDots
 import com.clawchat.android.core.ui.ClawCrossfade
-import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.ClawLetterTile
 import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawEmptyState
@@ -294,11 +294,13 @@ internal fun ConversationListView(
     val agentRunConversations = remember(conversations) {
         conversations.filter(Conversation::isAgentRun)
     }
+    RegisterPrimaryAction("chat", stringResource(R.string.chat_new_chat), onCreate)
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
+                navigationIcon = { com.clawchat.android.core.ui.HomeBackButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.chat_title),
@@ -315,12 +317,6 @@ internal fun ConversationListView(
                     }
                 },
                 colors = ClawTopBarColors(),
-            )
-        },
-        floatingActionButton = {
-            ClawFab(
-                onClick = onCreate,
-                contentDescription = stringResource(R.string.chat_new_chat),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,

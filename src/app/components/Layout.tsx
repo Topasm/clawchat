@@ -11,10 +11,12 @@ import type { Layout as PanelLayout, LayoutChangedMeta, PanelSize } from 'react-
 import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import ChatPanel from './chat-panel/ChatPanel';
+import TaskPane, { type TaskPaneMode } from './task-detail/TaskPane';
 import { ChatPanelControllerProvider } from './chat-panel/ChatPanelControllerContext';
 import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
-import { useToggleContextChat } from '../hooks/useContextChat';
+import { useOpenTaskChat, useToggleContextChat } from '../hooks/useContextChat';
+import { useCloseTaskPane, useOpenTask, useSelectedTaskId } from '../hooks/useTaskPane';
 import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
@@ -168,6 +170,46 @@ export default function Layout() {
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
   const { isDesktop, isMobile } = usePlatform();
+  // The right-hand pane on desktop: the task picked from a list (?task=<id>)
+  // or the AI conversation, one slot with a segmented header choosing which.
+  const selectedTaskId = useSelectedTaskId();
+  const closeTaskPane = useCloseTaskPane();
+  const openTask = useOpenTask();
+  const openTaskChat = useOpenTaskChat(chatPanel);
+  const [paneMode, setPaneMode] = useState<TaskPaneMode>('task');
+  const chatOpen = chatPanel.open;
+  const chatClose = chatPanel.close;
+  useEffect(() => {
+    setPaneMode(chatPanel.isOpen ? 'chat' : 'task');
+  }, [chatPanel.isOpen]);
+  useEffect(() => {
+    // Picking a task brings it in front of the conversation.
+    if (selectedTaskId) {
+      setPaneMode('task');
+      chatClose();
+    }
+  }, [chatClose, selectedTaskId]);
+  useEffect(() => {
+    // A phone-sized screen has no room beside the list: the task gets its page.
+    if (isMobile && selectedTaskId) navigate(`/tasks/${selectedTaskId}`, { replace: true });
+  }, [isMobile, navigate, selectedTaskId]);
+  const setPane = useCallback(
+    (mode: TaskPaneMode) => {
+      if (mode === 'chat') {
+        // The AI segment talks about the task in the pane.
+        if (selectedTaskId) void openTaskChat(selectedTaskId);
+        else chatOpen();
+      } else {
+        setPaneMode('task');
+        chatClose();
+      }
+    },
+    [chatClose, chatOpen, openTaskChat, selectedTaskId],
+  );
+  const closePane = useCallback(() => {
+    closeTaskPane();
+    chatClose();
+  }, [chatClose, closeTaskPane]);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarPanelRef = usePanelRef();
@@ -260,8 +302,15 @@ export default function Layout() {
   useWebSocket();
   // Wire global keyboard shortcuts
   const toggleContextChat = useToggleContextChat(chatPanel);
+  const toggleChat = useCallback(() => {
+    if (selectedTaskId && !isMobile) {
+      setPane(paneMode === 'chat' ? 'task' : 'chat');
+      return;
+    }
+    toggleContextChat();
+  }, [isMobile, paneMode, selectedTaskId, setPane, toggleContextChat]);
   useGlobalShortcuts({
-    onToggleChat: toggleContextChat,
+    onToggleChat: toggleChat,
     onNewItem: () => {
       // The Inbox has the input on the page; elsewhere the same input opens.
       const inboxInput = document.querySelector<HTMLInputElement>('.cc-inbox-capture__input');
@@ -437,8 +486,10 @@ export default function Layout() {
   // Persisted panel sizes
   const sidebarSize = useSettingsStore((s) => s.sidebarSize);
   const chatPanelSize = useSettingsStore((s) => s.chatPanelSize);
+  const taskPaneSize = useSettingsStore((s) => s.taskPaneSize);
   const setSidebarSize = useSettingsStore((s) => s.setSidebarSize);
   const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
+  const setTaskPaneSize = useSettingsStore((s) => s.setTaskPaneSize);
   const handleSidebarResize = useCallback((size: PanelSize) => {
     setSidebarCollapsed(size.inPixels <= SIDEBAR_RAIL_WIDTH + 1);
   }, []);
@@ -453,23 +504,26 @@ export default function Layout() {
       }
       const chat = layout['chat-panel'];
       if (chat !== undefined) setChatPanelSize(chat);
+      const pane = layout['task-pane'];
+      if (pane !== undefined) setTaskPaneSize(pane);
     },
-    [setChatPanelSize, setSidebarSize, sidebarPanelRef],
+    [setChatPanelSize, setSidebarSize, setTaskPaneSize, sidebarPanelRef],
   );
   // No chat bar waits at the foot of the page: the panel opens on ⌘K or the
   // top-right button, about the task or project on screen.
-  const showChatPanel = !onChatPage && chatPanel.isOpen;
   // The panel is a conversation about the screen in view, and its title says
   // which one; a project, task or run thread keeps its own name.
   const panelTitle =
     chatPanel.presentation.kind === 'quick'
       ? `${translateUi('AI')} · ${screenName(location.pathname, t)}`
       : chatPanel.presentation.title;
+  const showTaskPane = !onChatPage && !isMobile && Boolean(selectedTaskId);
+  const showChatPanel = !onChatPage && chatPanel.isOpen && !showTaskPane;
   const aiToggle = !onChatPage && !chatPanel.isOpen && (
     <button
       type="button"
       className="cc-ai-toggle"
-      onClick={toggleContextChat}
+      onClick={toggleChat}
       aria-label={translateUi('Talk with AI')}
       title={translateUi('Talk with AI (⌘K)')}
     >
@@ -575,6 +629,31 @@ export default function Layout() {
                   {!chatPanel.isOpen && <FloatingActionButton />}
                 </div>
               </Panel>
+              {showTaskPane && selectedTaskId && (
+                <>
+                  <PanelResizeHandle className="cc-resize-handle" />
+                  <Panel
+                    id="task-pane"
+                    defaultSize={`${taskPaneSize}%`}
+                    minSize="460px"
+                    maxSize="640px"
+                  >
+                    <TaskPane
+                      taskId={selectedTaskId}
+                      mode={paneMode}
+                      onModeChange={setPane}
+                      onOpenTask={openTask}
+                      onClose={closePane}
+                      chat={{
+                        conversationId: chatPanel.conversationId,
+                        onSetConversationId: chatPanel.setConversationId,
+                        title: chatPanel.presentation.title,
+                        subtitle: chatPanel.presentation.subtitle,
+                      }}
+                    />
+                  </Panel>
+                </>
+              )}
               {showChatPanel && (
                 <>
                   <PanelResizeHandle className="cc-resize-handle" />

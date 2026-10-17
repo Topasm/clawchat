@@ -165,6 +165,12 @@ export const koreanUiTranslations: Record<string, string> = {
   'Agent result approved': '에이전트 결과 승인됨',
   'Agent Task History': '에이전트 작업 기록',
   AI: 'AI',
+  'Task pane': '작업 패널',
+  'Pane view': '패널 보기',
+  'Open as page': '페이지로 열기',
+  'Copy link': '링크 복사',
+  'Link copied': '링크를 복사했습니다',
+  'Close pane': '패널 닫기',
   'AI configuration requires a server connection.': 'AI 구성에는 서버 연결이 필요합니다.',
   'AI did not return any actionable tasks. Add more guidance and regenerate.':
     'AI가 실행 가능한 작업을 반환하지 않았습니다. 더 많은 안내를 추가하고 재생성하세요.',

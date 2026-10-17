@@ -20,6 +20,8 @@ interface TaskListViewProps {
   /** Project titles by id, for the row's second line. */
   projectTitles?: Map<string, string>;
   telemetryByTaskId?: Map<string, TaskExecutionTelemetryResponse>;
+  /** The task open in the pane beside the list; its row stays raised. */
+  selectedTaskId?: string | null;
 }
 
 /**
@@ -67,6 +69,7 @@ export default function TaskListView({
   onToggleTask,
   projectTitles,
   telemetryByTaskId,
+  selectedTaskId,
 }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
   const steps = new Map<string, { done: number; total: number }>();
@@ -109,8 +112,9 @@ export default function TaskListView({
         return (
           <div
             key={todo.id}
-            className={`cc-task-row cc-task-row--${state.stage}${done ? ' cc-task-row--done' : ''}`}
+            className={`cc-task-row cc-task-row--${state.stage}${done ? ' cc-task-row--done' : ''}${todo.id === selectedTaskId ? ' cc-task-row--selected' : ''}`}
             role="listitem"
+            aria-current={todo.id === selectedTaskId ? 'true' : undefined}
             style={depth > 0 ? { marginLeft: depth * 22 } : undefined}
           >
             <Checkbox checked={done} onChange={() => onToggleTask(todo.id)} />
