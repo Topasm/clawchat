@@ -7,6 +7,7 @@ import type { ReviewItemResponse } from '../../types/api';
 import AttentionPage from '../AttentionPage';
 
 const queryMocks = vi.hoisted(() => ({
+  updateJob: vi.fn(),
   decide: vi.fn(),
   reviews: vi.fn(),
   runNext: vi.fn(),
@@ -14,6 +15,8 @@ const queryMocks = vi.hoisted(() => ({
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock('../../hooks/queries', () => ({
+  queryKeys: { reviews: ['reviews'] },
+  useUpdateScheduledJob: () => ({ mutate: queryMocks.updateJob, isPending: false }),
   useReviewsQuery: queryMocks.reviews,
   useRunsAwaitingInputQuery: () => ({ data: [], isLoading: false }),
   useAgentRunsQuery: () => ({ data: [], isLoading: false }),

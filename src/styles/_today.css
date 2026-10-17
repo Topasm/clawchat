@@ -5,6 +5,34 @@
   font-size: 14px;
 }
 
+/* What an automation adopted today without asking, and where to undo that. */
+.cc-today-auto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+.cc-today-auto__text {
+  flex: 1;
+  min-width: 0;
+}
+.cc-today-auto__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.cc-today-auto__action:hover {
+  color: var(--cc-text);
+}
+
 .cc-today-list {
   display: flex;
   flex-direction: column;

@@ -19,6 +19,13 @@ class ScheduledJobCreate(BaseModel):
     )
     timezone: str = Field(min_length=1, max_length=64, description="IANA zone name")
     enabled: bool = True
+    auto_approve_low_risk: bool = Field(
+        default=False,
+        description=(
+            "Approve low-risk results (prose only, no tool call) as they land "
+            "instead of asking; results that could change files always ask"
+        ),
+    )
 
 
 class ScheduledJobUpdate(BaseModel):
@@ -31,6 +38,7 @@ class ScheduledJobUpdate(BaseModel):
     rrule: str | None = Field(default=None, min_length=1, max_length=500)
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
     enabled: bool | None = None
+    auto_approve_low_risk: bool | None = None
 
 
 class ScheduledJobResponse(BaseModel):
@@ -44,6 +52,7 @@ class ScheduledJobResponse(BaseModel):
     rrule: str
     timezone: str
     enabled: bool
+    auto_approve_low_risk: bool
     next_run_at: UtcDatetime | None
     conversation_id: str | None
     last_run_at: UtcDatetime | None

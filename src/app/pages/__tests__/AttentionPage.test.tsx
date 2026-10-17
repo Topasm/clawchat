@@ -5,6 +5,7 @@ import type { AgentRunResponse, ReviewItemResponse } from '../../types/api';
 import AttentionPage from '../AttentionPage';
 
 const queryMocks = vi.hoisted(() => ({
+  updateJob: vi.fn(),
   awaitingInput: vi.fn(),
   reviews: vi.fn(),
   runs: vi.fn(),
@@ -17,6 +18,8 @@ const queryMocks = vi.hoisted(() => ({
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock('../../hooks/queries', () => ({
+  queryKeys: { reviews: ['reviews'] },
+  useUpdateScheduledJob: () => ({ mutate: queryMocks.updateJob, isPending: false }),
   useRunsAwaitingInputQuery: queryMocks.awaitingInput,
   useReviewsQuery: queryMocks.reviews,
   useAgentRunsQuery: queryMocks.runs,
@@ -205,6 +208,62 @@ describe('AttentionPage', () => {
       callId: 'tcall-1',
       decision: 'allow',
     });
+  });
+
+  it('lets an automation stop asking, right on its result card', () => {
+    queryMocks.reviews.mockReturnValue({
+      data: [
+        {
+          ...reviewItem,
+          risk_level: 'low',
+          metadata: {
+            run_id: 'run-2',
+            automation: {
+              scheduled_job_id: 'sjob-1',
+              title: 'Course notices digest',
+              auto_approve_low_risk: false,
+              offer_skip_review: true,
+            },
+          },
+        },
+      ],
+      isLoading: false,
+    });
+    renderPage();
+    expect(screen.getByText('Automation · Course notices digest')).toBeInTheDocument();
+    const skip = screen.getByRole('checkbox', { name: "Don't ask next time" });
+    expect(skip).not.toBeChecked();
+    fireEvent.click(skip);
+    expect(queryMocks.updateJob).toHaveBeenCalledWith({
+      id: 'sjob-1',
+      changes: { auto_approve_low_risk: true },
+    });
+    // The result on the card still needs this decision; the setting is for next time.
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+  });
+
+  it('does not offer to stop asking until the server says two results went through untouched', () => {
+    queryMocks.reviews.mockReturnValue({
+      data: [
+        {
+          ...reviewItem,
+          risk_level: 'low',
+          metadata: {
+            run_id: 'run-2',
+            automation: {
+              scheduled_job_id: 'sjob-1',
+              title: 'Course notices digest',
+              auto_approve_low_risk: false,
+              offer_skip_review: false,
+            },
+          },
+        },
+      ],
+      isLoading: false,
+    });
+    renderPage();
+    expect(screen.getByText('Automation · Course notices digest')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: "Don't ask next time" })).not.toBeInTheDocument();
   });
 
   it('keeps the log and the history as views of the same page', () => {

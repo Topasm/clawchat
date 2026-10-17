@@ -577,6 +577,50 @@
   cursor: default;
 }
 
+/* What an active task waits on, named under its title. */
+.cc-card__waiting {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+/* "Waiting on · task": grey with a pause mark, because being blocked is an
+   order, not a problem. Amber only when the blocked task is itself late. */
+.cc-waiting-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--cc-text-tertiary);
+  font-weight: 500;
+}
+.cc-waiting-on__mark {
+  flex: none;
+}
+.cc-waiting-on > span,
+.cc-waiting-on__link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-waiting-on__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cc-waiting-on__link:hover,
+.cc-waiting-on__link:focus-visible {
+  color: var(--cc-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cc-waiting-on--late {
+  color: var(--cc-warning);
+}
+
 /* --- Workspace status notices ----------------------------- */
 .cc-ai-setup-banner,
 .cc-version-notice {

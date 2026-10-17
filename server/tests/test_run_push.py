@@ -35,7 +35,7 @@ def reset_run_push(monkeypatch):
 
 def test_only_states_that_need_the_user_are_pushed():
     base = {"run_id": "run_1", "title": "Draft the report", "todo_id": "todo_1"}
-    for status in ("queued", "running", "completed", "cancelled"):
+    for status in ("queued", "starting"):
         assert run_push.push_data({**base, "status": status}) is None
     data = run_push.push_data({**base, "status": "waiting_input", "conversation_id": "c1"})
     assert data == {
@@ -48,6 +48,14 @@ def test_only_states_that_need_the_user_are_pushed():
     }
     failed = run_push.push_data({**base, "status": "failed", "error": "boom"})
     assert failed["detail"] == "boom"
+
+
+def test_a_result_waiting_for_review_carries_its_risk_so_the_phone_can_offer_approve():
+    base = {"run_id": "run_1", "title": "Course notices", "review_id": "review_1"}
+    low = run_push.push_data({**base, "status": "waiting_review", "risk_level": "low"})
+    assert (low["review_id"], low["risk_level"]) == ("review_1", "low")
+    unknown = run_push.push_data({**base, "status": "waiting_review", "risk_level": None})
+    assert "risk_level" not in unknown
 
 
 async def test_a_status_is_pushed_once_per_run():
@@ -113,3 +121,10 @@ async def test_a_run_waiting_for_input_pushes_after_commit(db_session, session_f
         "Pick a venue",
     )
     assert isinstance(run, AgentRun)
+
+
+def test_progress_is_pushed_quietly_for_top_level_runs_only():
+    base = {"run_id": "run_1", "title": "Draft the report"}
+    for status in ("running", "completed", "cancelled"):
+        assert run_push.push_data({**base, "status": status})["status"] == status
+        assert run_push.push_data({**base, "status": status, "parent_task_id": "t2"}) is None

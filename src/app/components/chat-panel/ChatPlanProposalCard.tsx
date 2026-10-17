@@ -11,7 +11,6 @@ import { useToastStore } from '../../stores/useToastStore';
 import type { PlanProposalResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import PlanReviewDiff from '../shared/PlanReviewDiff';
-import { CheckIcon, WarningIcon } from '../shared/Icons';
 
 const MAX_POLL_ATTEMPTS = 40;
 const POLL_INTERVAL_MS = 1500;
@@ -101,36 +100,45 @@ export default function ChatPlanProposalCard({ metadata }: { metadata: Record<st
               ? translateUi('Plan generation failed')
               : plan?.status === 'applying'
                 ? translateUi('Applying…')
-                : translateUi('Preparing a graph change proposal…');
+                : translateUi('Preparing the step proposal…');
+  // Line two of the card: what goes under what. A direct add names the one
+  // step; a generated plan is summed up by the task it is for.
+  const stepCount = plan?.subtasks.length ?? 0;
+  const summary =
+    isDirectGraphChange && plan?.subtasks[0]
+      ? `${plan.subtasks[0].title} → ${todoTitle}`
+      : todoTitle;
 
+  // The card stacks: kind and count, then the summary, then the button. It
+  // never lays anything side by side, so a 240px panel cannot crush it.
   return (
-    <div className="cc-action-card cc-action-card--plan">
-      <div
-        className={`cc-action-card__icon ${plan?.status === 'failed' ? 'cc-action-card__icon--warning' : 'cc-action-card__icon--todo'}`}
-      >
-        {plan?.status === 'failed' ? <WarningIcon size={14} /> : <CheckIcon size={14} />}
-      </div>
+    <div
+      className={`cc-action-card cc-action-card--plan${plan?.status === 'failed' ? ' cc-action-card--plan-failed' : ''}`}
+    >
       <div className="cc-action-card__content">
         <div className="cc-action-card__plan-heading">
-          <div>
-            <span className="cc-action-card__label">{translateUi('Graph change proposal')}</span>
-            {typeof metadata.discovered_from_task_id === 'string' && (
-              <span className="cc-action-card__detail">
-                {translateUi(
-                  'Follow-up work. Applying this proposal does not change the current run.',
-                )}
-              </span>
-            )}
-            <span className="cc-action-card__title">{todoTitle}</span>
-          </div>
-          <button
-            type="button"
-            className="cc-btn cc-btn--ghost cc-action-card__view-btn"
-            onClick={() => navigate(`/tasks/${todoId}`)}
-          >
-            {translateUi('Open task')}
-          </button>
+          <span className="cc-action-card__kind">{translateUi('Step proposal')}</span>
+          {stepCount > 0 && (
+            <span className="cc-action-card__count">
+              {translateUi('{{count}} steps', { count: stepCount })}
+            </span>
+          )}
         </div>
+        <span className="cc-action-card__plan-summary" title={summary}>
+          {summary}
+        </span>
+        {typeof metadata.discovered_from_task_id === 'string' && (
+          <span className="cc-action-card__detail">
+            {translateUi('Follow-up work. Applying this proposal does not change the current run.')}
+          </span>
+        )}
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-action-card__view-btn"
+          onClick={() => navigate(`/tasks/${todoId}`)}
+        >
+          {translateUi('Open task')}
+        </button>
 
         {isReviewable && plan ? (
           <PlanReviewDiff

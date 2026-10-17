@@ -13,6 +13,11 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.review import ReviewItemResponse
+from services.automation.job_provenance import (
+    AUTO_APPROVED_NOTE,
+    offers_skip_review,
+    scheduled_job_for_task,
+)
 from services.review import agent_review_handoff_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -216,6 +221,22 @@ async def build_review_response(
                 "run_status": run.status,
                 "approval_impact": approval_impact.model_dump(mode="json"),
             }
+            job = await scheduled_job_for_task(db, task)
+            if job is not None:
+                # The card offers "don't ask next time" right where the result
+                # is -- but only for a result that could not have changed
+                # anything, and only once two results in a row were approved
+                # untouched. Today lists the results that skipped the queue.
+                metadata["automation"] = {
+                    "scheduled_job_id": job.id,
+                    "title": job.title,
+                    "auto_approve_low_risk": bool(job.auto_approve_low_risk),
+                    "offer_skip_review": (
+                        item.risk_level == ReviewRiskLevel.LOW
+                        and await offers_skip_review(db, job)
+                    ),
+                    "auto_approved": item.review_note == AUTO_APPROVED_NOTE,
+                }
     elif item.subject_type == ReviewSubjectType.DATA_SOURCE_WRITE:
         from services.data_sources import service as data_source_service
 
