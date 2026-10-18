@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,12 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -31,7 +25,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,25 +33,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.RegisterPrimaryAction
 import com.clawchat.android.core.ui.TaskCreateSheet
-import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.localizedErrorMessage
 import com.clawchat.android.core.ui.theme.clawSemanticColors
 
@@ -79,7 +75,6 @@ fun HomeScreen(
     onOpenProject: (String) -> Unit = {},
     onOpenAllProjects: () -> Unit = {},
     onOpenChat: () -> Unit = {},
-    onOpenDevices: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
@@ -113,7 +108,6 @@ fun HomeScreen(
         onOpenProject = onOpenProject,
         onOpenAllProjects = onOpenAllProjects,
         onOpenChat = onOpenChat,
-        onOpenDevices = onOpenDevices,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
     )
@@ -130,7 +124,6 @@ fun HomeScreen(
 }
 
 /** The screen for one state, without its view model; [HomeScreen] wires it up. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeContent(
     state: HomeUiState,
@@ -145,59 +138,52 @@ internal fun HomeContent(
     onOpenProject: (String) -> Unit,
     onOpenAllProjects: () -> Unit,
     onOpenChat: () -> Unit,
-    onOpenDevices: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
 ) {
     val semantic = clawSemanticColors()
     val grey = MaterialTheme.colorScheme.onSurfaceVariant
+    // Chat and Settings sit a step back from the places above them.
+    val quiet = lerp(MaterialTheme.colorScheme.onSurface, grey, 0.5f)
+    val amber = MaterialTheme.colorScheme.tertiary
     val shownProjects = state.projects.take(HomeViewModel.PROJECT_ROWS)
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        // The whole screen is the sidebar of the desktop app.
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.home_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                colors = ClawTopBarColors(),
-            )
-        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
             // Room under the last row for the + button.
-            contentPadding = PaddingValues(bottom = 88.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 90.dp),
         ) {
             item { SearchField(onClick = onOpenSearch) }
             if (showServerFeatures) {
                 item {
                     HomeRow(
-                        icon = ClawIcons.Inbox,
-                        tint = MaterialTheme.colorScheme.primary,
+                        icon = HomeIcons.Inbox,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         label = stringResource(R.string.home_inbox),
                         onClick = onOpenInbox,
+                        trailing = countOrNull(state.inboxCount),
                     )
                 }
             }
             item {
                 HomeRow(
-                    icon = Icons.Default.Star,
+                    icon = HomeIcons.Star,
                     tint = semantic.today,
                     label = stringResource(R.string.home_today),
                     onClick = onOpenToday,
+                    trailing = countOrNull(state.todayCount),
                 )
             }
             item {
                 HomeRow(
-                    icon = ClawIcons.Today,
+                    icon = HomeIcons.Calendar,
                     tint = semantic.deadline,
                     label = stringResource(R.string.home_schedule),
                     onClick = onOpenSchedule,
@@ -205,31 +191,39 @@ internal fun HomeContent(
             }
             item {
                 HomeRow(
-                    icon = ClawIcons.Checklist,
+                    icon = HomeIcons.List,
                     tint = semantic.tasks,
                     label = stringResource(R.string.home_tasks),
                     onClick = onOpenTasks,
+                    trailing = countOrNull(state.taskCount),
                 )
             }
             if (showServerFeatures) {
                 item {
+                    // Quiet unless something waits: no "0" when nothing does.
                     val busy = state.checkCount > 0 || state.runningCount > 0
                     HomeRow(
-                        icon = ClawIcons.Schedule,
-                        tint = grey,
+                        icon = HomeIcons.Clock,
+                        tint = amber,
                         label = stringResource(R.string.home_progress),
                         onClick = onOpenProgress,
-                    ) {
-                        Text(
-                            text = if (busy) {
-                                stringResource(R.string.home_progress_counts, state.checkCount, state.runningCount)
-                            } else {
-                                "0"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (busy) semantic.needsInput else grey,
-                        )
-                    }
+                        trailing = if (busy) {
+                            {
+                                Text(
+                                    text = stringResource(
+                                        R.string.home_progress_counts,
+                                        state.checkCount,
+                                        state.runningCount,
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.5.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = amber,
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    )
                 }
                 if (shownProjects.isNotEmpty()) {
                     item { SectionHeader(stringResource(R.string.home_projects)) }
@@ -244,39 +238,41 @@ internal fun HomeContent(
                                 label = stringResource(R.string.home_projects_all),
                                 labelColor = MaterialTheme.colorScheme.primary,
                                 onClick = onOpenAllProjects,
+                                minHeight = 46.dp,
+                                fontSize = 15.5.sp,
                             )
                         }
                     }
                 }
+                item { Spacer(Modifier.height(14.dp)) }
                 item {
                     HomeRow(
-                        icon = ClawIcons.Chat,
-                        tint = grey,
+                        icon = HomeIcons.Chat,
+                        tint = quiet,
                         label = stringResource(R.string.home_chat),
+                        labelColor = quiet,
                         onClick = onOpenChat,
-                    )
-                }
-                item {
-                    HomeRow(
-                        icon = ClawIcons.PhoneAndroid,
-                        tint = grey,
-                        label = stringResource(R.string.home_devices),
-                        onClick = onOpenDevices,
+                        minHeight = 46.dp,
+                        fontSize = 15.sp,
+                        iconSize = 19.dp,
                     )
                 }
             }
             item {
                 HomeRow(
-                    icon = Icons.Default.Settings,
-                    tint = grey,
+                    icon = HomeIcons.Settings,
+                    tint = quiet,
                     label = stringResource(R.string.home_settings),
+                    labelColor = quiet,
                     onClick = onOpenSettings,
-                    divider = false,
+                    minHeight = 46.dp,
+                    fontSize = 15.sp,
+                    iconSize = 19.dp,
                 ) {
                     when {
                         isLocalOnly || !showServerFeatures -> Text(
                             text = stringResource(R.string.home_this_device),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                             color = grey,
                         )
                         else -> ConnectionState(
@@ -291,6 +287,20 @@ internal fun HomeContent(
     }
 }
 
+/** A grey number beside a row, or nothing when there is nothing to count. */
+private fun countOrNull(count: Int): (@Composable () -> Unit)? =
+    if (count <= 0) {
+        null
+    } else {
+        {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
 /** Looks like a search box; the real field lives on the search screen. */
 @Composable
 private fun SearchField(onClick: () -> Unit) {
@@ -298,9 +308,9 @@ private fun SearchField(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+            .padding(start = 4.dp, end = 4.dp, bottom = 14.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
             modifier = Modifier
@@ -309,23 +319,24 @@ private fun SearchField(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Default.Search,
+                HomeIcons.Search,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.home_search),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
-private val RowIconSize = 24.dp
-private val RowIconGap = 16.dp
+private val RowIconSlot = 20.dp
+private val RowIconGap = 14.dp
+private val RowShape = RoundedCornerShape(10.dp)
 
 @Composable
 private fun HomeRow(
@@ -334,52 +345,45 @@ private fun HomeRow(
     label: String,
     onClick: () -> Unit,
     labelColor: Color = MaterialTheme.colorScheme.onSurface,
-    divider: Boolean = true,
+    minHeight: Dp = 48.dp,
+    fontSize: TextUnit = 16.sp,
+    iconSize: Dp = RowIconSlot,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight)
+            .clip(RowShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Every icon sits in the same slot, so the labels line up.
+        Box(modifier = Modifier.size(RowIconSlot), contentAlignment = Alignment.Center) {
             if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(RowIconSize),
+                    modifier = Modifier.size(iconSize),
                     tint = tint,
                 )
-            } else {
-                Spacer(Modifier.width(RowIconSize))
-            }
-            Spacer(Modifier.width(RowIconGap))
-            Text(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = labelColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (trailing != null) {
-                Spacer(Modifier.width(12.dp))
-                trailing()
             }
         }
-        if (divider) RowDivider()
+        Spacer(Modifier.width(RowIconGap))
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = fontSize),
+            color = labelColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(12.dp))
+            trailing()
+        }
     }
-}
-
-@Composable
-private fun RowDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 16.dp + RowIconSize + RowIconGap),
-        color = MaterialTheme.colorScheme.outlineVariant,
-    )
 }
 
 @Composable
@@ -388,8 +392,9 @@ private fun SectionHeader(title: String) {
         text = title,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
-        style = MaterialTheme.typography.labelLarge,
+            .padding(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 4.dp),
+        style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.5.sp),
+        fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
@@ -397,53 +402,48 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun ProjectRow(project: HomeProject, onClick: () -> Unit) {
     val progressDescription = stringResource(R.string.home_cd_project_progress, project.done, project.total)
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Sits where the row icon would, so titles line up with the rows above.
-            Box(modifier = Modifier.size(RowIconSize), contentAlignment = Alignment.Center) {
-                ProgressRing(
-                    fraction = project.fraction,
-                    modifier = Modifier
-                        .size(14.dp)
-                        .semantics { contentDescription = progressDescription },
-                )
-            }
-            Spacer(Modifier.width(RowIconGap))
-            Text(
-                text = project.title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 46.dp)
+            .clip(RowShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(RowIconSlot), contentAlignment = Alignment.Center) {
+            ProgressPie(
+                fraction = project.fraction,
+                modifier = Modifier
+                    .size(18.dp)
+                    .semantics { contentDescription = progressDescription },
             )
         }
-        RowDivider()
+        Spacer(Modifier.width(RowIconGap))
+        Text(
+            text = project.title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.5.sp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
-/** A grey track with a blue arc for the share of tasks that are done. */
+/** A blue circle filled like a pie for the share of tasks that are done, as on the desktop sidebar. */
 @Composable
-private fun ProgressRing(fraction: Float, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.outlineVariant
+private fun ProgressPie(fraction: Float, modifier: Modifier = Modifier) {
     val fill = MaterialTheme.colorScheme.primary
     Canvas(modifier = modifier) {
-        val stroke = Stroke(width = 2.5.dp.toPx())
+        val stroke = Stroke(width = 2.dp.toPx())
         val inset = stroke.width / 2
-        val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
         drawArc(
-            color = track,
+            color = fill,
             startAngle = 0f,
             sweepAngle = 360f,
             useCenter = false,
             topLeft = Offset(inset, inset),
-            size = arcSize,
+            size = Size(size.width - stroke.width, size.height - stroke.width),
             style = stroke,
         )
         if (fraction > 0f) {
@@ -451,10 +451,7 @@ private fun ProgressRing(fraction: Float, modifier: Modifier = Modifier) {
                 color = fill,
                 startAngle = -90f,
                 sweepAngle = 360f * fraction,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = stroke,
+                useCenter = true,
             )
         }
     }
@@ -465,13 +462,13 @@ private fun ConnectionState(connected: Boolean, connectedColor: Color, grey: Col
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(7.dp)
                 .background(if (connected) connectedColor else grey, CircleShape),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text = stringResource(if (connected) R.string.home_connected else R.string.home_disconnected),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
             color = grey,
         )
     }

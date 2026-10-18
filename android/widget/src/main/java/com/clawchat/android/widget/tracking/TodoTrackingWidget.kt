@@ -8,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.datastore.preferences.core.Preferences
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -48,6 +47,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetAppearance
+import com.clawchat.android.widget.common.WidgetColors
 import com.clawchat.android.widget.common.WidgetSize
 import com.clawchat.android.widget.common.WidgetState
 import com.clawchat.android.widget.common.widgetBackground
@@ -134,7 +134,7 @@ internal fun openTodosQuery(): Map<String, String> = mapOf(
 )
 
 @Composable
-private fun TodoTrackingContent(
+internal fun TodoTrackingContent(
     state: WidgetState<TrackingWidgetData>,
     contentMode: WidgetContentMode,
     horizonDays: Int,
@@ -147,19 +147,16 @@ private fun TodoTrackingContent(
     val size = LocalSize.current
     val isLoggedIn = state !is WidgetState.NotLoggedIn
     val isCompactHeight = size.height <= WidgetSize.Height2
-    val quickAddIntent = QuickAddActivity.createIntent(context)
+    // Two cells by two: a tile with only its title, as in the design.
+    val isTile = isCompactHeight && size.width < WidgetSize.Width4
     val count = when (val data = (state as? WidgetState.Success)?.data) {
-        is TodoWidgetUiModel -> data.itemCount
+        is TodoWidgetUiModel -> data.itemCount.takeIf { !data.isEmpty }
         is NoteWidgetUiModel -> data.items.size
         null -> null
     }
-    val titleSize = if (size.width >= WidgetSize.Width4) 16.sp else 14.sp
-    val headerHeight = if (isCompactHeight) 40.dp else 44.dp
-    val showAddAction = isLoggedIn && !isCompactHeight
-    // What is left for the list once the header, the error line and the
-    // add action have their share.
-    val listHeight = size.height - headerHeight -
-        (if (showAddAction) AddActionHeight else 0.dp) -
+    val headerHeight = if (isTile) 36.dp else 44.dp
+    // What is left for the list once the header and the error line have their share.
+    val listHeight = size.height - headerHeight - 12.dp -
         (if (completionFailed) 18.dp else 0.dp)
 
     // Any tap that lands on nothing more specific opens the app: the blank
@@ -168,53 +165,53 @@ private fun TodoTrackingContent(
         modifier = GlanceModifier
             .fillMaxSize()
             .widgetBackground(backgroundOpacity)
+            .padding(top = 4.dp, bottom = 8.dp)
             .clickable(actionStartActivityByComponent(mainActivity)),
     ) {
-        Row(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .height(headerHeight)
-                .padding(start = 14.dp, end = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            WidgetContentMode.entries.forEachIndexed { index, mode ->
-                if (index > 0) Spacer(GlanceModifier.width(12.dp))
-                HeaderTab(
-                    mode = mode,
-                    active = mode == contentMode,
-                    count = count.takeIf { mode == contentMode },
-                    fontSize = titleSize,
-                )
-            }
-            Spacer(GlanceModifier.defaultWeight())
-            if (isLoggedIn && isCompactHeight) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_add),
-                    contentDescription = context.getString(R.string.widget_add_task),
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-                    modifier = GlanceModifier
-                        .size(32.dp)
-                        .padding(5.dp)
-                        .clickable(actionStartActivityByIntent(quickAddIntent)),
-                )
-            }
-            if (isLoggedIn && (!isCompactHeight || size.width >= WidgetSize.Width4)) {
-                Image(
-                    provider = ImageProvider(R.drawable.ic_widget_refresh),
-                    contentDescription = context.getString(R.string.widget_refresh),
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant),
-                    modifier = GlanceModifier
-                        .size(32.dp)
-                        .padding(7.dp)
-                        .clickable(actionRunCallback<RefreshTodosAction>()),
-                )
+        if (isTile) {
+            TileHeader(contentMode, headerHeight)
+        } else {
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(headerHeight)
+                    .padding(start = 14.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WidgetContentMode.entries.forEachIndexed { index, mode ->
+                    if (index > 0) Spacer(GlanceModifier.width(12.dp))
+                    HeaderTab(
+                        mode = mode,
+                        active = mode == contentMode,
+                        count = count.takeIf { mode == contentMode },
+                    )
+                }
+                Spacer(GlanceModifier.defaultWeight())
+                if (isLoggedIn) {
+                    HeaderIcon(
+                        icon = R.drawable.ic_widget_add,
+                        description = context.getString(R.string.widget_add_task),
+                        tint = WidgetColors.Ink2,
+                        action = actionStartActivityByIntent(QuickAddActivity.createIntent(context)),
+                    )
+                    HeaderIcon(
+                        icon = R.drawable.ic_widget_refresh,
+                        description = context.getString(R.string.widget_refresh),
+                        tint = WidgetColors.Ink3,
+                        action = actionRunCallback<RefreshTodosAction>(),
+                    )
+                }
             }
         }
 
         if (completionFailed) {
-            Text(context.getString(R.string.widget_complete_failed),
-                style = TextStyle(color = GlanceTheme.colors.error, fontSize = 12.sp),
-                modifier = GlanceModifier.padding(horizontal = 14.dp).clickable(actionStartActivityByComponent(mainActivity)))
+            Text(
+                context.getString(R.string.widget_complete_failed),
+                style = TextStyle(color = WidgetColors.Red, fontSize = 12.sp),
+                modifier = GlanceModifier
+                    .padding(horizontal = 14.dp)
+                    .clickable(actionStartActivityByComponent(mainActivity)),
+            )
         }
         when (state) {
             is WidgetState.NotLoggedIn -> CenterMessage(
@@ -251,15 +248,12 @@ private fun TodoTrackingContent(
                 is TodoWidgetUiModel -> if (data.isEmpty) {
                     // Saying why the list is empty, and what comes next, is
                     // what keeps an empty runway from reading as a broken widget.
-                    CenterMessage(
-                        data.nextDeadline?.let {
-                            context.getString(R.string.widget_no_deadlines_within, horizonDays) +
-                                "\n" + nextDeadlineText(context, it)
-                        } ?: context.getString(R.string.widget_empty),
-                        GlanceModifier
+                    EmptyRunway(
+                        model = data,
+                        horizonDays = horizonDays,
+                        modifier = GlanceModifier
                             .defaultWeight()
                             .clickable(actionStartActivityByComponent(mainActivity)),
-                        maxLines = 3,
                     )
                 } else if (workspaceKey == null) {
                     CenterMessage(
@@ -272,17 +266,57 @@ private fun TodoTrackingContent(
                         horizonDays = horizonDays,
                         mainActivity = mainActivity,
                         workspaceKey = workspaceKey,
-                        compact = isCompactHeight,
+                        compact = isTile,
                         availableHeight = listHeight,
                         modifier = GlanceModifier.defaultWeight(),
                     )
                 }
             }
         }
+    }
+}
 
-        if (showAddAction) {
-            AddTaskAction()
-        }
+/** The tile's only heading: the tab it shows, small and bold. */
+@Composable
+private fun TileHeader(mode: WidgetContentMode, height: Dp) {
+    val context = LocalContext.current
+    Box(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(height)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = context.getString(
+                when (mode) {
+                    WidgetContentMode.TASKS -> R.string.widget_tasks_title
+                    WidgetContentMode.NOTES -> R.string.widget_notes_title
+                },
+            ),
+            style = TextStyle(color = WidgetColors.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun HeaderIcon(
+    icon: Int,
+    description: String,
+    tint: androidx.glance.unit.ColorProvider,
+    action: androidx.glance.action.Action,
+) {
+    Box(
+        modifier = GlanceModifier.size(36.dp).clickable(action),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            provider = ImageProvider(icon),
+            contentDescription = description,
+            colorFilter = ColorFilter.tint(tint),
+            modifier = GlanceModifier.size(20.dp),
+        )
     }
 }
 
@@ -296,7 +330,6 @@ private fun HeaderTab(
     mode: WidgetContentMode,
     active: Boolean,
     count: Int?,
-    fontSize: TextUnit,
 ) {
     val context = LocalContext.current
     val (title, titleWithCount) = when (mode) {
@@ -307,8 +340,8 @@ private fun HeaderTab(
         text = if (count == null) context.getString(title) else context.getString(titleWithCount, count),
         style = TextStyle(
             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-            color = if (active) GlanceTheme.colors.onSurface else GlanceTheme.colors.onSurfaceVariant,
-            fontSize = fontSize,
+            color = if (active) WidgetColors.Ink else WidgetColors.Ink3,
+            fontSize = 15.sp,
         ),
         maxLines = 1,
         modifier = GlanceModifier.clickable(
@@ -317,6 +350,34 @@ private fun HeaderTab(
             ),
         ),
     )
+}
+
+/**
+ * No deadline inside the horizon: say so in grey, then name the next one,
+ * left-aligned under the title as the design's small tile does.
+ */
+@Composable
+private fun EmptyRunway(model: TodoWidgetUiModel, horizonDays: Int, modifier: GlanceModifier) {
+    val context = LocalContext.current
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+        Text(
+            text = if (model.nextDeadline != null) {
+                context.getString(R.string.widget_no_deadlines_within, horizonDays)
+            } else {
+                context.getString(R.string.widget_empty)
+            },
+            style = TextStyle(color = WidgetColors.Ink3, fontSize = 12.sp),
+            maxLines = 2,
+        )
+        Spacer(GlanceModifier.defaultWeight())
+        model.nextDeadline?.let { next ->
+            Text(
+                text = nextDeadlineText(context, next),
+                style = TextStyle(color = WidgetColors.Ink2, fontSize = 12.sp),
+                maxLines = 2,
+            )
+        }
+    }
 }
 
 @Composable
@@ -362,7 +423,6 @@ private fun TodoList(
 private val TodoRowHeight = 42.dp
 private val NoteRowHeight = 40.dp
 private val ListNoteHeight = 30.dp
-private val AddActionHeight = 42.dp
 private const val MaxColumnChildren = 10
 
 /** One row of a widget list, with the fixed height that decides whether the list fits. */
@@ -397,23 +457,20 @@ private fun WidgetList(entries: List<ListEntry>, availableHeight: Dp, modifier: 
     }
 }
 
+/** A grey line between groups, sitting on the rows below it. */
 @Composable
 private fun ListNote(text: String, mainActivity: ComponentName) {
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(ListNoteHeight)
-            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
+            .padding(start = 8.dp, end = 8.dp, bottom = 4.dp)
             .clickable(actionStartActivityByComponent(mainActivity)),
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = Alignment.BottomStart,
     ) {
         Text(
             text = text,
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            ),
+            style = TextStyle(color = WidgetColors.Ink3, fontSize = 12.sp),
             maxLines = 1,
         )
     }
@@ -448,25 +505,19 @@ private fun TodoRow(
                 ),
             contentAlignment = Alignment.Center,
         ) {
+            // A quiet grey ring: the runway and the D-label carry the urgency.
             Image(
-                provider = ImageProvider(R.drawable.ic_widget_circle),
+                provider = ImageProvider(R.drawable.ic_widget_check_ring),
                 contentDescription = context.getString(R.string.widget_mark_done, todo.title),
-                colorFilter = ColorFilter.tint(
-                    if (todo.isOverdue) GlanceTheme.colors.error
-                    else GlanceTheme.colors.primary
-                ),
-                modifier = GlanceModifier.size(22.dp),
+                colorFilter = ColorFilter.tint(WidgetColors.Ink3),
+                modifier = GlanceModifier.size(18.dp),
             )
         }
 
         Text(
             text = todo.title,
             modifier = GlanceModifier.defaultWeight(),
-            style = TextStyle(
-                color = if (todo.isOverdue) GlanceTheme.colors.error
-                else GlanceTheme.colors.onSurface,
-                fontSize = 14.sp,
-            ),
+            style = TextStyle(color = WidgetColors.Ink, fontSize = 14.sp),
             maxLines = 1,
         )
 
@@ -482,8 +533,7 @@ private fun TodoRow(
             Text(
                 text = label,
                 style = TextStyle(
-                    color = if (todo.isOverdue) GlanceTheme.colors.error
-                    else GlanceTheme.colors.onSurfaceVariant,
+                    color = if (todo.isOverdue) WidgetColors.Red else WidgetColors.Ink3,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 ),
@@ -508,7 +558,7 @@ private fun RunwayBar(fraction: Float, overdue: Boolean) {
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .height(3.dp)
-                .background(GlanceTheme.colors.surfaceVariant),
+                .background(WidgetColors.Raised),
             content = {},
         )
         if (filled.value > 0f) {
@@ -516,10 +566,7 @@ private fun RunwayBar(fraction: Float, overdue: Boolean) {
                 modifier = GlanceModifier
                     .width(filled)
                     .height(3.dp)
-                    .background(
-                        if (overdue) GlanceTheme.colors.error
-                        else GlanceTheme.colors.primary
-                    ),
+                    .background(if (overdue) WidgetColors.Red else WidgetColors.Blue),
                 content = {},
             )
         }
@@ -552,7 +599,7 @@ private fun NoteRow(note: NoteWidgetItem, mainActivity: ComponentName) {
     ) {
         Text(
             text = note.headline,
-            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp),
+            style = TextStyle(color = WidgetColors.Ink, fontSize = 14.sp),
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight(),
         )
@@ -565,7 +612,7 @@ private fun NoteRow(note: NoteWidgetItem, mainActivity: ComponentName) {
                     shortDate(context, day)
                 },
                 style = TextStyle(
-                    color = GlanceTheme.colors.onSurfaceVariant,
+                    color = WidgetColors.Ink3,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 ),
@@ -595,36 +642,6 @@ private fun nextDeadlineText(context: Context, next: NextDeadline): String =
     )
 
 @Composable
-private fun AddTaskAction() {
-    val context = LocalContext.current
-    val quickAddIntent = QuickAddActivity.createIntent(context)
-    Row(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .height(AddActionHeight)
-            .padding(horizontal = 12.dp)
-            .clickable(actionStartActivityByIntent(quickAddIntent)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            provider = ImageProvider(R.drawable.ic_widget_add),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-            modifier = GlanceModifier.size(22.dp),
-        )
-        Spacer(GlanceModifier.width(10.dp))
-        Text(
-            text = context.getString(R.string.widget_add_task),
-            style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-            ),
-        )
-    }
-}
-
-@Composable
 private fun CenterMessage(
     text: String,
     modifier: GlanceModifier,
@@ -639,7 +656,7 @@ private fun CenterMessage(
         Text(
             text = text,
             style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
+                color = WidgetColors.Ink3,
                 fontSize = 13.sp,
             ),
             maxLines = maxLines,

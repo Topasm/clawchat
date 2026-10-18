@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { isLocalHostMode, itemStorageLocation, workspaceAddressLabel } from '../workspaceLocation';
+import { afterEach, describe, expect, it } from 'vitest';
+import { changeAppLanguage } from '../../i18n';
+import type { WorkspaceProfile } from '../../stores/useWorkspaceStore';
+import {
+  activeWorkspaceName,
+  isLocalHostMode,
+  itemStorageLocation,
+  workspaceAddressLabel,
+} from '../workspaceLocation';
 
 describe('workspaceAddressLabel', () => {
   it('shows the host and port a workspace answers on', () => {
@@ -46,5 +53,28 @@ describe('itemStorageLocation', () => {
       kind: 'workspace',
       workspaceName: 'Home',
     });
+  });
+});
+
+describe('activeWorkspaceName', () => {
+  const profile = (id: string, kind: WorkspaceProfile['kind'], name: string) =>
+    ({ id, kind, name }) as WorkspaceProfile;
+  const profiles = [
+    profile('local', 'local', 'This device'),
+    profile('remote-1', 'remote', 'Home'),
+  ];
+
+  afterEach(async () => {
+    await changeAppLanguage('en');
+  });
+
+  it('reads the private workspace in the app language', async () => {
+    await changeAppLanguage('ko');
+    expect(activeWorkspaceName({ profiles, activeWorkspaceId: 'local' })).toBe('이 장치');
+  });
+
+  it("keeps a server's own name", async () => {
+    await changeAppLanguage('ko');
+    expect(activeWorkspaceName({ profiles, activeWorkspaceId: 'remote-1' })).toBe('Home');
   });
 });

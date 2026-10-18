@@ -35,6 +35,7 @@ import { queryKeys } from './queryKeys';
 import { getTaskStatusLabel } from '../../utils/taskStatus';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 import { translateUi } from '../../i18n';
+import { activeWorkspaceName } from '../../utils/workspaceLocation';
 import { deferredDeleteQueue } from '../../services/deferredDeleteQueue';
 import { getOfflineQueueScope } from '../../services/offlineQueue';
 
@@ -84,12 +85,8 @@ export function useEventsQuery() {
 // ---------------------------------------------------------------------------
 // Results of creates that were queued offline instead of reaching the server.
 const queuedCreateResults = new WeakSet<object>();
-function activeWorkspaceName(): string {
-  const workspace = useWorkspaceStore.getState();
-  return (
-    workspace.profiles.find((profile) => profile.id === workspace.activeWorkspaceId)?.name ??
-    translateUi('This device')
-  );
+function currentWorkspaceName(): string {
+  return activeWorkspaceName(useWorkspaceStore.getState());
 }
 export function useCreateTodo() {
   const queryClient = useQueryClient();
@@ -146,7 +143,7 @@ export function useCreateTodo() {
           translateUi(
             'Saved on this device. It will sync to {{workspace}} when you are back online.',
             {
-              workspace: activeWorkspaceName(),
+              workspace: currentWorkspaceName(),
             },
           ),
         );

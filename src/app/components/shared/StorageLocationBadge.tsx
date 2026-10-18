@@ -1,6 +1,6 @@
 import { translateUi } from '../../i18n';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { itemStorageLocation } from '../../utils/workspaceLocation';
+import { activeWorkspaceName, itemStorageLocation } from '../../utils/workspaceLocation';
 
 interface StorageLocationBadgeProps {
   item: { id: string };
@@ -11,19 +11,11 @@ interface StorageLocationBadgeProps {
   variant?: 'chip' | 'line';
 }
 
-function useActiveWorkspaceName(): string {
-  return useWorkspaceStore(
-    (state) =>
-      state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name ??
-      translateUi('This device'),
-  );
-}
-
 export default function StorageLocationBadge({
   item,
   variant = 'chip',
 }: StorageLocationBadgeProps) {
-  const workspaceName = useActiveWorkspaceName();
+  const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const location = itemStorageLocation(item, workspaceName);
   const pendingText = translateUi('Only on this device · waiting to sync to {{workspace}}', {
     workspace: location.workspaceName,

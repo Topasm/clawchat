@@ -197,7 +197,6 @@ fun ClawChatNavGraph(
                     onOpenProject = { projectId -> open(NavRoute.Projects.forProject(projectId)) },
                     onOpenAllProjects = { open(NavRoute.Projects.route) },
                     onOpenChat = { open(NavRoute.Chat.route) },
-                    onOpenDevices = { open(NavRoute.Devices.route) },
                     onOpenSettings = { open(NavRoute.Settings.route) },
                     onOpenSearch = navigateToSearch,
                 )
@@ -423,6 +422,7 @@ fun ClawChatNavGraph(
                         }
                     },
                     onSetupServer = openConnectionSetup,
+                    onOpenDevices = { open(NavRoute.Devices.route) },
                     pushStatus = pushStatus,
                 )
             }

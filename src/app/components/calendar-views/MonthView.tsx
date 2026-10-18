@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { EventResponse, TodoResponse } from '../../types/api';
 import {
-  DAY_NAMES,
+  dayNames,
   MAX_VISIBLE_PILLS,
   getMonthGrid,
   toDateKey,
@@ -36,7 +36,7 @@ export default function MonthView({
     <div className="cc-calendar__month">
       {/* Day-of-week headers */}
       <div className="cc-calendar__dow-row">
-        {DAY_NAMES.map((name) => (
+        {dayNames().map((name) => (
           <div key={name} className="cc-calendar__dow">
             {name}
           </div>

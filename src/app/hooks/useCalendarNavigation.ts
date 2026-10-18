@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { MONTH_NAMES, startOfWeek, toDateKey } from '../utils/calendarUtils';
+import { formatMonthLabel, formatWeekLabel, startOfWeek, toDateKey } from '../utils/calendarUtils';
 
 export type ViewMode = 'month' | 'week';
 
@@ -67,17 +67,7 @@ export default function useCalendarNavigation(initialView: ViewMode = 'month') {
 
   // Header label
   const headerLabel =
-    view === 'month'
-      ? `${MONTH_NAMES[month]} ${year}`
-      : (() => {
-          const ws = startOfWeek(currentDate);
-          const we = new Date(ws);
-          we.setDate(we.getDate() + 6);
-          if (ws.getMonth() === we.getMonth()) {
-            return `${MONTH_NAMES[ws.getMonth()]} ${ws.getDate()} - ${we.getDate()}, ${ws.getFullYear()}`;
-          }
-          return `${MONTH_NAMES[ws.getMonth()].slice(0, 3)} ${ws.getDate()} - ${MONTH_NAMES[we.getMonth()].slice(0, 3)} ${we.getDate()}, ${we.getFullYear()}`;
-        })();
+    view === 'month' ? formatMonthLabel(year, month) : formatWeekLabel(startOfWeek(currentDate));
 
   return {
     today,

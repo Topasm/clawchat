@@ -24,6 +24,8 @@
     <string name="settings_switching_workspace">Switching…</string>
     <string name="settings_server">Server</string>
     <string name="settings_server_description">Connection and AI status.</string>
+    <string name="settings_device_folders">Device folders</string>
+    <string name="settings_device_folders_description">Folders a desktop shares with this workspace.</string>
     <string name="settings_paired_devices">Paired devices</string>
     <string name="settings_paired_devices_description">Active mobile connections.</string>
     <string name="settings_account">Account</string>

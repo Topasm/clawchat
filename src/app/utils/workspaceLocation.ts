@@ -1,5 +1,19 @@
+import { translateUi } from '../i18n';
 import type { ServerConfig } from '../platform';
-import { LOCAL_WORKSPACE_ID } from '../stores/useWorkspaceStore';
+import { LOCAL_WORKSPACE_ID, type WorkspaceProfile } from '../stores/useWorkspaceStore';
+
+/**
+ * The open workspace's name as screens print it. The private workspace on
+ * this device is stored as "This device" and read in the reader's language.
+ */
+export function activeWorkspaceName(state: {
+  profiles: WorkspaceProfile[];
+  activeWorkspaceId: string;
+}): string {
+  const profile = state.profiles.find((item) => item.id === state.activeWorkspaceId);
+  if (!profile || profile.kind === 'local') return translateUi('This device');
+  return profile.name;
+}
 
 /**
  * The desktop serves its own workspace: host mode (or a local server kept
