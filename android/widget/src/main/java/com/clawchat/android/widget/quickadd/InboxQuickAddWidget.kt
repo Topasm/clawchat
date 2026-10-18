@@ -13,6 +13,7 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.currentState
 import androidx.glance.action.actionStartActivity as actionStartActivityByComponent
 import androidx.glance.action.clickable
@@ -23,15 +24,15 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
+import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.clawchat.android.core.data.WorkspaceMode
@@ -40,6 +41,7 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetAppearance
+import com.clawchat.android.widget.common.WidgetColors
 import com.clawchat.android.widget.common.widgetBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
@@ -91,89 +93,83 @@ internal fun cachedInboxCount(todos: List<Todo>): Int =
             todo.inboxState != "none"
     }
 
+/**
+ * Two cells tall, as in the design: "Inbox" in grey over a round field that
+ * opens the quick add. One cell tall, only the field. The count of what is
+ * waiting stays grey beside the label (or at the end of the field).
+ */
 @Composable
-private fun InboxQuickAddContent(
+internal fun InboxQuickAddContent(
     isConfigured: Boolean,
     inboxCount: Int?,
     backgroundOpacity: Float,
 ) {
     val context = LocalContext.current
+    val size = LocalSize.current
     val quickAddIntent = QuickAddActivity.createIntent(context)
     val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
+    val action = if (isConfigured) actionStartActivityByIntent(quickAddIntent) else actionStartActivityByComponent(mainActivity)
+    val waiting = inboxCount?.takeIf { it > 0 }
+    val showLabel = size.height >= TwoRowHeight
 
-    Row(
+    Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .widgetBackground(backgroundOpacity)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = if (showLabel) 12.dp else 6.dp)
+            .clickable(action),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Inbox icon
-        Image(
-            provider = ImageProvider(R.drawable.ic_widget_inbox),
-            contentDescription = context.getString(R.string.widget_inbox),
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-            modifier = GlanceModifier.size(24.dp),
-        )
-
-        Spacer(GlanceModifier.width(8.dp))
-
-        // Fake text field area — tapping opens QuickAddActivity or main app
-        Box(
+        if (showLabel) {
+            Text(
+                text = waiting?.let { context.getString(R.string.widget_inbox_with_count, it) }
+                    ?: context.getString(R.string.widget_inbox),
+                style = TextStyle(color = WidgetColors.Ink3, fontSize = 12.sp),
+                maxLines = 1,
+            )
+            Spacer(GlanceModifier.height(6.dp))
+        }
+        Row(
             modifier = GlanceModifier
-                .defaultWeight()
+                .fillMaxWidth()
                 .then(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        GlanceModifier.cornerRadius(12.dp)
-                            .background(GlanceTheme.colors.surfaceVariant)
+                        GlanceModifier.cornerRadius(20.dp).background(WidgetColors.Raised)
                     } else {
-                        GlanceModifier.background(GlanceTheme.colors.surfaceVariant)
-                    }
+                        GlanceModifier.background(WidgetColors.Raised)
+                    },
                 )
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .clickable(
-                    if (isConfigured) actionStartActivityByIntent(quickAddIntent)
-                    else actionStartActivityByComponent(mainActivity)
-                ),
-            contentAlignment = Alignment.CenterStart,
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clickable(action),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (isConfigured) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_add),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(WidgetColors.Ink2),
+                    modifier = GlanceModifier.size(14.dp),
+                )
+                Spacer(GlanceModifier.width(8.dp))
+            }
             Text(
                 text = context.getString(
-                    if (isConfigured) R.string.widget_add_to_inbox
-                    else R.string.widget_login_required
+                    if (isConfigured) R.string.widget_add_to_inbox else R.string.widget_login_required,
                 ),
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurfaceVariant,
-                    fontSize = 14.sp,
-                ),
+                style = TextStyle(color = WidgetColors.Ink2, fontSize = 13.sp),
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight(),
             )
-        }
-
-        // Inbox count badge
-        if (inboxCount != null && inboxCount > 0) {
-            Spacer(GlanceModifier.width(8.dp))
-            Box(
-                modifier = GlanceModifier
-                    .then(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            GlanceModifier.cornerRadius(12.dp)
-                                .background(GlanceTheme.colors.primary)
-                        } else {
-                            GlanceModifier.background(GlanceTheme.colors.primary)
-                        }
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            if (!showLabel && waiting != null) {
+                Spacer(GlanceModifier.width(8.dp))
                 Text(
-                    text = inboxCount.toString(),
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                    ),
+                    text = waiting.toString(),
+                    style = TextStyle(color = WidgetColors.Ink3, fontSize = 12.sp),
                 )
             }
         }
     }
 }
+
+/** From this height the widget has room for its label above the field. */
+private val TwoRowHeight = 90.dp

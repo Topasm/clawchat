@@ -1,4 +1,5 @@
 plugins {
+    alias(libs.plugins.roborazzi)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
@@ -21,6 +22,10 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -48,4 +53,8 @@ dependencies {
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Widget screenshots (Robolectric + Roborazzi): `./gradlew :widget:recordRoborazziDebug`
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.androidx.test.ext.junit)
 }
