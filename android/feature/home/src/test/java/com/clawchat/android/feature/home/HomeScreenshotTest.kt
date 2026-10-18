@@ -35,6 +35,9 @@ class HomeScreenshotTest {
         "src/test/screenshots/home_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
     private val state = HomeUiState(
+        inboxCount = 2,
+        todayCount = 3,
+        taskCount = 5,
         checkCount = 2,
         runningCount = 1,
         projects = listOf(
@@ -70,7 +73,6 @@ class HomeScreenshotTest {
                         onOpenProject = {},
                         onOpenAllProjects = {},
                         onOpenChat = {},
-                        onOpenDevices = {},
                         onOpenSettings = {},
                         onOpenSearch = {},
                     )

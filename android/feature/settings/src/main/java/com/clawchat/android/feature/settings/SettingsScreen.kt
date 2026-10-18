@@ -81,6 +81,7 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onLoggedOut: () -> Unit = {},
     onSetupServer: () -> Unit = {},
+    onOpenDevices: () -> Unit = {},
     pushStatus: PushStatus = PushStatus.NOT_CONFIGURED,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -195,6 +196,17 @@ fun SettingsScreen(
                             ).show()
                         },
                     )
+                }
+            }
+
+            // Folders a desktop shares with this workspace; Home keeps to the design's rows.
+            if (state.workspaceMode == WorkspaceMode.SERVER) {
+                item {
+                    SettingsSection(
+                        title = stringResource(R.string.settings_device_folders),
+                        subtitle = stringResource(R.string.settings_device_folders_description),
+                        onClick = onOpenDevices,
+                    ) {}
                 }
             }
 

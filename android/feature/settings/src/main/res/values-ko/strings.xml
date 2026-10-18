@@ -24,6 +24,8 @@
     <string name="settings_switching_workspace">전환 중…</string>
     <string name="settings_server">서버</string>
     <string name="settings_server_description">연결 및 AI 상태입니다.</string>
+    <string name="settings_device_folders">기기 폴더</string>
+    <string name="settings_device_folders_description">데스크톱이 이 작업공간에 공개한 폴더입니다.</string>
     <string name="settings_paired_devices">페어링된 기기</string>
     <string name="settings_paired_devices_description">현재 연결된 모바일 기기입니다.</string>
     <string name="settings_account">계정</string>

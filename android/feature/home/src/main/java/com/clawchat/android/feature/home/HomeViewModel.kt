@@ -20,6 +20,9 @@ import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -44,6 +47,12 @@ data class HomeProject(
 }
 
 data class HomeUiState(
+    /** Captures still in the Inbox. */
+    val inboxCount: Int = 0,
+    /** Open tasks due today or overdue. */
+    val todayCount: Int = 0,
+    /** Open tasks, not counting Inbox captures or project roots. */
+    val taskCount: Int = 0,
     /** Pending reviews plus runs waiting for an answer: what Progress asks the user to check. */
     val checkCount: Int = 0,
     /** Runs that are queued, starting or running. */
@@ -61,6 +70,33 @@ internal fun homeCounts(reviews: List<ReviewItem>, runs: List<AgentRun>): Pair<I
     val running = runs.count { it.status.isExecuting }
     return check to running
 }
+
+/** The three numbers beside Inbox, Today and Tasks; the web sidebar counts the same way. */
+internal data class HomeTodoCounts(val inbox: Int, val today: Int, val tasks: Int)
+
+internal fun homeTodoCounts(
+    todos: List<Todo>,
+    today: LocalDate,
+    zone: ZoneId = ZoneId.systemDefault(),
+): HomeTodoCounts {
+    val open = todos.filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS }
+    val (inbox, tasks) = open.partition { it.isInboxCapture }
+    val ownTasks = tasks.filter { it.source != PROJECT_ROOT_SOURCE }
+    return HomeTodoCounts(
+        inbox = inbox.size,
+        today = ownTasks.count { task -> task.dueDate?.let { dueLocalDate(it, zone) }?.let { it <= today } == true },
+        tasks = ownTasks.size,
+    )
+}
+
+/** An open todo the server has not placed yet, or one without project, date or parent when it says nothing. */
+private val Todo.isInboxCapture: Boolean
+    get() = inboxState?.let { it != "none" } ?: (projectId == null && dueDate == null && parentId == null)
+
+/** "2030-03-15" or a timestamp, read as a day where the phone is. */
+private fun dueLocalDate(raw: String, zone: ZoneId): LocalDate? =
+    runCatching { OffsetDateTime.parse(raw).atZoneSameInstant(zone).toLocalDate() }.getOrNull()
+        ?: runCatching { LocalDate.parse(raw.take(10)) }.getOrNull()
 
 /** A project's ring counts its own tasks; the root todo is the project itself and a cancelled task is nobody's work. */
 internal fun homeProjects(projects: List<ProjectPlan>, todos: List<Todo>): List<HomeProject> {
@@ -161,7 +197,11 @@ class HomeViewModel @Inject constructor(
                     }
                     val projects = snapshot.projects.dataOrNull()
                     val todos = snapshot.todos.dataOrNull()?.items
+                    val todoCounts = todos?.let { homeTodoCounts(it, LocalDate.now()) }
                     state.copy(
+                        inboxCount = todoCounts?.inbox ?: state.inboxCount,
+                        todayCount = todoCounts?.today ?: state.todayCount,
+                        taskCount = todoCounts?.tasks ?: state.taskCount,
                         checkCount = check,
                         runningCount = running,
                         projects = if (projects != null && todos != null) homeProjects(projects, todos) else state.projects,
