@@ -11,6 +11,7 @@ import ServerVersionNotice from '../components/shared/ServerVersionNotice';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { activeWorkspaceName } from '../utils/workspaceLocation';
 import { resetWorkspaceConnections } from '../services/workspaceSessionCoordinator';
 import { translateUi, useTranslation } from '../i18n';
 
@@ -28,9 +29,7 @@ export default function ConnectionCenterPage() {
   const logout = useAuthStore((state) => state.logout);
   const addToast = useToastStore((state) => state.addToast);
   const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
-  const activeWorkspaceName = useWorkspaceStore(
-    (state) => state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name,
-  );
+  const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const health = useServerHealth();
   const resetConnections = async () => {
     await resetWorkspaceConnections();
@@ -47,7 +46,7 @@ export default function ConnectionCenterPage() {
     >
       <div className="cc-settings-page">
         {token && (
-          <ServerVersionNotice serverVersion={health?.version} serverName={activeWorkspaceName} />
+          <ServerVersionNotice serverVersion={health?.version} serverName={workspaceName} />
         )}
         <WorkspaceConnectionsSection />
 

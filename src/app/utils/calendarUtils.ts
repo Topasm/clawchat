@@ -1,8 +1,9 @@
 import type { EventResponse, TodoResponse } from '../types/api';
-import { translateUi } from '../i18n';
+import { getAppLanguage, translateUi } from '../i18n';
 import { isTerminalTaskStatus } from './taskStatus';
 
-export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const KO_DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 export const MONTH_NAMES = [
   'January',
   'February',
@@ -35,7 +36,37 @@ export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Weekday names from Sunday, in the app's language ("일", "월" / "Sun", "Mon"). */
+export function dayNames(): string[] {
+  return getAppLanguage() === 'ko' ? KO_DAY_NAMES : DAY_NAMES;
+}
+
+/** "2030년 3월" / "March 2030". */
+export function formatMonthLabel(year: number, month: number): string {
+  if (getAppLanguage() === 'ko') return `${year}년 ${month + 1}월`;
+  return `${MONTH_NAMES[month]} ${year}`;
+}
+
+/** The week from [weekStart]: "2030년 3월 10일 – 16일" / "March 10 - 16, 2030". */
+export function formatWeekLabel(weekStart: Date): string {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  const sameMonth = weekStart.getMonth() === end.getMonth();
+  if (getAppLanguage() === 'ko') {
+    const from = `${weekStart.getFullYear()}년 ${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일`;
+    if (sameMonth) return `${from} – ${end.getDate()}일`;
+    const toYear = end.getFullYear() === weekStart.getFullYear() ? '' : `${end.getFullYear()}년 `;
+    return `${from} – ${toYear}${end.getMonth() + 1}월 ${end.getDate()}일`;
+  }
+  if (sameMonth) {
+    return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getDate()} - ${end.getDate()}, ${weekStart.getFullYear()}`;
+  }
+  return `${MONTH_NAMES[weekStart.getMonth()].slice(0, 3)} ${weekStart.getDate()} - ${MONTH_NAMES[end.getMonth()].slice(0, 3)} ${end.getDate()}, ${end.getFullYear()}`;
+}
+
+/** An hour row's label: "오전 7시" / "7 AM" (written out: newer ICU data says "AM" for Korean). */
 export function formatTimeLabel(hour: number): string {
+  if (getAppLanguage() === 'ko') return `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시`;
   if (hour === 0) return '12 AM';
   if (hour < 12) return `${hour} AM`;
   if (hour === 12) return '12 PM';

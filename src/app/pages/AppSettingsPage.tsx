@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { activeWorkspaceName } from '../utils/workspaceLocation';
 import { useUpdateStore } from '../stores/useUpdateStore';
 export default function AppSettingsPage() {
   const { mode, setMode } = useTheme();
@@ -33,9 +34,7 @@ export default function AppSettingsPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
   const health = useServerHealth();
-  const activeWorkspaceName = useWorkspaceStore(
-    (state) => state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name,
-  );
+  const workspaceName = useWorkspaceStore(activeWorkspaceName);
   return (
     <SettingsShell
       activePane="general"
@@ -219,17 +218,14 @@ export default function AppSettingsPage() {
             </span>
           </SettingsRow>
           {token && health?.version && (
-            <SettingsRow
-              label={activeWorkspaceName ?? translateUi('Server')}
-              sublabel={translateUi('Server version')}
-            >
+            <SettingsRow label={workspaceName} sublabel={translateUi('Server version')}>
               <span className="cc-settings-status cc-settings-status--muted">
                 v{health.version}
               </span>
             </SettingsRow>
           )}
           {token && (
-            <ServerVersionNotice serverVersion={health?.version} serverName={activeWorkspaceName} />
+            <ServerVersionNotice serverVersion={health?.version} serverName={workspaceName} />
           )}
         </SettingsSection>
       </div>

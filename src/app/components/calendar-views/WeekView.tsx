@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { EventResponse, TodoResponse } from '../../types/api';
 import {
-  DAY_NAMES,
+  dayNames,
   WEEK_START_HOUR,
   WEEK_END_HOUR,
   startOfWeek,
@@ -53,7 +53,7 @@ export default function WeekView({
               key={i}
               className={`cc-calendar__week-col-header${isToday ? ' cc-calendar__week-col-header--today' : ''}`}
             >
-              <span className="cc-calendar__week-day-name">{DAY_NAMES[date.getDay()]}</span>
+              <span className="cc-calendar__week-day-name">{dayNames()[date.getDay()]}</span>
               <span
                 className={`cc-calendar__week-day-number${isToday ? ' cc-calendar__week-day-number--today' : ''}`}
               >

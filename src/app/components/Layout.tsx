@@ -60,7 +60,7 @@ import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
 import { useServerHealthStore } from '../stores/useServerHealthStore';
 import { useServerHealthPolling } from '../hooks/useServerHealth';
-import { workspaceAddressLabel } from '../utils/workspaceLocation';
+import { activeWorkspaceName, workspaceAddressLabel } from '../utils/workspaceLocation';
 import { platformApi } from '../platform';
 import ActiveRunsLine from './shared/ActiveRunsLine';
 import WorkerStatusLine from './shared/WorkerStatusLine';
@@ -331,11 +331,7 @@ export default function Layout() {
   useWorkerRunner();
   useDataSourceSharing();
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
-  const activeWorkspaceName = useWorkspaceStore(
-    (state) =>
-      state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name ??
-      'This device',
-  );
+  const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const connectionLabel = isFlushing
     ? t('connection.syncing')
     : t(CONNECTION_LABEL_KEYS[connectionStatus]);
@@ -432,7 +428,7 @@ export default function Layout() {
       <ActiveRunsLine />
       <WorkerStatusLine />
       <WorkspaceMenu
-        workspaceName={activeWorkspaceName}
+        workspaceName={workspaceName}
         connectionStatus={connectionStatus}
         connectionLabel={connectionLabel}
         address={workspaceAddressLabel(serverUrl)}
@@ -601,7 +597,7 @@ export default function Layout() {
                 <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
                   <span className="cc-mobile-status-bar__dot" />
                   <span>
-                    {activeWorkspaceName} ·{' '}
+                    {workspaceName} ·{' '}
                     {isFlushing
                       ? t('connection.syncing')
                       : t(CONNECTION_LABEL_KEYS[connectionStatus])}

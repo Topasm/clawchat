@@ -98,7 +98,12 @@
   overflow-y: auto;
 }
 
-/* The task page's own padding reads well in the pane; the chat fills it. */
+/* The task page gets its padding from the page around it, which the pane
+   doesn't have, so the pane gives it its own; the chat fills it. */
+.cc-detail-pane__body > .cc-detail {
+  padding: var(--cc-space-4) var(--cc-space-5) var(--cc-space-6);
+}
+
 .cc-detail-pane__body > .cc-chat-panel--side {
   flex: 1;
 }
