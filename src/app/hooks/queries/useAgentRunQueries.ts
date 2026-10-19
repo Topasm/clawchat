@@ -69,7 +69,8 @@ export function useActiveRunsQuery() {
     enabled: !!serverUrl,
   });
 }
-export function useAgentRunEventsQuery(runId: string | null) {
+/** A run's event log; [live] rereads it every few seconds while the run works. */
+export function useAgentRunEventsQuery(runId: string | null, live = false) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
     queryKey: queryKeys.runEvents(runId ?? ''),
@@ -78,6 +79,7 @@ export function useAgentRunEventsQuery(runId: string | null) {
       return z.array(AgentRunEventResponseSchema).parse(response.data);
     },
     enabled: !!serverUrl && !!runId,
+    refetchInterval: live ? 3000 : false,
   });
 }
 function invalidateRuns(queryClient: QueryClient) {

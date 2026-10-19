@@ -15,5 +15,7 @@ internal object WidgetColors {
     /** Fields and the runway's empty track. */
     val Raised = ColorProvider(day = Color(0xFFECECEF), night = Color(0xFF2C2C2F))
     val Blue = ColorProvider(day = Color(0xFF3A82F7), night = Color(0xFF4A8DFA))
+    /** Marks drawn on a blue fill. */
+    val OnBlue = ColorProvider(day = Color.White, night = Color.White)
     val Red = ColorProvider(day = Color(0xFFD23B40), night = Color(0xFFF0676B))
 }

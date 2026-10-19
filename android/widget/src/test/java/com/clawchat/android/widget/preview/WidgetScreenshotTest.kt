@@ -20,11 +20,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clawchat.android.widget.common.WidgetState
 import com.clawchat.android.widget.quickadd.InboxQuickAddContent
 import com.clawchat.android.widget.tracking.NextDeadline
+import com.clawchat.android.widget.tracking.NoteWidgetItem
+import com.clawchat.android.widget.tracking.NoteWidgetUiModel
 import com.clawchat.android.widget.tracking.TodoTrackingContent
 import com.clawchat.android.widget.tracking.TodoWidgetItem
 import com.clawchat.android.widget.tracking.TodoWidgetUiModel
 import com.clawchat.android.widget.tracking.WidgetContentMode
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -76,6 +79,40 @@ class WidgetScreenshotTest {
         TodoTrackingContent(
             state = WidgetState.Success(runway),
             contentMode = WidgetContentMode.TASKS,
+            horizonDays = 14,
+            mainActivity = mainActivity,
+            workspaceKey = "ws",
+            backgroundOpacity = 0.96f,
+        )
+    }
+
+    @Test
+    fun justCheckedRow() = shot("tracking_list_checked", DpSize(362.dp, 380.dp)) {
+        TodoTrackingContent(
+            state = WidgetState.Success(runway),
+            contentMode = WidgetContentMode.TASKS,
+            horizonDays = 14,
+            mainActivity = mainActivity,
+            workspaceKey = "ws",
+            backgroundOpacity = 0.96f,
+            completingIds = setOf("t2"),
+        )
+    }
+
+    @Test
+    fun notes() = shot("tracking_notes", DpSize(362.dp, 250.dp)) {
+        val now = Instant.now()
+        TodoTrackingContent(
+            state = WidgetState.Success(
+                NoteWidgetUiModel(
+                    listOf(
+                        NoteWidgetItem("n1", "선택지 만드는 모델 판단하는 모델", LocalDate.now(), now.minusSeconds(20)),
+                        NoteWidgetItem("n2", "커널 최적화 아이디어", LocalDate.now(), now.minusSeconds(8 * 60)),
+                        NoteWidgetItem("n3", "강의 노트 7주차", LocalDate.of(2026, 10, 14), null),
+                    ),
+                ),
+            ),
+            contentMode = WidgetContentMode.NOTES,
             horizonDays = 14,
             mainActivity = mainActivity,
             workspaceKey = "ws",

@@ -29,7 +29,7 @@ export default function StorageLocationBadge({
         title={pendingText}
         aria-label={pendingText}
       >
-        {translateUi('On this device')}
+        {translateUi('Waiting to send')}
       </span>
     );
   }

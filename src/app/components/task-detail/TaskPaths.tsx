@@ -74,6 +74,9 @@ async function openPath(path: TodoPathResponse) {
  * so nothing is typed twice. Taking an uploaded file off the list asks once,
  * since the copy on Home goes with it; a path is only taken off the list.
  */
+/** Resources listed before the rest fold behind "N more". */
+const RESOURCES_SHOWN = 3;
+
 export default function TaskPaths({ taskId }: { taskId: string }) {
   const { data: paths = [] } = useTodoPathsQuery(taskId);
   const { data: attachments = [] } = useAttachmentsQuery(taskId);
@@ -86,6 +89,7 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
   const thisHostId = useWorkerStore((state) => state.hostId);
   const [draft, setDraft] = useState('');
   const [removing, setRemoving] = useState<AttachmentResponse | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const own = paths.filter((path) => !path.inherited);
   const inherited = paths.filter((path) => path.inherited);
 
@@ -118,46 +122,72 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
     }
   };
 
+  // A long list keeps the pane short: the first few, then "N more".
+  const rows = [
+    ...own.map((path) => ({
+      key: `own:${path.id}`,
+      node: (
+        <PathRow
+          key={`own:${path.id}`}
+          path={path}
+          hint={whereHint(path, thisHostId)}
+          onRemove={() => deletePath.mutate(path)}
+        />
+      ),
+    })),
+    ...attachments.map((attachment) => ({
+      key: `file:${attachment.id}`,
+      node: (
+        <li key={`file:${attachment.id}`}>
+          <span className="cc-task-paths__kind">{translateUi('File')}</span>
+          <button
+            type="button"
+            className="cc-task-paths__path"
+            title={attachment.filename}
+            onClick={() => openAttachment(attachment)}
+          >
+            {attachment.filename}
+          </button>
+          <span className="cc-task-paths__size">{formatFileSize(attachment.size_bytes)}</span>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost cc-btn--compact"
+            aria-label={translateUi('Remove {{filename}} from the list', {
+              filename: attachment.filename,
+            })}
+            onClick={() => setRemoving(attachment)}
+          >
+            ×
+          </button>
+        </li>
+      ),
+    })),
+    ...inherited.map((path) => ({
+      key: `inherited:${path.id}`,
+      node: <PathRow key={`inherited:${path.id}`} path={path} hint={whereHint(path, thisHostId)} />,
+    })),
+  ];
+
   return (
     <section className="cc-task-paths" aria-label={translateUi('Resources')}>
-      <div className="cc-exec-panel__section-title">{translateUi('Resources')}</div>
-      {(paths.length > 0 || attachments.length > 0) && (
+      <div className="cc-exec-panel__section-title">
+        {translateUi('Resources')}
+        {rows.length > 0 && <span className="cc-task-paths__count">{rows.length}</span>}
+      </div>
+      {rows.length > 0 && (
         <ul className="cc-task-paths__list">
-          {own.map((path) => (
-            <PathRow
-              key={`own:${path.id}`}
-              path={path}
-              hint={whereHint(path, thisHostId)}
-              onRemove={() => deletePath.mutate(path)}
-            />
-          ))}
-          {attachments.map((attachment) => (
-            <li key={`file:${attachment.id}`}>
-              <span className="cc-task-paths__kind">{translateUi('File')}</span>
+          {(showAll ? rows : rows.slice(0, RESOURCES_SHOWN)).map((row) => row.node)}
+          {!showAll && rows.length > RESOURCES_SHOWN && (
+            <li>
               <button
                 type="button"
-                className="cc-task-paths__path"
-                title={attachment.filename}
-                onClick={() => openAttachment(attachment)}
+                className="cc-task-paths__more"
+                onClick={() => setShowAll(true)}
               >
-                {attachment.filename}
-              </button>
-              <span className="cc-task-paths__size">{formatFileSize(attachment.size_bytes)}</span>
-              <button
-                type="button"
-                className="cc-btn cc-btn--ghost cc-btn--compact"
-                aria-label={translateUi('Remove {{filename}} from the list', {
-                  filename: attachment.filename,
-                })}
-                onClick={() => setRemoving(attachment)}
-              >
-                ×
+                {translateUi('Show {{count}} more', { count: rows.length - RESOURCES_SHOWN })}
               </button>
             </li>
-          ))}
-          {inherited.map((path) => (
-            <PathRow key={`inherited:${path.id}`} path={path} hint={whereHint(path, thisHostId)} />
-          ))}
+          )}
         </ul>
       )}
       <div className="cc-task-paths__add">

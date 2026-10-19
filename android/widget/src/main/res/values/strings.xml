@@ -8,6 +8,7 @@
     <string name="widget_load_error">Load failed. Tap to retry.</string>
     <string name="widget_empty">No open tasks</string>
     <string name="widget_mark_done">Mark %1$s complete</string>
+    <string name="widget_marked_done">%1$s marked complete</string>
     <string name="widget_inbox">Inbox</string>
     <string name="widget_inbox_with_count">Inbox · %1$d</string>
     <string name="widget_add_to_inbox">Add to inbox…</string>
@@ -44,6 +45,8 @@
     <string name="widget_next_deadline">Next: %1$s %2$s · %3$s</string>
     <string name="widget_other_tasks">In progress · no deadline</string>
     <string name="widget_in_progress">Doing</string>
+    <string name="widget_just_now">Just now</string>
+    <string name="widget_minutes_ago">%1$d min ago</string>
     <string name="widget_today">Today</string>
     <string name="widget_short_date_pattern">MMM d</string>
 </resources>

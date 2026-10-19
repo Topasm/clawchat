@@ -831,3 +831,48 @@
   color: var(--cc-text-tertiary);
   font-size: 12px;
 }
+
+/* --- Home out of reach ------------------------------------- */
+.cc-offline-banner {
+  position: fixed;
+  top: var(--cc-space-2);
+  left: 50%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 8px 12px;
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-error) 10%, var(--cc-surface));
+  color: var(--cc-text);
+  font-size: 13px;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 2px var(--cc-shadow);
+}
+
+.cc-offline-banner--sending {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+}
+
+.cc-offline-banner__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cc-error);
+  flex-shrink: 0;
+}
+
+.cc-offline-banner__text {
+  min-width: 0;
+}
+
+.cc-offline-banner__retry {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cc-link);
+  font: inherit;
+  cursor: pointer;
+}

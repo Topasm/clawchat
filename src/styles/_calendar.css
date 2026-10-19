@@ -552,3 +552,126 @@
 .cc-calendar__week-tasks-col:empty {
   min-height: 0;
 }
+
+/* Week as seven columns ------------------------------------------------------
+ *
+ * The design's week: one column per day, events with a red rule and their
+ * time, tasks due that day in grey, today tinted. No hour grid.
+ */
+.cc-calendar__week--columns {
+  overflow: auto;
+}
+
+.cc-calendar__week-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  flex: 1;
+  min-height: 420px;
+  border-top: 1px solid var(--cc-border);
+}
+
+.cc-calendar__week-day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--cc-border);
+}
+
+.cc-calendar__week-day:first-child {
+  border-left: 1px solid var(--cc-border);
+}
+
+.cc-calendar__week-day--today {
+  background: color-mix(in srgb, var(--cc-overdue-red) 4%, transparent);
+}
+
+.cc-calendar__week-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 8px 8px;
+}
+
+.cc-calendar__week-day-head .cc-calendar__week-day-name {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cc-calendar__week-day-head .cc-calendar__week-day-number {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.cc-calendar__week-day--today .cc-calendar__week-day-number {
+  color: var(--cc-overdue-red);
+}
+
+.cc-calendar__week-day-items {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 6px 8px;
+}
+
+.cc-calendar__week-event {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 0;
+  border-left: 2px solid var(--cc-overdue-red);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-overdue-red);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-calendar__week-event-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-calendar__week-event-time {
+  flex-shrink: 0;
+}
+
+.cc-calendar__week-day .cc-calendar__task-bar {
+  height: auto;
+  padding: 5px 8px;
+  border-left: 0;
+  background: var(--cc-surface-secondary);
+}
+
+.cc-calendar__week-day .cc-calendar__task-bar:hover {
+  background: var(--cc-hover-surface);
+}
+
+.cc-calendar__week-day .cc-calendar__task-bar-title {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cc-calendar__week-day .cc-calendar__task-bar--overdue .cc-calendar__task-bar-title {
+  color: var(--cc-overdue-red);
+}
+
+.cc-calendar__week-day-fill {
+  flex: 1;
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cc-calendar__week-legend {
+  margin: 10px 0 0;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}

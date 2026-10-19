@@ -1,6 +1,8 @@
 """Shared review queue persistence and enriched read models."""
 
+import json
 from datetime import datetime, timezone
+from typing import Any
 
 from domain.plan_proposal import PlanProposalStatus
 from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
@@ -22,6 +24,38 @@ from services.review import agent_review_handoff_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
+
+
+#: How many changed paths a review card lists; the count says the rest.
+CHANGED_FILES_SHOWN = 20
+
+
+def run_changed_files(run: AgentRun) -> list[dict[str, Any]] | None:
+    """The files a run changed, as its executor recorded them, or None when unknown.
+
+    Only executors that diff their workspace (OpenCode) write ``usage.files``;
+    for the rest the card stays silent rather than claiming "no changes".
+    """
+    try:
+        usage = json.loads(run.usage_json or "null")
+    except (TypeError, ValueError):
+        return None
+    files = usage.get("files") if isinstance(usage, dict) else None
+    if not isinstance(files, list):
+        return None
+    changed = []
+    for item in files:
+        if not isinstance(item, dict) or not item.get("file"):
+            continue
+        changed.append(
+            {
+                "path": str(item["file"]),
+                "status": str(item.get("status") or "modified"),
+                "additions": item.get("additions"),
+                "deletions": item.get("deletions"),
+            }
+        )
+    return changed
 
 
 async def ensure_review_item(
@@ -221,6 +255,10 @@ async def build_review_response(
                 "run_status": run.status,
                 "approval_impact": approval_impact.model_dump(mode="json"),
             }
+            changed = run_changed_files(run)
+            if changed is not None:
+                metadata["changed_files"] = changed[:CHANGED_FILES_SHOWN]
+                metadata["changed_files_count"] = len(changed)
             job = await scheduled_job_for_task(db, task)
             if job is not None:
                 # The card offers "don't ask next time" right where the result

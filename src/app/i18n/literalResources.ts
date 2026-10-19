@@ -1,5 +1,30 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  '{{count}} files changed': '파일 {{count}}개 바뀜',
+  'Done {{done}}/{{total}}': '완료 {{done}}/{{total}}',
+  'Show {{count}} more': '{{count}}개 더 보기',
+  'Add to {{day}}': '{{day}}에 추가',
+  'Red rule = calendar event · grey = task with a deadline':
+    '빨간 줄 = 캘린더 일정 · 회색 = 마감 있는 할 일',
+  'Branches {{count}}': '갈래 {{count}}',
+  "Can't reach {{workspace}}": '{{workspace}}에 연결할 수 없어요',
+  '{{count}} changes are kept on this device and sent when it reconnects':
+    '바꾼 내용 {{count}}건을 이 기기에 모아 두었다가 다시 연결되면 보냅니다',
+  'Changes are kept on this device until it reconnects':
+    '바꾼 내용은 다시 연결될 때까지 이 기기에 모아 둡니다',
+  'Retry now': '지금 다시',
+  'Reconnecting…': '다시 연결하는 중…',
+  'Sending {{count}} changes…': '바꾼 내용 {{count}}건 보내는 중…',
+  'Waiting to send': '보내기 대기',
+  'Reconnect to {{workspace}} to hand this to AI':
+    '{{workspace}}에 다시 연결되면 AI에게 맡길 수 있어요',
+  'Changed files': '바뀐 파일',
+  'Waiting to start': '시작 대기',
+  'Just started': '방금 시작',
+  '{{minutes}} min in': '{{minutes}}분째',
+  'Stop run': '멈추기',
+  'Stopping…': '멈추는 중…',
+  'Full run log': '실행 기록 전체',
   'Waiting on · {{title}}': '선행 대기 · {{title}}',
   'Waiting on {{count}} tasks': '선행 대기 {{count}}개',
   'Prerequisite running · {{title}}': '선행 진행 중 · {{title}}',
@@ -1676,7 +1701,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Due {{date}} · this time is free': '{{date}} 마감 · 이 시간이 비어 있음',
   'Added automatically': '바로 추가됨',
   'Dismiss {{title}}': '{{title}} 무시',
-  'Can do now {{ready}} · Blocked {{blocked}}': '지금 할 수 있는 것 {{ready}} · 막힘 {{blocked}}',
   Steps: '단계',
   '{{done}}/{{total}} steps': '{{done}}/{{total}} 단계',
   'Other task: {{title}}': '다른 작업: {{title}}',

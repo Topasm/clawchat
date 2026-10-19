@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAgentRunsQuery, useRetryAgentRun } from '../../hooks/queries';
+import {
+  useAgentRunEventsQuery,
+  useAgentRunsQuery,
+  useCancelAgentRun,
+  useRetryAgentRun,
+} from '../../hooks/queries';
+import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import { relativeTime } from '../../utils/formatters';
 import { agentName, describeTaskStage, getRunStage } from '../../utils/taskStage';
@@ -26,6 +32,7 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
   );
   if (!latest) return null;
   const openRun = () => navigate(`/attention?view=runs&run_id=${latest.id}`);
+  if (ACTIVE_RUN.has(latest.status)) return <LiveRunCard run={latest} onOpenRun={openRun} />;
   const stage = getRunStage(latest);
   const updatedAt = latest.updated_at ?? latest.created_at;
   return (
@@ -76,6 +83,71 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
         )}
         <button type="button" className="cc-btn cc-btn--ghost" onClick={openRun}>
           {translateUi('Open run')}
+        </button>
+      </span>
+    </div>
+  );
+}
+
+const ACTIVE_RUN = new Set(['queued', 'starting', 'running']);
+/** Lifecycle events say nothing the card does not; the log shows the work. */
+const LIFECYCLE_EVENTS = new Set(['queued', 'starting', 'running']);
+
+/** "3분째" / "3 min in"; "방금 시작" for the first minute. */
+export function runElapsedLabel(startedAt: string | null | undefined, now = Date.now()): string {
+  if (!startedAt) return translateUi('Waiting to start');
+  const minutes = Math.floor((now - new Date(startedAt).getTime()) / 60_000);
+  if (minutes < 1) return translateUi('Just started');
+  return translateUi('{{minutes}} min in', { minutes });
+}
+
+/**
+ * A run at work, as the design's step 3 draws it: a green dot, the agent,
+ * how long it has been going and where, the last two things it did, then
+ * Stop and the full run log.
+ */
+function LiveRunCard({ run, onOpenRun }: { run: AgentRunResponse; onOpenRun: () => void }) {
+  const cancel = useCancelAgentRun();
+  const { data: events = [] } = useAgentRunEventsQuery(run.id, true);
+  const recent = events
+    .filter((event) => !LIFECYCLE_EVENTS.has(event.event_type) && event.message)
+    .slice(-2);
+  const stopping = cancel.isPending || !!run.cancel_requested_at;
+  return (
+    <div className="cc-exec-panel__section" data-testid="task-agent-thread">
+      <div className="cc-exec-panel__section-title">{translateUi('Agent run')}</div>
+      <div className="cc-run-live" role="status">
+        <div className="cc-run-live__head">
+          <span className="cc-run-live__dot" aria-hidden="true" />
+          <b>{agentName(run.provider)}</b>
+          <span className="cc-run-live__meta">
+            · {runElapsedLabel(run.started_at)}
+            {run.host_label ? ` · ${run.host_label}` : ''}
+          </span>
+        </div>
+        {recent.length > 0 && (
+          <div className="cc-run-live__log">
+            {recent.map((event) => (
+              <span key={event.id}>{translateUi(event.message ?? '')}</span>
+            ))}
+          </div>
+        )}
+      </div>
+      <span className="cc-task-progress__actions">
+        <button
+          type="button"
+          className="cc-btn cc-btn--secondary"
+          disabled={stopping}
+          onClick={() => cancel.mutate(run.id)}
+        >
+          {stopping ? translateUi('Stopping…') : translateUi('Stop run')}
+        </button>
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-run-live__link"
+          onClick={onOpenRun}
+        >
+          {translateUi('Full run log')}
         </button>
       </span>
     </div>
