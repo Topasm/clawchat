@@ -4,7 +4,7 @@ kotlin = "2.4.21"
 ksp = "2.3.12"
 hilt = "2.60.1"
 room = "2.8.5"
-firebaseBom = "35.0.0"
+firebaseBom = "35.0.2"
 
 compileSdk = "37"
 minSdk = "26"
