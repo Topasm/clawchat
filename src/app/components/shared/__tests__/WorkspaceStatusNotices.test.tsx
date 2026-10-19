@@ -151,7 +151,7 @@ describe('StorageLocationBadge', () => {
     render(<StorageLocationBadge item={{ id: 'temp-1' }} />);
     expect(
       screen.getByLabelText('Only on this device · waiting to sync to Home'),
-    ).toHaveTextContent('On this device');
+    ).toHaveTextContent('Waiting to send');
   });
 
   it('keeps synced rows unmarked in lists', () => {

@@ -4,6 +4,9 @@ import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../../stores/useToastStore';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { activeWorkspaceName } from '../../utils/workspaceLocation';
 import { useDebouncedPersist } from '../../hooks/useDebouncedPersist';
 import {
   useTodosQuery,
@@ -98,6 +101,8 @@ export default function TaskDetail({
   extraMenuItems,
 }: TaskDetailProps) {
   const navigate = useNavigate();
+  const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const openTask = useCallback(
     (id: string) => (onOpenTask ? onOpenTask(id) : navigate(`/tasks/${id}`)),
     [navigate, onOpenTask],
@@ -211,6 +216,7 @@ export default function TaskDetail({
   // A task is yours unless it was handed to AI (assignee) or AI already ran
   // it. Only delegated work shows the five steps and the plan button; for
   // your own task the top of the page is its due date and flow.
+  const homeReachable = connectionStatus === 'connected';
   const isDelegated = Boolean(
     task.assignee ||
     hasAgentSkills ||
@@ -229,6 +235,17 @@ export default function TaskDetail({
   // The task's conversation opens in the one AI panel, as ⌘K does here.
   const discuss = () => openTaskChat(task.id);
   const setAssignee = (assignee: string | null) => {
+    // A hand-off needs Home: the run would start there. Checking and adding
+    // keep working offline; delegating waits for the connection.
+    if (assignee && !homeReachable) {
+      useToastStore.getState().addToast(
+        'info',
+        translateUi('Reconnect to {{workspace}} to hand this to AI', {
+          workspace: workspaceName,
+        }),
+      );
+      return;
+    }
     const previous = task.assignee ?? null;
     updateTodoMutation.mutate({ id: task.id, data: { assignee } });
     const undo = {
@@ -368,7 +385,14 @@ export default function TaskDetail({
                 <button
                   type="button"
                   className="cc-btn cc-btn--primary"
-                  disabled={runner.isPending}
+                  disabled={runner.isPending || !homeReachable}
+                  title={
+                    homeReachable
+                      ? undefined
+                      : translateUi('Reconnect to {{workspace}} to hand this to AI', {
+                          workspace: workspaceName,
+                        })
+                  }
                   onClick={() => void runner.runTask(task.id)}
                 >
                   {translateUi('Start as is')}

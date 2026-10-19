@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
 import TaskDetail from '../../components/task-detail/TaskDetail';
 import { useToastStore } from '../../stores/useToastStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 const mocks = vi.hoisted(() => ({
   projectDescription: null as string | null,
@@ -114,6 +115,7 @@ function renderPage() {
 
 describe('TaskDetailPage project context', () => {
   beforeEach(() => {
+    useAuthStore.setState({ connectionStatus: 'connected' });
     mocks.projectDescription = null;
     mocks.updateTodo.mockReset();
     mocks.deleteTodo.mockReset();
@@ -170,6 +172,15 @@ describe('TaskDetailPage project context', () => {
     expect(screen.getByRole('menuitem', { name: 'Suggest steps' })).toBeVisible();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Task' }));
     expect(mocks.deleteTodo).toHaveBeenCalledWith('todo-e65a');
+  });
+
+  it('waits for Home before handing work to AI', () => {
+    useAuthStore.setState({ connectionStatus: 'disconnected' });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
+    expect(mocks.updateTodo).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/^Reconnect to /);
   });
 
   it('delegates from the menu by setting the assignee', () => {

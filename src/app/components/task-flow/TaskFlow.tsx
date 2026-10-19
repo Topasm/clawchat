@@ -46,6 +46,17 @@ function byOrder(left: TodoResponse, right: TodoResponse) {
   );
 }
 
+/** How many extra paths the flow opens: a step that leads to three adds two. */
+export function flowBranchCount(edges: readonly FlowEdge[]): number {
+  const next = new Map<string, number>();
+  edges.forEach((edge) => next.set(edge.before, (next.get(edge.before) ?? 0) + 1));
+  let branches = 0;
+  next.forEach((count) => {
+    branches += Math.max(0, count - 1);
+  });
+  return branches;
+}
+
 /** Whether `from` already waits, through any chain, on `to`. */
 function waitsOn(edges: readonly FlowEdge[], from: string, to: string): boolean {
   const before = new Map<string, string[]>();
@@ -192,7 +203,10 @@ export default function TaskFlow({
     : edges;
 
   const canDoNow = allNodes.filter((node) => node.tone === 'ready' || node.tone === 'active');
-  const blocked = allNodes.filter((node) => node.tone === 'blocked').length;
+  // The header the design gives a flow: how far it is, and how many times it forks.
+  const counted = steps.filter((step) => step.status !== 'cancelled');
+  const doneCount = counted.filter((step) => step.status === 'completed').length;
+  const branches = flowBranchCount(edges);
   const focusId = allNodes.find((node) => node.tone === 'active')?.id ?? canDoNow[0]?.id ?? null;
   const ends = steps.filter(
     (step) => linked.has(step.id) && !edges.some((edge) => edge.before === step.id),
@@ -288,10 +302,8 @@ export default function TaskFlow({
       )}
       {steps.length > 0 && (
         <p className="cc-flow__summary">
-          {translateUi('Can do now {{ready}} · Blocked {{blocked}}', {
-            ready: canDoNow.length,
-            blocked,
-          })}
+          {translateUi('Done {{done}}/{{total}}', { done: doneCount, total: counted.length })}
+          {branches > 0 && ` · ${translateUi('Branches {{count}}', { count: branches })}`}
           {selectedId && stepIds.has(selectedId) && !childCount.has(selectedId) && (
             <button type="button" onClick={() => openTask(selectedId)}>
               {translateUi('Open task')}

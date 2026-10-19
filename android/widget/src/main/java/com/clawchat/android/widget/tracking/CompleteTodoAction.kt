@@ -13,6 +13,10 @@ import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+
+/** How long a checked row stays on screen, done, before the list drops it. */
+private const val DONE_HOLD_MILLIS = 1_200L
 
 /**
  * A widget checkbox is a one-way "done" action, not a status toggle.
@@ -42,8 +46,17 @@ class CompleteTodoAction : ActionCallback {
             ) is ApiResult.Success
         }
 
-        val completed = handler.complete(todoId)
+        // Draw the row done right away: a filled check and a struck title.
         updateAppWidgetState(context, glanceId) { preferences ->
+            preferences[WidgetCompletingIdsKey] = preferences[WidgetCompletingIdsKey].orEmpty() + todoId
+        }
+        TodoTrackingWidget().update(context, glanceId)
+
+        val completed = handler.complete(todoId)
+        // Long enough to see it land, short enough not to read as stuck.
+        if (completed) delay(DONE_HOLD_MILLIS)
+        updateAppWidgetState(context, glanceId) { preferences ->
+            preferences[WidgetCompletingIdsKey] = preferences[WidgetCompletingIdsKey].orEmpty() - todoId
             if (completed) preferences.remove(WidgetCompletionErrorWorkspaceKey)
             else preferences[WidgetCompletionErrorWorkspaceKey] = expectedWorkspaceKey
         }

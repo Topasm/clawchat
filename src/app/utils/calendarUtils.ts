@@ -20,7 +20,6 @@ export const MONTH_NAMES = [
 ];
 
 export const WEEK_START_HOUR = 7;
-export const WEEK_END_HOUR = 22; // exclusive — last slot is 21:00-22:00
 
 export const MAX_VISIBLE_PILLS = 3;
 
@@ -62,15 +61,6 @@ export function formatWeekLabel(weekStart: Date): string {
     return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getDate()} - ${end.getDate()}, ${weekStart.getFullYear()}`;
   }
   return `${MONTH_NAMES[weekStart.getMonth()].slice(0, 3)} ${weekStart.getDate()} - ${MONTH_NAMES[end.getMonth()].slice(0, 3)} ${end.getDate()}, ${end.getFullYear()}`;
-}
-
-/** An hour row's label: "오전 7시" / "7 AM" (written out: newer ICU data says "AM" for Korean). */
-export function formatTimeLabel(hour: number): string {
-  if (getAppLanguage() === 'ko') return `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시`;
-  if (hour === 0) return '12 AM';
-  if (hour < 12) return `${hour} AM`;
-  if (hour === 12) return '12 PM';
-  return `${hour - 12} PM`;
 }
 
 /** Get the start of the week (Sunday) for a given date. */

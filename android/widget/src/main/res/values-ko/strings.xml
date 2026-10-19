@@ -8,6 +8,7 @@
     <string name="widget_load_error">불러오기 실패. 눌러서 재시도</string>
     <string name="widget_empty">열린 작업 없음</string>
     <string name="widget_mark_done">%1$s 완료 처리</string>
+    <string name="widget_marked_done">%1$s 완료됨</string>
     <string name="widget_inbox">받은함</string>
     <string name="widget_inbox_with_count">받은함 · %1$d</string>
     <string name="widget_add_to_inbox">받은함에 추가…</string>
@@ -44,6 +45,8 @@
     <string name="widget_next_deadline">다음 마감 %1$s %2$s · %3$s</string>
     <string name="widget_other_tasks">진행 중 · 마감 없음</string>
     <string name="widget_in_progress">진행 중</string>
+    <string name="widget_just_now">방금</string>
+    <string name="widget_minutes_ago">%1$d분 전</string>
     <string name="widget_today">오늘</string>
     <string name="widget_short_date_pattern">M월 d일</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.clawchat.android.widget.tracking
 
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.widget.common.WidgetState
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.*
 
 internal val WidgetRefreshKey = stringPreferencesKey("task_refresh_token")
 internal val WidgetCompletionErrorWorkspaceKey = stringPreferencesKey("completion_error_workspace")
+/** Rows just checked off: drawn done for a moment before the list drops them. */
+internal val WidgetCompletingIdsKey = stringSetPreferencesKey("completing_ids")
 
 /** Reload inside the active composition; update() alone does not rerun provideGlance. */
 @OptIn(ExperimentalCoroutinesApi::class)

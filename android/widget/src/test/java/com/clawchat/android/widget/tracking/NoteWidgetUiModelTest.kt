@@ -34,4 +34,19 @@ class NoteWidgetUiModelTest {
         assertEquals(NoteWidgetUiModel.MAX_ROWS, result.items.size)
         assertEquals("n1", result.items.first().id)
     }
+
+    @Test
+    fun `a note dates itself just now, minutes ago, today, or by day`() {
+        val now = java.time.Instant.parse("2026-10-18T09:00:00Z")
+        val today = LocalDate.of(2026, 10, 18)
+        fun age(updatedAt: String) = noteAge(
+            NoteWidgetUiModel.from(listOf(note("n", "Note", updatedAt)), ZoneId.of("UTC")).items.single(),
+            now,
+            today,
+        )
+        assertEquals(NoteAge.JUST_NOW to 0L, age("2026-10-18T08:59:30Z"))
+        assertEquals(NoteAge.MINUTES to 5L, age("2026-10-18T08:55:00Z"))
+        assertEquals(NoteAge.TODAY to 0L, age("2026-10-18T06:00:00Z"))
+        assertEquals(NoteAge.DATE to 0L, age("2026-10-15T09:00:00Z"))
+    }
 }

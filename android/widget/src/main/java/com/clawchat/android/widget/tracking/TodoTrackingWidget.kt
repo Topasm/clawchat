@@ -44,6 +44,7 @@ import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetAppearance
@@ -56,6 +57,7 @@ import com.clawchat.android.widget.di.WidgetEntryPoint
 import com.clawchat.android.widget.quickadd.QuickAddActivity
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -107,6 +109,7 @@ class TodoTrackingWidget : GlanceAppWidget() {
                     mainActivity = mainActivity,
                     workspaceKey = if (currentWorkspace) snapshot.workspaceKey else null,
                     backgroundOpacity = appearance.backgroundOpacity,
+                    completingIds = preferences[WidgetCompletingIdsKey].orEmpty(),
                     completionFailed = contentMode == WidgetContentMode.TASKS &&
                         currentWorkspace && runtime.workspaceKey != null &&
                         preferences[WidgetCompletionErrorWorkspaceKey] == runtime.workspaceKey,
@@ -141,6 +144,7 @@ internal fun TodoTrackingContent(
     mainActivity: ComponentName,
     workspaceKey: String?,
     backgroundOpacity: Float,
+    completingIds: Set<String> = emptySet(),
     completionFailed: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -267,6 +271,7 @@ internal fun TodoTrackingContent(
                         mainActivity = mainActivity,
                         workspaceKey = workspaceKey,
                         compact = isTile,
+                        completingIds = completingIds,
                         availableHeight = listHeight,
                         modifier = GlanceModifier.defaultWeight(),
                     )
@@ -387,6 +392,7 @@ private fun TodoList(
     mainActivity: ComponentName,
     workspaceKey: String,
     compact: Boolean,
+    completingIds: Set<String>,
     availableHeight: Dp,
     modifier: GlanceModifier,
 ) {
@@ -396,7 +402,7 @@ private fun TodoList(
         // section headings used to spell out.
         model.deadlines.forEach { todo ->
             add(ListEntry(todo.id.hashCode().toLong(), TodoRowHeight) {
-                TodoRow(todo, mainActivity, workspaceKey, compact)
+                TodoRow(todo, mainActivity, workspaceKey, compact, done = todo.id in completingIds)
             })
         }
         if (model.deadlines.isEmpty()) {
@@ -412,7 +418,7 @@ private fun TodoList(
             }
             model.others.forEach { todo ->
                 add(ListEntry(todo.id.hashCode().toLong(), TodoRowHeight) {
-                    TodoRow(todo, mainActivity, workspaceKey, compact)
+                    TodoRow(todo, mainActivity, workspaceKey, compact, done = todo.id in completingIds)
                 })
             }
         }
@@ -482,6 +488,7 @@ private fun TodoRow(
     mainActivity: ComponentName,
     workspaceKey: String,
     compact: Boolean,
+    done: Boolean = false,
 ) {
     val context = LocalContext.current
     // The whole row opens the app; only the circle completes the task.
@@ -495,39 +502,73 @@ private fun TodoRow(
         Box(
             modifier = GlanceModifier
                 .size(42.dp)
-                .clickable(
-                    actionRunCallback<CompleteTodoAction>(
-                        actionParametersOf(
-                            TodoTrackingWidget.TODO_ID_KEY to todo.id,
-                            TodoTrackingWidget.WORKSPACE_KEY to workspaceKey,
-                        ),
-                    )
+                .then(
+                    if (done) {
+                        GlanceModifier
+                    } else {
+                        GlanceModifier.clickable(
+                            actionRunCallback<CompleteTodoAction>(
+                                actionParametersOf(
+                                    TodoTrackingWidget.TODO_ID_KEY to todo.id,
+                                    TodoTrackingWidget.WORKSPACE_KEY to workspaceKey,
+                                ),
+                            )
+                        )
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            // A quiet grey ring: the runway and the D-label carry the urgency.
-            Image(
-                provider = ImageProvider(R.drawable.ic_widget_check_ring),
-                contentDescription = context.getString(R.string.widget_mark_done, todo.title),
-                colorFilter = ColorFilter.tint(WidgetColors.Ink3),
-                modifier = GlanceModifier.size(18.dp),
-            )
+            if (done) {
+                // Just checked: a filled blue disc with a tick, until the list drops it.
+                Box(
+                    modifier = GlanceModifier
+                        .size(18.dp)
+                        .background(
+                            imageProvider = ImageProvider(R.drawable.ic_widget_dot),
+                            colorFilter = ColorFilter.tint(WidgetColors.Blue),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_widget_check),
+                        contentDescription = context.getString(R.string.widget_marked_done, todo.title),
+                        colorFilter = ColorFilter.tint(WidgetColors.OnBlue),
+                        modifier = GlanceModifier.size(12.dp),
+                    )
+                }
+            } else {
+                // A quiet grey ring: the runway and the D-label carry the urgency.
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_check_ring),
+                    contentDescription = context.getString(R.string.widget_mark_done, todo.title),
+                    colorFilter = ColorFilter.tint(WidgetColors.Ink3),
+                    modifier = GlanceModifier.size(18.dp),
+                )
+            }
         }
 
         Text(
             text = todo.title,
             modifier = GlanceModifier.defaultWeight(),
-            style = TextStyle(color = WidgetColors.Ink, fontSize = 14.sp),
+            style = TextStyle(
+                color = if (done) WidgetColors.Ink3 else WidgetColors.Ink,
+                fontSize = 14.sp,
+                textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+            ),
             maxLines = 1,
         )
 
-        val runway = todo.runwayFraction
+        val runway = todo.runwayFraction.takeUnless { done }
         if (!compact && runway != null) {
             Spacer(GlanceModifier.width(8.dp))
             RunwayBar(fraction = runway, overdue = todo.isOverdue)
         }
-        val label = todo.daysRemaining?.let { deadlineLabel(context, it) }
-            ?: context.getString(R.string.widget_in_progress).takeIf { todo.inProgress }
+        val label = if (done) {
+            null
+        } else {
+            todo.daysRemaining?.let { deadlineLabel(context, it) }
+                ?: context.getString(R.string.widget_in_progress).takeIf { todo.inProgress }
+        }
         if (label != null) {
             Spacer(GlanceModifier.width(8.dp))
             Text(
@@ -603,14 +644,17 @@ private fun NoteRow(note: NoteWidgetItem, mainActivity: ComponentName) {
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight(),
         )
-        note.updatedOn?.let { day ->
+        val (age, minutes) = noteAge(note, Instant.now(), LocalDate.now())
+        val label = when (age) {
+            NoteAge.JUST_NOW -> context.getString(R.string.widget_just_now)
+            NoteAge.MINUTES -> context.getString(R.string.widget_minutes_ago, minutes.toInt())
+            NoteAge.TODAY -> context.getString(R.string.widget_today)
+            NoteAge.DATE -> note.updatedOn?.let { shortDate(context, it) }
+        }
+        label?.let { text ->
             Spacer(GlanceModifier.width(8.dp))
             Text(
-                text = if (day == LocalDate.now()) {
-                    context.getString(R.string.widget_today)
-                } else {
-                    shortDate(context, day)
-                },
+                text = text,
                 style = TextStyle(
                     color = WidgetColors.Ink3,
                     fontSize = 11.sp,

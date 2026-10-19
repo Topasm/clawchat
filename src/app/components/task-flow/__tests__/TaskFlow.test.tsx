@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlanProposalResponse, TodoResponse } from '../../../types/api';
 import { useToastStore } from '../../../stores/useToastStore';
-import TaskFlow from '../TaskFlow';
+import TaskFlow, { flowBranchCount } from '../TaskFlow';
 
 const mocks = vi.hoisted(() => ({
   todos: [] as TodoResponse[],
@@ -119,7 +119,7 @@ describe('TaskFlow', () => {
     expect(screen.queryByText('Unrelated')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Other task: Prepare data' })).toBeVisible();
     expect(within(steps).getByText(/1 inside/)).toBeVisible();
-    expect(screen.getByText('Can do now 1 · Blocked 0')).toBeVisible();
+    expect(screen.getByText('Done 1/3')).toBeVisible();
   });
 
   it('appends on Enter and branches from the selected step on Tab, one at a time', async () => {
@@ -312,5 +312,16 @@ describe('TaskFlow', () => {
       target: { value: ' ' },
     });
     expect(screen.getByRole('button', { name: 'Add all' })).toBeDisabled();
+  });
+});
+
+describe('flowBranchCount', () => {
+  it('counts the extra paths a fork opens', () => {
+    const e = (before: string, after: string) => ({ before, after });
+    expect(flowBranchCount([e('a', 'b'), e('b', 'c')])).toBe(0);
+    expect(
+      flowBranchCount([e('read', 'kernel'), e('kernel', 'profile'), e('kernel', 'figures')]),
+    ).toBe(1);
+    expect(flowBranchCount([e('base', 'A'), e('base', 'B'), e('base', 'H')])).toBe(2);
   });
 });

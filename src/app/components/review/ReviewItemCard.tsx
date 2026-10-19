@@ -40,6 +40,37 @@ export function reviewAutomation(item: ReviewItemResponse): ReviewAutomation | n
   };
 }
 
+export interface ChangedFile {
+  path: string;
+  status: string;
+}
+
+/**
+ * The files a run changed, when its executor recorded them (OpenCode diffs
+ * its workspace); null when nobody knows, which is not the same as none.
+ */
+export function reviewChangedFiles(
+  item: ReviewItemResponse,
+): { files: ChangedFile[]; count: number } | null {
+  const raw = item.metadata.changed_files;
+  if (!Array.isArray(raw)) return null;
+  const files = raw
+    .filter((file): file is ChangedFile => typeof file?.path === 'string')
+    .map((file) => ({ path: file.path, status: String(file.status ?? 'modified') }));
+  const count =
+    typeof item.metadata.changed_files_count === 'number'
+      ? item.metadata.changed_files_count
+      : files.length;
+  return { files, count };
+}
+
+/** "+" for a new file, "−" for a removed one, "~" for one that changed. */
+function changeMark(status: string): { mark: string; tone: string } {
+  if (status === 'added') return { mark: '+', tone: 'added' };
+  if (status === 'deleted' || status === 'removed') return { mark: '−', tone: 'deleted' };
+  return { mark: '~', tone: 'modified' };
+}
+
 export function subjectLabel(item: ReviewItemResponse): string {
   const labels: Record<string, string> = {
     plan_proposal: translateUi('AI suggestion'),
@@ -75,6 +106,7 @@ export default function ReviewItemCard({
   const updateJob = useUpdateScheduledJob();
   const impact = agentRunApprovalImpact(item);
   const automation = reviewAutomation(item);
+  const changed = reviewChangedFiles(item);
   const open = item.status === 'pending' || item.status === 'changes_requested';
   // "Don't ask next time" lives on the card, not in a settings screen: the
   // automation is switched right where its result is being looked at. The
@@ -100,6 +132,9 @@ export default function ReviewItemCard({
         <span className={`cc-review-card__risk cc-review-card__risk--${item.risk_level}`}>
           {riskLabel(item.risk_level)}
         </span>
+        {changed && changed.count > 0 && (
+          <span>{translateUi('{{count}} files changed', { count: changed.count })}</span>
+        )}
         <span>{subjectLabel(item)}</span>
         {automation && (
           <span>{translateUi('Automation · {{title}}', { title: automation.title })}</span>
@@ -109,6 +144,26 @@ export default function ReviewItemCard({
       </div>
       <h2>{title}</h2>
       {summary && <p className="cc-review-card__summary">{summary}</p>}
+      {changed && changed.files.length > 0 && (
+        <ul className="cc-review-card__files" aria-label={translateUi('Changed files')}>
+          {changed.files.map((file) => {
+            const { mark, tone } = changeMark(file.status);
+            return (
+              <li key={file.path}>
+                <span className={`cc-review-card__file-mark cc-review-card__file-mark--${tone}`}>
+                  {mark}
+                </span>
+                <span className="cc-review-card__file-path">{file.path}</span>
+              </li>
+            );
+          })}
+          {changed.count > changed.files.length && (
+            <li className="cc-review-card__files-more">
+              {translateUi('{{count}} more', { count: changed.count - changed.files.length })}
+            </li>
+          )}
+        </ul>
+      )}
       {item.subject_description && (
         <pre className="cc-review-card__preview">{item.subject_description}</pre>
       )}

@@ -59,6 +59,61 @@
   color: var(--cc-text-secondary);
 }
 
+/* A run at work: the design's step 3 card. */
+.cc-run-live {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 var(--cc-space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  font-size: 12px;
+}
+
+.cc-run-live__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cc-run-live__head b {
+  font-weight: 600;
+}
+
+.cc-run-live__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cc-success);
+  flex-shrink: 0;
+}
+
+.cc-run-live__meta {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-run-live__log {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-run-live__log span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-run-live__link {
+  color: var(--cc-link);
+}
+
 .cc-exec-panel__run-failure {
   margin: 0 0 var(--cc-space-2);
   font-size: 13px;
@@ -361,4 +416,24 @@
   flex-wrap: wrap;
   gap: 4px;
   margin: 8px 0;
+}
+
+.cc-task-paths__count {
+  margin-left: 6px;
+  color: var(--cc-text-tertiary);
+  font-weight: 500;
+}
+
+.cc-task-paths__more {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cc-task-paths__more:hover {
+  color: var(--cc-link);
 }
