@@ -7,8 +7,8 @@ import {
   type TaskExecutionTelemetryResponse,
 } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
+import { isRunExecuting } from '../../utils/taskStage';
 
-const EXECUTING_STATUSES = new Set(['queued', 'starting', 'running']);
 const WAITING_STATUSES = new Set(['waiting_input', 'waiting_review']);
 
 export function useTaskExecutionTelemetryQuery(projectId?: string | null) {
@@ -24,12 +24,7 @@ export function useTaskExecutionTelemetryQuery(projectId?: string | null) {
     enabled: !!serverUrl,
     refetchInterval: (query) => {
       const telemetry = query.state.data as TaskExecutionTelemetryResponse[] | undefined;
-      if (
-        telemetry?.some(
-          (item) =>
-            item.latest_run_status != null && EXECUTING_STATUSES.has(item.latest_run_status),
-        )
-      ) {
+      if (telemetry?.some((item) => isRunExecuting(item.latest_run_status))) {
         return 3_000;
       }
       return telemetry?.some(

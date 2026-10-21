@@ -45,19 +45,24 @@ export default function WeekView({
 }: WeekViewProps) {
   const ws = useMemo(() => startOfWeek(currentDate), [currentDate]);
   const weekDates = useMemo(() => getWeekDates(ws), [ws]);
+  // All-day first, then by time: each day's list already comes in time order,
+  // so a stable split is enough.
+  const eventsByDay = useMemo(
+    () =>
+      weekDates.map((date) => {
+        const events = eventsByDate.get(toDateKey(date)) ?? [];
+        return [...events.filter((ev) => ev.is_all_day), ...events.filter((ev) => !ev.is_all_day)];
+      }),
+    [weekDates, eventsByDate],
+  );
 
   return (
     <div className="cc-calendar__week cc-calendar__week--columns">
       <div className="cc-calendar__week-days">
-        {weekDates.map((date) => {
+        {weekDates.map((date, index) => {
           const key = toDateKey(date);
           const isToday = isSameDay(date, today);
-          // All-day first, then by time.
-          const dayEvents = [...(eventsByDate.get(key) ?? [])].sort(
-            (a, b) =>
-              Number(b.is_all_day) - Number(a.is_all_day) ||
-              a.start_time.localeCompare(b.start_time),
-          );
+          const dayEvents = eventsByDay[index];
           const dayTasks = tasksByDate.get(key) ?? [];
           return (
             <section

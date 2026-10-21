@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentName, describeTaskStage, getRunStage, getTaskStage } from '../taskStage';
+import {
+  agentName,
+  describeTaskStage,
+  getRunStage,
+  getTaskStage,
+  isRunExecuting,
+} from '../taskStage';
 
 describe('getTaskStage', () => {
   it('starts a fresh task at Captured', () => {
@@ -85,5 +91,16 @@ describe('labels', () => {
     );
     expect(agentName('claude_code')).toBe('Claude');
     expect(agentName('codex_cli')).toBe('Codex');
+  });
+});
+
+describe('isRunExecuting', () => {
+  it('is true only while a run is queued, starting or running', () => {
+    expect(['queued', 'starting', 'running'].every(isRunExecuting)).toBe(true);
+    for (const status of ['waiting_input', 'waiting_review', 'completed', 'failed', 'cancelled']) {
+      expect(isRunExecuting(status)).toBe(false);
+    }
+    expect(isRunExecuting(null)).toBe(false);
+    expect(isRunExecuting(undefined)).toBe(false);
   });
 });

@@ -5,11 +5,10 @@ import { FlagIcon } from '../shared/Icons';
 import { formatDueDate, isOverdue } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 import WaitingOnLine from '../shared/WaitingOnLine';
-import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
+import { describeTaskStage, getTaskStage, isRunExecuting } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
 import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
 /** A prerequisite with one of these on it is in progress, not merely waited on. */
-const ACTIVE_RUN = new Set<string | null | undefined>(['queued', 'starting', 'running']);
 
 interface TaskListViewProps {
   todos: TodoResponse[];
@@ -156,7 +155,7 @@ export default function TaskListView({
                 <WaitingOnLine
                   prerequisites={waitingOn}
                   dueDate={todo.due_date}
-                  isRunning={(id) => ACTIVE_RUN.has(telemetryByTaskId?.get(id)?.latest_run_status)}
+                  isRunning={(id) => isRunExecuting(telemetryByTaskId?.get(id)?.latest_run_status)}
                   onOpenTask={onOpenTask}
                   className="cc-task-row__waiting"
                 />

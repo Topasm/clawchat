@@ -13,9 +13,8 @@ import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
 import type { ReviewStatus } from '../types/api';
 import { translateUi } from '../i18n';
 import { relativeTime } from '../utils/formatters';
-import { describeTaskStage, getRunStage } from '../utils/taskStage';
+import { describeTaskStage, getRunStage, isRunExecuting } from '../utils/taskStage';
 
-const EXECUTING = new Set(['queued', 'starting', 'running']);
 const FINISHED = new Set(['completed', 'failed', 'cancelled']);
 /** Recent runs are a glance at what just ended; the full log is "All runs". */
 const RECENT_RUNS = 5;
@@ -63,7 +62,7 @@ export default function AttentionPage() {
     [approvedAgentRun?.reviewId, reviews],
   );
   const decisions = useMemo(() => runs.filter(needsRecoveryDecision), [runs]);
-  const executing = useMemo(() => runs.filter((run) => EXECUTING.has(run.status)), [runs]);
+  const executing = useMemo(() => runs.filter((run) => isRunExecuting(run.status)), [runs]);
   // What just ended, minus the failures already listed above for a decision.
   const recent = useMemo(
     () =>

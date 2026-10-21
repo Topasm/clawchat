@@ -65,6 +65,7 @@ import { platformApi } from '../platform';
 import ActiveRunsLine from './shared/ActiveRunsLine';
 import WorkerStatusLine from './shared/WorkerStatusLine';
 import WorkspaceMenu from './shared/WorkspaceMenu';
+import { isRunExecuting } from '../utils/taskStage';
 
 const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
@@ -138,7 +139,6 @@ const primaryNavItems: NavItem[] = [
   { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon, tone: 'tasks' },
   { to: '/attention', labelKey: 'nav.attention', Icon: ProgressIcon, tone: 'progress' },
 ];
-const RUN_EXECUTING = new Set(['queued', 'starting', 'running']);
 /** The name of the screen a path shows, as the sidebar prints it. */
 /** Below this width the task pane covers the list rather than sitting beside it. */
 const NARROW_DESKTOP_QUERY = '(max-width: 1439px)';
@@ -251,7 +251,7 @@ export default function Layout() {
   const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   const { data: agentRuns = [] } = useAgentRunsQuery();
   const runningCount = useMemo(
-    () => agentRuns.filter((run) => RUN_EXECUTING.has(run.status)).length,
+    () => agentRuns.filter((run) => isRunExecuting(run.status)).length,
     [agentRuns],
   );
   useEffect(() => {

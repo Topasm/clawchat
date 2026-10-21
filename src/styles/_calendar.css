@@ -225,154 +225,6 @@
   overflow: hidden;
 }
 
-/* Column headers */
-.cc-calendar__week-header {
-  display: flex;
-  border-bottom: 1px solid var(--cc-border);
-  flex-shrink: 0;
-}
-
-.cc-calendar__time-gutter-header {
-  width: 56px;
-  flex-shrink: 0;
-}
-
-.cc-calendar__week-col-header {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px 8px;
-  min-width: 0;
-}
-
-.cc-calendar__week-col-header--today {
-  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
-}
-
-.cc-calendar__week-day-name {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--cc-text-secondary);
-}
-
-.cc-calendar__week-day-number {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--cc-text);
-  line-height: 1;
-}
-
-.cc-calendar__week-day-number--today {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--cc-primary);
-  color: #fff;
-}
-
-/* Scrollable body */
-.cc-calendar__week-body {
-  flex: 1;
-  display: flex;
-  overflow-y: auto;
-  position: relative;
-}
-
-/* Time gutter */
-.cc-calendar__time-gutter {
-  width: 56px;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.cc-calendar__time-label {
-  position: absolute;
-  right: 8px;
-  transform: translateY(-50%);
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--cc-text-tertiary);
-  white-space: nowrap;
-}
-
-/* Day column */
-.cc-calendar__week-col {
-  flex: 1;
-  position: relative;
-  border-left: 1px solid var(--cc-border);
-  min-width: 0;
-}
-
-/* Time slot (hourly grid line) */
-.cc-calendar__time-slot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 60px;
-  border-bottom: 1px solid color-mix(in srgb, var(--cc-border) 60%, transparent);
-  cursor: pointer;
-  transition: background 0.1s ease;
-}
-
-.cc-calendar__time-slot:hover {
-  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
-}
-
-/* Event block (week view) */
-.cc-calendar__event-block {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  border-radius: var(--cc-radius-sm);
-  background: color-mix(in srgb, var(--cc-primary) 18%, transparent);
-  border-left: 3px solid var(--cc-primary);
-  padding: 3px 6px;
-  cursor: pointer;
-  border-top: none;
-  border-right: none;
-  border-bottom: none;
-  text-align: left;
-  overflow: hidden;
-  z-index: 1;
-  transition: background 0.15s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.cc-calendar__event-block:hover {
-  background: color-mix(in srgb, var(--cc-primary) 30%, transparent);
-}
-
-.cc-calendar__event-block--allday {
-  position: relative;
-  top: auto;
-  height: auto;
-  margin-bottom: 2px;
-}
-
-.cc-calendar__event-block-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--cc-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cc-calendar__event-block-time {
-  font-size: 10px;
-  color: var(--cc-text-secondary);
-  white-space: nowrap;
-}
-
 /* ============================================================
    Event Create Dialog — form styles
    ============================================================ */
@@ -467,25 +319,6 @@
   .cc-calendar__event-pill-title {
     font-size: 10px;
   }
-
-  /* Week view: stack vertically */
-  .cc-calendar__week-body {
-    flex-direction: column;
-    overflow-x: auto;
-    min-width: 600px;
-  }
-
-  .cc-calendar__time-gutter-header {
-    width: 44px;
-  }
-
-  .cc-calendar__time-gutter {
-    width: 44px;
-  }
-
-  .cc-calendar__time-label {
-    font-size: 9px;
-  }
 }
 
 /* Task deadlines ----------------------------------------------------------
@@ -533,26 +366,6 @@
   min-width: 0;
 }
 
-/* Week view: deadlines have no time of day, so they sit above the hour grid */
-.cc-calendar__week-tasks {
-  display: flex;
-  border-bottom: 1px solid var(--cc-border);
-  flex-shrink: 0;
-}
-
-.cc-calendar__week-tasks-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 2px 0;
-  min-width: 0;
-}
-
-.cc-calendar__week-tasks-col:empty {
-  min-height: 0;
-}
-
 /* Week as seven columns ------------------------------------------------------
  *
  * The design's week: one column per day, events with a red rule and their
@@ -592,14 +405,17 @@
   padding: 10px 8px 8px;
 }
 
-.cc-calendar__week-day-head .cc-calendar__week-day-name {
-  text-transform: none;
-  letter-spacing: 0;
+.cc-calendar__week-day-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cc-text-secondary);
 }
 
-.cc-calendar__week-day-head .cc-calendar__week-day-number {
+.cc-calendar__week-day-number {
   font-size: 17px;
   font-weight: 700;
+  color: var(--cc-text);
+  line-height: 1;
 }
 
 .cc-calendar__week-day--today .cc-calendar__week-day-number {
