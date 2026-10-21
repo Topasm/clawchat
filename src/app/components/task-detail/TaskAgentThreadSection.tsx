@@ -9,7 +9,7 @@ import {
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import { relativeTime } from '../../utils/formatters';
-import { agentName, describeTaskStage, getRunStage } from '../../utils/taskStage';
+import { agentName, describeTaskStage, getRunStage, isRunExecuting } from '../../utils/taskStage';
 import { runFailureReason } from '../../utils/runFailure';
 
 /**
@@ -32,7 +32,7 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
   );
   if (!latest) return null;
   const openRun = () => navigate(`/attention?view=runs&run_id=${latest.id}`);
-  if (ACTIVE_RUN.has(latest.status)) return <LiveRunCard run={latest} onOpenRun={openRun} />;
+  if (isRunExecuting(latest.status)) return <LiveRunCard run={latest} onOpenRun={openRun} />;
   const stage = getRunStage(latest);
   const updatedAt = latest.updated_at ?? latest.created_at;
   return (
@@ -89,7 +89,6 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
   );
 }
 
-const ACTIVE_RUN = new Set(['queued', 'starting', 'running']);
 /** Lifecycle events say nothing the card does not; the log shows the work. */
 const LIFECYCLE_EVENTS = new Set(['queued', 'starting', 'running']);
 

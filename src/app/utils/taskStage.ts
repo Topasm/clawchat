@@ -15,6 +15,18 @@ export type TaskStage = 'capture' | 'plan' | 'run' | 'review' | 'done';
 /** Something wrong on top of the current step, shown as a badge on it. */
 export type TaskStageException = 'needs_input' | 'failed';
 
+/** Run states in which the agent is at work, or about to be: nothing waits on the user. */
+const EXECUTING_RUN_STATUSES: ReadonlySet<string> = new Set<AgentRunStatus>([
+  'queued',
+  'starting',
+  'running',
+]);
+
+/** Whether a run is queued, starting or running -- the one test every screen uses. */
+export function isRunExecuting(status: string | null | undefined): boolean {
+  return status != null && EXECUTING_RUN_STATUSES.has(status);
+}
+
 export const TASK_STAGES: readonly TaskStage[] = ['capture', 'plan', 'run', 'review', 'done'];
 
 export interface TaskStageState {

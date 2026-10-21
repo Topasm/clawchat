@@ -10,8 +10,8 @@ import {
 } from '../../types/schemas';
 import type { AgentRunResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
+import { isRunExecuting } from '../../utils/taskStage';
 import { translateUi } from '../../i18n';
-const ACTIVE = new Set(['queued', 'starting', 'running']);
 export function useAgentRunsQuery(projectId?: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -25,7 +25,7 @@ export function useAgentRunsQuery(projectId?: string | null) {
     enabled: !!serverUrl,
     refetchInterval: (query) => {
       const runs = query.state.data as AgentRunResponse[] | undefined;
-      return runs?.some((run) => ACTIVE.has(run.status)) ? 3000 : false;
+      return runs?.some((run) => isRunExecuting(run.status)) ? 3000 : false;
     },
   });
 }
@@ -64,7 +64,7 @@ export function useActiveRunsQuery() {
       return z
         .array(AgentRunResponseSchema)
         .parse(response.data)
-        .filter((run) => ACTIVE.has(run.status));
+        .filter((run) => isRunExecuting(run.status));
     },
     enabled: !!serverUrl,
   });
