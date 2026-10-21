@@ -46,7 +46,7 @@ internal data class NoteWidgetItem(
     /** First non-blank line of the note. */
     val headline: String,
     val updatedOn: LocalDate?,
-    /** The exact moment, for "just now" and "5 min ago"; null when unreadable. */
+    /** The exact moment, for the time a note from today shows; null when unreadable. */
     val updatedAt: Instant? = null,
 )
 
@@ -58,15 +58,15 @@ private fun noteInstant(raw: String?): Instant? {
         .getOrNull()
 }
 
-/** How a note row dates itself: just now, minutes ago, today, or the day. */
-internal enum class NoteAge { JUST_NOW, MINUTES, TODAY, DATE }
+/**
+ * How a note row dates itself: the time for today's notes, the day otherwise.
+ * A widget is redrawn only every half hour or so, so a relative "5 min ago"
+ * would go stale on screen; a time of day stays true until midnight.
+ */
+internal enum class NoteAge { TIME, TODAY, DATE }
 
-internal fun noteAge(item: NoteWidgetItem, now: Instant, today: LocalDate): Pair<NoteAge, Long> {
-    val minutes = item.updatedAt?.let { java.time.Duration.between(it, now).toMinutes() }
-    return when {
-        minutes != null && minutes in 0..0 -> NoteAge.JUST_NOW to 0L
-        minutes != null && minutes in 1..59 -> NoteAge.MINUTES to minutes
-        item.updatedOn == today -> NoteAge.TODAY to 0L
-        else -> NoteAge.DATE to 0L
-    }
+internal fun noteAge(item: NoteWidgetItem, today: LocalDate): NoteAge = when {
+    item.updatedOn != today -> NoteAge.DATE
+    item.updatedAt != null -> NoteAge.TIME
+    else -> NoteAge.TODAY
 }

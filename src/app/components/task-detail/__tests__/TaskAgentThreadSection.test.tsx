@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import TaskAgentThreadSection, { runElapsedLabel } from '../TaskAgentThreadSection';
@@ -6,12 +6,16 @@ import TaskAgentThreadSection, { runElapsedLabel } from '../TaskAgentThreadSecti
 const mocks = vi.hoisted(() => ({
   runs: [] as unknown[],
   events: [] as unknown[],
+  eventsArgs: [] as unknown[],
   cancel: vi.fn(),
 }));
 
 vi.mock('../../../hooks/queries', () => ({
   useAgentRunsQuery: () => ({ data: mocks.runs }),
-  useAgentRunEventsQuery: () => ({ data: mocks.events }),
+  useAgentRunEventsQuery: (...args: unknown[]) => {
+    mocks.eventsArgs = args;
+    return { data: mocks.events };
+  },
   useCancelAgentRun: () => ({ mutate: mocks.cancel, isPending: false }),
   useRetryAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -93,5 +97,32 @@ describe('TaskAgentThreadSection', () => {
     expect(runElapsedLabel(null, now)).toBe('Waiting to start');
     expect(runElapsedLabel('2026-10-18T09:59:30Z', now)).toBe('Just started');
     expect(runElapsedLabel('2026-10-18T09:57:00Z', now)).toBe('3 min in');
+  });
+
+  it('keeps counting while a run goes quiet, reading only the end of its log', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.parse('2026-10-18T10:00:00Z'));
+      mocks.events = [];
+      mocks.runs = [
+        {
+          id: 'run-quiet',
+          todo_id: 'task-1',
+          provider: 'codex_cli',
+          status: 'running',
+          host_label: null,
+          started_at: '2026-10-18T09:58:00Z',
+          created_at: '2026-10-02T00:00:00Z',
+          conversation_id: null,
+        },
+      ];
+      renderSection();
+      expect(screen.getByText(/2 min in/)).toBeInTheDocument();
+      expect(mocks.eventsArgs).toEqual(['run-quiet', true, 20]);
+      act(() => vi.advanceTimersByTime(10 * 60_000));
+      expect(screen.getByText(/12 min in/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

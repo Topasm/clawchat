@@ -69,10 +69,13 @@ async def get_run(
 @router.get("/{run_id}/events", response_model=list[AgentRunEventResponse])
 async def get_run_events(
     run_id: str,
+    tail: int | None = Query(
+        None, ge=1, le=200, description="Only the last N events, still oldest first."
+    ),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    return await agent_run_service.list_events(db, run_id)
+    return await agent_run_service.list_events(db, run_id, tail=tail)
 
 
 def _active_provider(request: Request) -> tuple[str, object, str | None]:

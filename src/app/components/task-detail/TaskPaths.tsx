@@ -83,13 +83,15 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
   const addPath = useAddTodoPath(taskId);
   const deletePath = useDeleteTodoPath(taskId);
   const deleteAttachment = useDeleteAttachment();
-  const upload = useAttachmentUploader(taskId);
+  const [showAll, setShowAll] = useState(false);
+  // Whatever the user just added is unfolded, so it never lands out of sight.
+  const reveal = () => setShowAll(true);
+  const upload = useAttachmentUploader(taskId, reveal);
   const serverUrl = useAuthStore((state) => state.serverUrl);
   const { isDesktop } = usePlatform();
   const thisHostId = useWorkerStore((state) => state.hostId);
   const [draft, setDraft] = useState('');
   const [removing, setRemoving] = useState<AttachmentResponse | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const own = paths.filter((path) => !path.inherited);
   const inherited = paths.filter((path) => path.inherited);
 
@@ -111,6 +113,7 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
     if (!path) return;
     addPath.mutate({ kind, path, host_id: kind === 'device' ? thisHostId : null });
     setDraft('');
+    reveal();
   };
 
   const browse = async () => {
@@ -218,7 +221,7 @@ export default function TaskPaths({ taskId }: { taskId: string }) {
           </button>
         )}
       </div>
-      <FileDropZone todoId={taskId} compact />
+      <FileDropZone todoId={taskId} onUploadComplete={reveal} compact />
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => {

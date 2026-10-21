@@ -45,8 +45,6 @@
     <string name="widget_next_deadline">다음 마감 %1$s %2$s · %3$s</string>
     <string name="widget_other_tasks">진행 중 · 마감 없음</string>
     <string name="widget_in_progress">진행 중</string>
-    <string name="widget_just_now">방금</string>
-    <string name="widget_minutes_ago">%1$d분 전</string>
     <string name="widget_today">오늘</string>
     <string name="widget_short_date_pattern">M월 d일</string>
 </resources>

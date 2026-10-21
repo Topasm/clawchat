@@ -70,12 +70,19 @@ export function useActiveRunsQuery() {
   });
 }
 /** A run's event log; [live] rereads it every few seconds while the run works. */
-export function useAgentRunEventsQuery(runId: string | null, live = false) {
+/**
+ * A run's event log. With `tail`, only its last `tail` events: a live card
+ * polling for the latest steps should not re-download the whole log.
+ */
+export function useAgentRunEventsQuery(runId: string | null, live = false, tail?: number) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
+  const logKey = queryKeys.runEvents(runId ?? '');
   return useQuery({
-    queryKey: queryKeys.runEvents(runId ?? ''),
+    queryKey: tail ? [...logKey, 'tail', tail] : logKey,
     queryFn: async () => {
-      const response = await apiClient.get(`/runs/${runId}/events`);
+      const response = await apiClient.get(`/runs/${runId}/events`, {
+        params: tail ? { tail } : undefined,
+      });
       return z.array(AgentRunEventResponseSchema).parse(response.data);
     },
     enabled: !!serverUrl && !!runId,

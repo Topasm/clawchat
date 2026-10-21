@@ -45,8 +45,6 @@
     <string name="widget_next_deadline">Next: %1$s %2$s · %3$s</string>
     <string name="widget_other_tasks">In progress · no deadline</string>
     <string name="widget_in_progress">Doing</string>
-    <string name="widget_just_now">Just now</string>
-    <string name="widget_minutes_ago">%1$d min ago</string>
     <string name="widget_today">Today</string>
     <string name="widget_short_date_pattern">MMM d</string>
 </resources>

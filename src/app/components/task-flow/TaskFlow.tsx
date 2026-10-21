@@ -206,7 +206,13 @@ export default function TaskFlow({
   // The header the design gives a flow: how far it is, and how many times it forks.
   const counted = steps.filter((step) => step.status !== 'cancelled');
   const doneCount = counted.filter((step) => step.status === 'completed').length;
-  const branches = flowBranchCount(edges);
+  // A fork into a cancelled step no longer exists, as Done x/y leaves it out.
+  const cancelled = new Set(
+    steps.filter((step) => step.status === 'cancelled').map((step) => step.id),
+  );
+  const branches = flowBranchCount(
+    edges.filter((edge) => !cancelled.has(edge.before) && !cancelled.has(edge.after)),
+  );
   const focusId = allNodes.find((node) => node.tone === 'active')?.id ?? canDoNow[0]?.id ?? null;
   const ends = steps.filter(
     (step) => linked.has(step.id) && !edges.some((edge) => edge.before === step.id),
