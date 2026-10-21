@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
-
-/** A connection that drops for less than this is not an outage. */
-export const OUTAGE_GRACE_MS = 4000;
+import { homeGraceLeft, isHomeReachableNow } from '../services/homeReachability';
 
 /**
  * Whether Home can be reached, as the offline banner and the hand-off buttons
@@ -10,31 +8,30 @@ export const OUTAGE_GRACE_MS = 4000;
  * reconnects, still counts as reachable; the browser going offline does not.
  */
 export default function useHomeReachable(): boolean {
+  // Re-render on what the answer depends on: the socket, the server and the browser.
   const serverUrl = useAuthStore((state) => state.serverUrl);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const [browserOnline, setBrowserOnline] = useState(navigator.onLine);
-  const [lost, setLost] = useState(false);
+  const [, setGraceEnded] = useState(0);
 
   useEffect(() => {
-    const goOnline = () => setBrowserOnline(navigator.onLine);
-    const goOffline = () => setBrowserOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
+    const update = () => setBrowserOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
     return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
     };
   }, []);
 
-  const unreachable = !browserOnline || (!!serverUrl && connectionStatus !== 'connected');
+  const reachable = isHomeReachableNow();
+  // Inside the grace period, look again the moment it runs out.
+  const graceLeft = reachable ? homeGraceLeft() : 0;
   useEffect(() => {
-    if (!unreachable) {
-      setLost(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setLost(true), browserOnline ? OUTAGE_GRACE_MS : 0);
+    if (graceLeft <= 0) return;
+    const timer = window.setTimeout(() => setGraceEnded((count) => count + 1), graceLeft);
     return () => window.clearTimeout(timer);
-  }, [unreachable, browserOnline]);
+  }, [graceLeft, serverUrl, connectionStatus, browserOnline]);
 
-  return !(unreachable && lost);
+  return reachable;
 }

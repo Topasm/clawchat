@@ -11,6 +11,11 @@ import {
 import type { AgentRunResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { isRunExecuting } from '../../utils/taskStage';
+import {
+  HomeUnreachableError,
+  homeUnreachableMessage,
+  requireHome,
+} from '../../services/homeReachability';
 import { translateUi } from '../../i18n';
 export function useAgentRunsQuery(projectId?: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -116,6 +121,7 @@ export function useRetryAgentRun() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ runId, followUp }: { runId: string; followUp?: string }) => {
+      requireHome();
       const response = await apiClient.post(`/runs/${runId}/retry`, {
         follow_up_instruction: followUp?.trim() || null,
       });
@@ -125,8 +131,10 @@ export function useRetryAgentRun() {
       invalidateRuns(queryClient);
       useToastStore.getState().addToast('success', translateUi('New agent attempt started'));
     },
-    onError: () =>
-      useToastStore.getState().addToast('error', translateUi('Could not retry agent run')),
+    onError: (error) =>
+      error instanceof HomeUnreachableError
+        ? useToastStore.getState().addToast('info', homeUnreachableMessage())
+        : useToastStore.getState().addToast('error', translateUi('Could not retry agent run')),
   });
 }
 export function useReturnAgentRunToReady() {
@@ -157,6 +165,7 @@ export function useResumeAgentRun() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ runId, followUp }: { runId: string; followUp: string }) => {
+      requireHome();
       const response = await apiClient.post(`/runs/${runId}/resume`, {
         follow_up_instruction: followUp.trim(),
       });
@@ -166,8 +175,10 @@ export function useResumeAgentRun() {
       invalidateRuns(queryClient);
       useToastStore.getState().addToast('success', translateUi('Agent run resumed'));
     },
-    onError: () =>
-      useToastStore.getState().addToast('error', translateUi('Could not resume agent run')),
+    onError: (error) =>
+      error instanceof HomeUnreachableError
+        ? useToastStore.getState().addToast('info', homeUnreachableMessage())
+        : useToastStore.getState().addToast('error', translateUi('Could not resume agent run')),
   });
 }
 
