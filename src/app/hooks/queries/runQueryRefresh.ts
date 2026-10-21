@@ -40,7 +40,8 @@ export function createRunQueryRefresher(
       void queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
     }
     for (const runId of runIds) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runEvents(runId), exact: true });
+      // The full log and any tail of it.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runEvents(runId) });
     }
     runIds.clear();
   };

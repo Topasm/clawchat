@@ -217,6 +217,36 @@ async def test_run_detail_exposes_full_result_but_list_stays_compact(
 
 
 @pytest.mark.asyncio
+async def test_run_events_tail_returns_only_the_latest_in_order(
+    client, auth_headers, db_session
+):
+    _project, _todo, task = await create_project_task(db_session)
+    run = await agent_run_service.create_run(db_session, task, provider="openclaw")
+    await agent_run_service.mark_starting(db_session, run)
+    await agent_run_service.mark_running(db_session, run)
+    await db_session.commit()
+
+    full = await client.get(f"/api/runs/{run.id}/events", headers=auth_headers)
+    assert full.status_code == 200, full.text
+    assert [event["event_type"] for event in full.json()] == [
+        "queued",
+        "starting",
+        "running",
+    ]
+
+    tail = await client.get(
+        f"/api/runs/{run.id}/events", params={"tail": 2}, headers=auth_headers
+    )
+    assert tail.status_code == 200, tail.text
+    assert [event["event_type"] for event in tail.json()] == ["starting", "running"]
+
+    no_events = await client.get(
+        f"/api/runs/{run.id}/events", params={"tail": 0}, headers=auth_headers
+    )
+    assert no_events.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_cancel_endpoint_stops_registered_execution(
     client, auth_headers, db_session
 ):

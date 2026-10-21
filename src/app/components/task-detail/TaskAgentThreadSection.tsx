@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useAgentRunEventsQuery,
@@ -93,6 +93,20 @@ const ACTIVE_RUN = new Set(['queued', 'starting', 'running']);
 /** Lifecycle events say nothing the card does not; the log shows the work. */
 const LIFECYCLE_EVENTS = new Set(['queued', 'starting', 'running']);
 
+/** Enough of the log's end to hold the last two steps past lifecycle events. */
+const LIVE_EVENTS_TAIL = 20;
+/** "N min in" moves by the minute; a run that goes quiet must not freeze it. */
+const ELAPSED_TICK_MS = 30_000;
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
 /** "3분째" / "3 min in"; "방금 시작" for the first minute. */
 export function runElapsedLabel(startedAt: string | null | undefined, now = Date.now()): string {
   if (!startedAt) return translateUi('Waiting to start');
@@ -108,7 +122,8 @@ export function runElapsedLabel(startedAt: string | null | undefined, now = Date
  */
 function LiveRunCard({ run, onOpenRun }: { run: AgentRunResponse; onOpenRun: () => void }) {
   const cancel = useCancelAgentRun();
-  const { data: events = [] } = useAgentRunEventsQuery(run.id, true);
+  const { data: events = [] } = useAgentRunEventsQuery(run.id, true, LIVE_EVENTS_TAIL);
+  const now = useNow(ELAPSED_TICK_MS);
   const recent = events
     .filter((event) => !LIFECYCLE_EVENTS.has(event.event_type) && event.message)
     .slice(-2);
@@ -121,7 +136,7 @@ function LiveRunCard({ run, onOpenRun }: { run: AgentRunResponse; onOpenRun: () 
           <span className="cc-run-live__dot" aria-hidden="true" />
           <b>{agentName(run.provider)}</b>
           <span className="cc-run-live__meta">
-            · {runElapsedLabel(run.started_at)}
+            · {runElapsedLabel(run.started_at, now)}
             {run.host_label ? ` · ${run.host_label}` : ''}
           </span>
         </div>

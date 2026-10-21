@@ -19099,6 +19099,26 @@
               "title": "Run Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Only the last N events, still oldest first.",
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 200,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the last N events, still oldest first.",
+              "title": "Tail"
+            }
           }
         ],
         "responses": {

@@ -6,22 +6,21 @@ const mocks = vi.hoisted(() => ({
   deleteAttachment: vi.fn(async () => undefined),
   upload: vi.fn(async () => ({})),
   addPath: vi.fn(),
+  paths: [] as unknown[],
 }));
 
+const INHERITED_FOLDER = {
+  id: 'path-1',
+  kind: 'device',
+  path: '~/postech/GPU_Computing/hw3',
+  label: null,
+  host_id: 'host-1',
+  host_label: 'Lab Mac',
+  inherited: true,
+};
+
 vi.mock('../../../hooks/queries', () => ({
-  useTodoPathsQuery: () => ({
-    data: [
-      {
-        id: 'path-1',
-        kind: 'device',
-        path: '~/postech/GPU_Computing/hw3',
-        label: null,
-        host_id: 'host-1',
-        host_label: 'Lab Mac',
-        inherited: true,
-      },
-    ],
-  }),
+  useTodoPathsQuery: () => ({ data: mocks.paths }),
   useAttachmentsQuery: () => ({
     data: [
       {
@@ -59,6 +58,8 @@ describe('TaskPaths as the one resources list', () => {
   beforeEach(() => {
     mocks.deleteAttachment.mockClear();
     mocks.upload.mockClear();
+    mocks.addPath.mockClear();
+    mocks.paths = [INHERITED_FOLDER];
   });
 
   it('lists uploaded files next to paths under one heading, each row saying its kind', () => {
@@ -95,5 +96,27 @@ describe('TaskPaths as the one resources list', () => {
       clipboardData: { files: [file], getData: () => '' },
     });
     expect(mocks.upload).toHaveBeenCalledWith({ file, todoId: 'task-1' });
+  });
+
+  it('unfolds the list when a path is added, so the new row is in sight', () => {
+    mocks.paths = ['a', 'b', 'c'].map((name) => ({
+      id: `own-${name}`,
+      kind: 'note',
+      path: `note ${name}`,
+      label: null,
+      host_id: null,
+      host_label: null,
+      inherited: false,
+    }));
+    render(<TaskPaths taskId="task-1" />);
+    expect(screen.getByRole('button', { name: 'Show 1 more' })).toBeInTheDocument();
+
+    const input = screen.getByLabelText('Paste a path, URL or file');
+    fireEvent.change(input, { target: { value: 'https://example.com/spec' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(mocks.addPath).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /^Show \d+ more$/ })).not.toBeInTheDocument();
+    expect(screen.getByText('notice.png')).toBeInTheDocument();
   });
 });

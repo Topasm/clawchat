@@ -11,6 +11,7 @@ function seededClient() {
     queryKeys.runList('project-1'),
     queryKeys.runsByStatus('waiting_input'),
     queryKeys.runEvents('run-1'),
+    [...queryKeys.runEvents('run-1'), 'tail', 20],
     queryKeys.runEvents('run-2'),
     queryKeys.reviews,
     queryKeys.projects,
@@ -43,7 +44,12 @@ describe('createRunQueryRefresher', () => {
     expect(invalidated(queryClient)).toEqual([]);
     vi.advanceTimersByTime(RUN_REFRESH_DELAY_MS);
 
-    expect(invalidated(queryClient)).toEqual([JSON.stringify(queryKeys.runEvents('run-1'))]);
+    expect(invalidated(queryClient)).toEqual(
+      [
+        JSON.stringify(queryKeys.runEvents('run-1')),
+        JSON.stringify([...queryKeys.runEvents('run-1'), 'tail', 20]),
+      ].sort(),
+    );
   });
 
   it('coalesces a burst of state changes into one refresh of the run lists', () => {
@@ -56,7 +62,7 @@ describe('createRunQueryRefresher', () => {
     refresher.runProgressed('run-1');
     vi.advanceTimersByTime(RUN_REFRESH_DELAY_MS);
 
-    // Run lists, reviews, projects, telemetry, and the one event log.
+    // Run lists, reviews, projects, telemetry, and the one event log (with its tail).
     expect(invalidate).toHaveBeenCalledTimes(5);
     expect(invalidated(queryClient)).toEqual(
       [
@@ -64,6 +70,7 @@ describe('createRunQueryRefresher', () => {
         queryKeys.runList('project-1'),
         queryKeys.runsByStatus('waiting_input'),
         queryKeys.runEvents('run-1'),
+        [...queryKeys.runEvents('run-1'), 'tail', 20],
         queryKeys.reviews,
         queryKeys.projects,
         [...queryKeys.taskExecutionTelemetry, 'all'],

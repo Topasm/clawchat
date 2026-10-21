@@ -122,6 +122,20 @@ describe('TaskFlow', () => {
     expect(screen.getByText('Done 1/3')).toBeVisible();
   });
 
+  it('counts a fork only while both of its steps are live', () => {
+    mocks.todos.push(todo('figures', { title: 'Figures', parent_id: 'hw', sort_order: 15 }));
+    mocks.relationships.push(edge('figures', 'read'));
+    const { unmount } = renderFlow();
+    expect(document.querySelector('.cc-flow__summary')?.textContent).toBe('Done 1/4 · Branches 1');
+    unmount();
+
+    mocks.todos = mocks.todos.map((task) =>
+      task.id === 'figures' ? { ...task, status: 'cancelled' } : task,
+    );
+    renderFlow();
+    expect(document.querySelector('.cc-flow__summary')?.textContent).toBe('Done 1/3');
+  });
+
   it('appends on Enter and branches from the selected step on Tab, one at a time', async () => {
     renderFlow();
     const input = screen.getByRole('textbox', { name: 'Next step' });

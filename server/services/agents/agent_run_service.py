@@ -775,19 +775,19 @@ async def _pending_tool_call(db: AsyncSession, run: AgentRun):
     )
 
 
-async def list_events(db: AsyncSession, run_id: str) -> list[AgentRunEventResponse]:
+async def list_events(
+    db: AsyncSession, run_id: str, tail: int | None = None
+) -> list[AgentRunEventResponse]:
+    """A run's events in order; with ``tail``, only the last ``tail`` of them."""
     await require_run(db, run_id)
-    events = list(
-        (
-            await db.execute(
-                select(AgentRunEvent)
-                .where(AgentRunEvent.run_id == run_id)
-                .order_by(AgentRunEvent.sequence.asc())
-            )
-        )
-        .scalars()
-        .all()
-    )
+    query = select(AgentRunEvent).where(AgentRunEvent.run_id == run_id)
+    if tail is None:
+        query = query.order_by(AgentRunEvent.sequence.asc())
+    else:
+        query = query.order_by(AgentRunEvent.sequence.desc()).limit(tail)
+    events = list((await db.execute(query)).scalars().all())
+    if tail is not None:
+        events.reverse()
     responses = []
     for event in events:
         payload = None

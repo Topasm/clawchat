@@ -36,17 +36,18 @@ class NoteWidgetUiModelTest {
     }
 
     @Test
-    fun `a note dates itself just now, minutes ago, today, or by day`() {
-        val now = java.time.Instant.parse("2026-10-18T09:00:00Z")
+    fun `a note from today shows its time, an older one its day`() {
         val today = LocalDate.of(2026, 10, 18)
-        fun age(updatedAt: String) = noteAge(
-            NoteWidgetUiModel.from(listOf(note("n", "Note", updatedAt)), ZoneId.of("UTC")).items.single(),
-            now,
-            today,
+        fun item(updatedAt: String) =
+            NoteWidgetUiModel.from(listOf(note("n", "Note", updatedAt)), ZoneId.of("UTC")).items.single()
+
+        assertEquals(NoteAge.TIME, noteAge(item("2026-10-18T08:59:30Z"), today))
+        assertEquals(NoteAge.TIME, noteAge(item("2026-10-18T06:00:00Z"), today))
+        assertEquals(NoteAge.DATE, noteAge(item("2026-10-15T09:00:00Z"), today))
+        // A day without a readable moment still says it was today.
+        assertEquals(
+            NoteAge.TODAY,
+            noteAge(NoteWidgetItem(id = "n", headline = "Note", updatedOn = today), today),
         )
-        assertEquals(NoteAge.JUST_NOW to 0L, age("2026-10-18T08:59:30Z"))
-        assertEquals(NoteAge.MINUTES to 5L, age("2026-10-18T08:55:00Z"))
-        assertEquals(NoteAge.TODAY to 0L, age("2026-10-18T06:00:00Z"))
-        assertEquals(NoteAge.DATE to 0L, age("2026-10-15T09:00:00Z"))
     }
 }

@@ -29,6 +29,7 @@ import com.clawchat.android.widget.tracking.WidgetContentMode
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,13 +102,16 @@ class WidgetScreenshotTest {
 
     @Test
     fun notes() = shot("tracking_notes", DpSize(362.dp, 250.dp)) {
-        val now = Instant.now()
+        // Today's notes show their time of day; fixed times keep the image stable.
+        val today = LocalDate.now()
+        fun at(hour: Int, minute: Int): Instant =
+            today.atTime(hour, minute).atZone(ZoneId.systemDefault()).toInstant()
         TodoTrackingContent(
             state = WidgetState.Success(
                 NoteWidgetUiModel(
                     listOf(
-                        NoteWidgetItem("n1", "선택지 만드는 모델 판단하는 모델", LocalDate.now(), now.minusSeconds(20)),
-                        NoteWidgetItem("n2", "커널 최적화 아이디어", LocalDate.now(), now.minusSeconds(8 * 60)),
+                        NoteWidgetItem("n1", "선택지 만드는 모델 판단하는 모델", today, at(9, 41)),
+                        NoteWidgetItem("n2", "커널 최적화 아이디어", today, at(9, 12)),
                         NoteWidgetItem("n3", "강의 노트 7주차", LocalDate.of(2026, 10, 14), null),
                     ),
                 ),

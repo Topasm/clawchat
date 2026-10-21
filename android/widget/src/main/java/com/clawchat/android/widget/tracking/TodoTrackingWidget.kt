@@ -59,7 +59,9 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 class TodoTrackingWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
@@ -644,10 +646,8 @@ private fun NoteRow(note: NoteWidgetItem, mainActivity: ComponentName) {
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight(),
         )
-        val (age, minutes) = noteAge(note, Instant.now(), LocalDate.now())
-        val label = when (age) {
-            NoteAge.JUST_NOW -> context.getString(R.string.widget_just_now)
-            NoteAge.MINUTES -> context.getString(R.string.widget_minutes_ago, minutes.toInt())
+        val label = when (noteAge(note, LocalDate.now())) {
+            NoteAge.TIME -> note.updatedAt?.let { shortTime(context, it) }
             NoteAge.TODAY -> context.getString(R.string.widget_today)
             NoteAge.DATE -> note.updatedOn?.let { shortDate(context, it) }
         }
@@ -671,6 +671,12 @@ private fun deadlineLabel(context: Context, daysRemaining: Int): String = when {
     daysRemaining == 0 -> context.getString(R.string.widget_due_today)
     else -> context.getString(R.string.widget_days_remaining, daysRemaining)
 }
+
+private fun shortTime(context: Context, moment: Instant): String =
+    DateTimeFormatter
+        .ofLocalizedTime(FormatStyle.SHORT)
+        .withLocale(context.resources.configuration.locales[0])
+        .format(moment.atZone(ZoneId.systemDefault()))
 
 private fun shortDate(context: Context, day: LocalDate): String =
     DateTimeFormatter
