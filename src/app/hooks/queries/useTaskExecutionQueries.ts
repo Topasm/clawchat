@@ -6,6 +6,11 @@ import type { ProjectResponse, Skill, TodoResponse } from '../../types/api';
 import { DelegateResponseSchema, SkillsResponseSchema } from '../../types/schemas';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 import { queryKeys } from './queryKeys';
+import {
+  HomeUnreachableError,
+  homeUnreachableMessage,
+  requireHome,
+} from '../../services/homeReachability';
 import { translateUi } from '../../i18n';
 import { useTodosQuery } from './useModuleQueries';
 import { useProjectsQuery } from './useChatQueries';
@@ -74,6 +79,7 @@ export function useStartReadyTaskExecution() {
       executionProvider,
       model,
     }: StartReadyTaskExecutionVariables) => {
+      requireHome();
       const response = await apiClient.post(`/todos/${todoId}/delegate`, {
         ...(skillId ? { skill_id: skillId } : {}),
         execution_provider: executionProvider,
@@ -94,6 +100,10 @@ export function useStartReadyTaskExecution() {
       useToastStore.getState().addToast('success', translateUi('Agent run started'));
     },
     onError: (error) => {
+      if (error instanceof HomeUnreachableError) {
+        useToastStore.getState().addToast('info', homeUnreachableMessage());
+        return;
+      }
       useToastStore.getState().addToast('error', executionErrorMessage(error));
     },
   });
