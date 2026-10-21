@@ -4,7 +4,7 @@ import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../../stores/useToastStore';
-import { useAuthStore } from '../../stores/useAuthStore';
+import useHomeReachable from '../../hooks/useHomeReachable';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { activeWorkspaceName } from '../../utils/workspaceLocation';
 import { useDebouncedPersist } from '../../hooks/useDebouncedPersist';
@@ -101,7 +101,7 @@ export default function TaskDetail({
   extraMenuItems,
 }: TaskDetailProps) {
   const navigate = useNavigate();
-  const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const homeReachable = useHomeReachable();
   const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const openTask = useCallback(
     (id: string) => (onOpenTask ? onOpenTask(id) : navigate(`/tasks/${id}`)),
@@ -216,7 +216,6 @@ export default function TaskDetail({
   // A task is yours unless it was handed to AI (assignee) or AI already ran
   // it. Only delegated work shows the five steps and the plan button; for
   // your own task the top of the page is its due date and flow.
-  const homeReachable = connectionStatus === 'connected';
   const isDelegated = Boolean(
     task.assignee ||
     hasAgentSkills ||
@@ -224,7 +223,17 @@ export default function TaskDetail({
     taskTelemetry?.pending_review_count,
   );
   const planIsNext = isDelegated && stage.stage === 'capture' && !stage.exception;
+  // Suggesting steps starts AI planning on Home, so it waits like a hand-off.
   const organize = async () => {
+    if (!homeReachable) {
+      useToastStore.getState().addToast(
+        'info',
+        translateUi('Reconnect to {{workspace}} to hand this to AI', {
+          workspace: workspaceName,
+        }),
+      );
+      return;
+    }
     try {
       await apiClient.post(`/todos/${taskId}/organize`);
       useToastStore.getState().addToast('info', translateUi('Planning...'));

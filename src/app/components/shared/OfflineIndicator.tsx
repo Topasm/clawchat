@@ -4,10 +4,8 @@ import { wsClient } from '../../services/wsClient';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { activeWorkspaceName } from '../../utils/workspaceLocation';
+import useHomeReachable from '../../hooks/useHomeReachable';
 import { translateUi } from '../../i18n';
-
-/** A connection that drops for less than this is not worth a banner. */
-const SHOW_AFTER_MS = 4000;
 
 /**
  * Home out of reach, as the design's state board says it: one soft red line
@@ -20,43 +18,22 @@ export default function OfflineIndicator() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const workspaceName = useWorkspaceStore(activeWorkspaceName);
   const queueScope = getOfflineQueueScope({ serverUrl, token });
-  const [browserOnline, setBrowserOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(() => offlineQueue.getCount(queueScope));
-  const [lost, setLost] = useState(false);
+  const reachable = useHomeReachable();
 
   useEffect(() => {
     const recount = () => setPendingCount(offlineQueue.getCount(queueScope));
     recount();
-    const goOnline = () => setBrowserOnline(true);
-    const goOffline = () => setBrowserOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    const unsubscribe = offlineQueue.subscribe(recount);
-    return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
-      unsubscribe();
-    };
+    return offlineQueue.subscribe(recount);
   }, [queueScope]);
 
-  // A socket that is still opening, or blinks, is not an outage.
-  const unreachable = !browserOnline || (!!serverUrl && connectionStatus !== 'connected');
-  useEffect(() => {
-    if (!unreachable) {
-      setLost(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setLost(true), browserOnline ? SHOW_AFTER_MS : 0);
-    return () => window.clearTimeout(timer);
-  }, [unreachable, browserOnline]);
-
+  // Only the socket can say Home answered: reconnect it, and the network hook
+  // sends the kept changes once it is up.
   const retry = () => {
     if (serverUrl && token) wsClient.connect(serverUrl, token);
-    // The network hook flushes the queue and refreshes on "online".
-    window.dispatchEvent(new Event('online'));
   };
 
-  if (lost) {
+  if (!reachable) {
     return (
       <div className="cc-offline-banner" role="status">
         <span className="cc-offline-banner__dot" aria-hidden="true" />
@@ -77,7 +54,7 @@ export default function OfflineIndicator() {
       </div>
     );
   }
-  if (pendingCount > 0 && !unreachable) {
+  if (pendingCount > 0 && connectionStatus === 'connected') {
     return (
       <div className="cc-offline-banner cc-offline-banner--sending" role="status">
         <span className="cc-offline-banner__text">
