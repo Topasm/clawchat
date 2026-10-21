@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
 import TaskDetail from '../../components/task-detail/TaskDetail';
 import { useToastStore } from '../../stores/useToastStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import apiClient from '../../services/apiClient';
 
 const mocks = vi.hoisted(() => ({
   projectDescription: null as string | null,
@@ -115,7 +116,7 @@ function renderPage() {
 
 describe('TaskDetailPage project context', () => {
   beforeEach(() => {
-    useAuthStore.setState({ connectionStatus: 'connected' });
+    useAuthStore.setState({ serverUrl: 'http://home.local:8000', connectionStatus: 'connected' });
     mocks.projectDescription = null;
     mocks.updateTodo.mockReset();
     mocks.deleteTodo.mockReset();
@@ -175,12 +176,46 @@ describe('TaskDetailPage project context', () => {
   });
 
   it('waits for Home before handing work to AI', () => {
-    useAuthStore.setState({ connectionStatus: 'disconnected' });
+    vi.useFakeTimers();
+    try {
+      useAuthStore.setState({ connectionStatus: 'disconnected' });
+      renderPage();
+      act(() => vi.advanceTimersByTime(4000));
+      fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
+      expect(mocks.updateTodo).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/^Reconnect to /);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still hands work over while the socket only blinks', () => {
+    useAuthStore.setState({ connectionStatus: 'reconnecting' });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delegate' }));
-    expect(mocks.updateTodo).not.toHaveBeenCalled();
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/^Reconnect to /);
+    expect(mocks.updateTodo).toHaveBeenCalledWith({
+      id: 'todo-e65a',
+      data: { assignee: 'agent' },
+    });
+  });
+
+  it('waits for Home before suggesting steps', () => {
+    vi.useFakeTimers();
+    const post = vi.spyOn(apiClient, 'post');
+    try {
+      useAuthStore.setState({ connectionStatus: 'disconnected' });
+      renderPage();
+      act(() => vi.advanceTimersByTime(4000));
+      fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Suggest steps' }));
+      expect(post).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/^Reconnect to /);
+    } finally {
+      post.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('delegates from the menu by setting the assignee', () => {

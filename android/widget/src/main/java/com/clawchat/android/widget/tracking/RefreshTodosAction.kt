@@ -13,8 +13,13 @@ class RefreshTodosAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        // An explicit refresh acknowledges the last completion error, not a success.
-        updateAppWidgetState(context, glanceId) { it.remove(WidgetCompletionErrorWorkspaceKey) }
+        // An explicit refresh acknowledges the last completion error, not a success,
+        // and drops a done mark a killed process left behind; the list it loads
+        // says which tasks are really done.
+        updateAppWidgetState(context, glanceId) {
+            it.remove(WidgetCompletionErrorWorkspaceKey)
+            it.remove(WidgetCompletingIdsKey)
+        }
         WidgetUpdater.updateAll(context)
     }
 }

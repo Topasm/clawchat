@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { getOfflineQueueScope, offlineQueue } from '../services/offlineQueue';
 import { useAuthStore } from '../stores/useAuthStore';
+import { wsClient } from '../services/wsClient';
 import { logger } from '../services/logger';
 
 /**
- * Monitors online/offline status and flushes the offline queue on reconnect.
+ * Monitors online/offline status and flushes the offline queue once the
+ * socket reconnects to Home.
  * Must be used inside a component that also renders `useDataSync` (e.g., Layout).
  * Accepts a `refresh` callback to pull fresh data after flushing.
  */
@@ -28,27 +30,30 @@ function useNetworkStatus(refresh: () => void) {
   useEffect(() => {
     if (!serverUrl) return;
 
-    const handleOnline = async () => {
-      logger.info('Network: back online');
-      setConnectionStatus('reconnecting');
-
+    // Kept changes go out once the socket says Home answered -- not on the
+    // browser's word, which only means some network is back.
+    const flush = async () => {
       if (flushingRef.current) return;
       flushingRef.current = true;
       setIsFlushing(true);
-
       try {
         // Dynamic import to avoid circular dependency
         const { default: apiClient } = await import('../services/apiClient');
         await offlineQueue.flush(queueScope, apiClient);
         setPendingCount(offlineQueue.getCount(queueScope));
         refresh();
-        setConnectionStatus('connected');
-      } catch {
-        setConnectionStatus('disconnected');
+      } catch (error) {
+        logger.warn('Offline queue: could not send kept changes', error);
       } finally {
         flushingRef.current = false;
         setIsFlushing(false);
       }
+    };
+
+    const handleOnline = () => {
+      logger.info('Network: back online');
+      // Skip the socket's backoff; its status reports whether Home answers.
+      if (token) wsClient.connect(serverUrl, token);
     };
 
     const handleOffline = () => {
@@ -58,6 +63,11 @@ function useNetworkStatus(refresh: () => void) {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    const unsubscribe = useAuthStore.subscribe((state, previous) => {
+      if (state.connectionStatus === 'connected' && previous.connectionStatus !== 'connected') {
+        void flush();
+      }
+    });
 
     // Set initial status based on navigator.onLine
     if (!navigator.onLine) {
@@ -67,8 +77,9 @@ function useNetworkStatus(refresh: () => void) {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      unsubscribe();
     };
-  }, [serverUrl, queueScope, setConnectionStatus, refresh]);
+  }, [serverUrl, token, queueScope, setConnectionStatus, refresh]);
 
   return { isFlushing, pendingCount };
 }

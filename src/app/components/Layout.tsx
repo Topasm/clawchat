@@ -593,18 +593,6 @@ export default function Layout() {
             </Suspense>
           ) : isMobile ? (
             <>
-              {connectionStatus !== 'connected' && (
-                <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
-                  <span className="cc-mobile-status-bar__dot" />
-                  <span>
-                    {workspaceName} ·{' '}
-                    {isFlushing
-                      ? t('connection.syncing')
-                      : t(CONNECTION_LABEL_KEYS[connectionStatus])}
-                  </span>
-                  {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
-                </div>
-              )}
               <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 {mobileMainContent}
               </div>

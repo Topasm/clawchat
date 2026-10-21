@@ -13,7 +13,9 @@ import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** How long a checked row stays on screen, done, before the list drops it. */
 private const val DONE_HOLD_MILLIS = 1_200L
@@ -52,15 +54,24 @@ class CompleteTodoAction : ActionCallback {
         }
         TodoTrackingWidget().update(context, glanceId)
 
-        val completed = handler.complete(todoId)
-        // Long enough to see it land, short enough not to read as stuck.
-        if (completed) delay(DONE_HOLD_MILLIS)
-        updateAppWidgetState(context, glanceId) { preferences ->
-            preferences[WidgetCompletingIdsKey] = preferences[WidgetCompletingIdsKey].orEmpty() - todoId
-            if (completed) preferences.remove(WidgetCompletionErrorWorkspaceKey)
-            else preferences[WidgetCompletionErrorWorkspaceKey] = expectedWorkspaceKey
+        var completed = false
+        try {
+            completed = handler.complete(todoId)
+            // Long enough to see it land, short enough not to read as stuck.
+            if (completed) delay(DONE_HOLD_MILLIS)
+        } finally {
+            // Even when the broadcast's time runs out mid-call, the row must not
+            // stay drawn done and untappable for a task the server never closed.
+            withContext(NonCancellable) {
+                updateAppWidgetState(context, glanceId) { preferences ->
+                    preferences[WidgetCompletingIdsKey] =
+                        preferences[WidgetCompletingIdsKey].orEmpty() - todoId
+                    if (completed) preferences.remove(WidgetCompletionErrorWorkspaceKey)
+                    else preferences[WidgetCompletionErrorWorkspaceKey] = expectedWorkspaceKey
+                }
+                WidgetUpdater.updateAll(context)
+            }
         }
-        WidgetUpdater.updateAll(context)
     }
 }
 
