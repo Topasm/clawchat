@@ -22,6 +22,7 @@ npm run test                # Run all Vitest tests
 npm run typecheck           # TypeScript check (tsconfig.app.json)
 npm run build               # Typecheck + production web build
 npm run generate:api        # Refresh OpenAPI plus generated TS/Kotlin contracts
+npm run readme:media        # Re-render docs/media (README screenshots + walkthrough GIF)
 ```
 
 Single test file: `npx vitest run src/app/stores/__tests__/useAuthStore.test.ts`
