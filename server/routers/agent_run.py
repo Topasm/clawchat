@@ -30,6 +30,7 @@ from services.agents import (
     opencode_execution_service,
     orca_execution_service,
     orca_landing_service,
+    run_context_service,
     run_resume_service,
     task_execution_recovery_service,
 )
@@ -123,7 +124,9 @@ async def retry_run(
         raise NotFoundError("Agent task not found")
     await task_execution_recovery_service.validate_retryable_run(db, previous, task)
     provider = body.provider or previous.provider
-    instruction = previous.instruction_snapshot
+    instruction = run_context_service.snapshot_for_provider(
+        previous.instruction_snapshot, task, provider
+    )
     if body.follow_up_instruction:
         instruction = (
             f"{instruction}\n\nFollow-up instruction:\n{body.follow_up_instruction.strip()}"
