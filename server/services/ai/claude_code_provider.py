@@ -57,11 +57,20 @@ class ClaudeCodeError(Exception):
 
 
 def _run_cli_sync(
-    cmd: list[str], timeout: int = 120, env: dict[str, str] | None = None
+    cmd: list[str],
+    timeout: int = 120,
+    env: dict[str, str] | None = None,
+    *,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a CLI command synchronously (safe for any event loop)."""
+    """Run a CLI command synchronously (safe for any event loop).
+
+    The prompt goes in on stdin: a command-line argument is capped at about
+    32,000 characters on Windows, where the server also runs as a sidecar.
+    """
     return subprocess.run(
         cmd,
+        input=input_text,
         capture_output=True,
         timeout=timeout,
         text=True,
@@ -72,12 +81,17 @@ def _run_cli_sync(
 
 
 def _stream_cli_lines(
-    cmd: list[str], queue: Queue, timeout: int = 180, env: dict[str, str] | None = None
+    cmd: list[str],
+    queue: Queue,
+    timeout: int = 180,
+    env: dict[str, str] | None = None,
+    input_text: str | None = None,
 ):
     """Run CLI and push stdout lines to a queue. Runs in a thread."""
     try:
         proc = subprocess.Popen(
             cmd,
+            stdin=subprocess.PIPE if input_text is not None else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -85,6 +99,12 @@ def _stream_cli_lines(
             errors="replace",
             env=env,
         )
+        if input_text is not None:
+            try:
+                proc.stdin.write(input_text)
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass  # The CLI quit before reading; its stderr says why.
         for line in proc.stdout:
             queue.put(("line", line.rstrip()))
         proc.wait()
@@ -175,13 +195,15 @@ class ClaudeCodeProvider:
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
 
-        cmd.extend(["-p", message])
-
+        # With no prompt argument, --print reads the prompt from stdin.
         queue: Queue = Queue()
         thread = threading.Thread(
             target=_stream_cli_lines,
             args=(cmd, queue),
-            kwargs={"env": cli_tool_args.claude_env(tools) if tools else None},
+            kwargs={
+                "env": cli_tool_args.claude_env(tools) if tools else None,
+                "input_text": message,
+            },
             daemon=True,
         )
         thread.start()
@@ -284,16 +306,22 @@ class ClaudeCodeProvider:
             cmd.extend(["--system-prompt", system_prompt])
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
-        cmd.extend(["-p", prompt])
         timeout = cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS if tools else 120
 
         try:
+            # With no prompt argument, --print reads the prompt from stdin.
             if tools:
                 result = await asyncio.to_thread(
-                    _run_cli_sync, cmd, timeout, cli_tool_args.claude_env(tools)
+                    _run_cli_sync,
+                    cmd,
+                    timeout,
+                    cli_tool_args.claude_env(tools),
+                    input_text=prompt,
                 )
             else:
-                result = await asyncio.to_thread(_run_cli_sync, cmd, timeout)
+                result = await asyncio.to_thread(
+                    _run_cli_sync, cmd, timeout, input_text=prompt
+                )
             if result.returncode != 0:
                 raise AIUnavailableError(f"Claude Code error: {result.stderr[:200]}")
             return result.stdout.strip()

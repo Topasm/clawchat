@@ -82,8 +82,7 @@ fn build_args(request: &WorkerRunRequest) -> Result<Vec<String>, String> {
                 args.push("--model".to_owned());
                 args.push(model.to_owned());
             }
-            args.push("-p".to_owned());
-            args.push(request.prompt.clone());
+            // No prompt argument: --print then reads the prompt from stdin.
             Ok(args)
         }
         "codex" => {
@@ -143,8 +142,11 @@ pub async fn run(request: WorkerRunRequest) -> Result<WorkerRunResult, String> {
         .spawn()
         .map_err(|error| format!("Could not start {program}: {error}"))?;
 
-    if request.provider == "codex" {
-        // Codex reads the prompt from stdin; the "-" argument above says so.
+    // Both CLIs read the prompt from stdin (Codex is told so by its "-"
+    // argument; Claude reads it when --print gets no prompt). A command-line
+    // argument would cap it at about 32,000 characters on Windows, and the
+    // prompt carries the project rules, workspace, conversation and skills.
+    {
         use tokio::io::AsyncWriteExt;
         if let Some(mut stdin) = child.stdin.take() {
             stdin
@@ -156,8 +158,6 @@ pub async fn run(request: WorkerRunRequest) -> Result<WorkerRunResult, String> {
                 .await
                 .map_err(|error| format!("Could not finish the prompt for {program}: {error}"))?;
         }
-    } else {
-        drop(child.stdin.take());
     }
 
     let output = match tokio::time::timeout(RUN_TIMEOUT, child.wait_with_output()).await {
@@ -210,7 +210,21 @@ mod tests {
         assert!(args.contains(&"--permission-mode".to_owned()));
         assert!(args.contains(&"acceptEdits".to_owned()));
         assert!(args.contains(&"sonnet".to_owned()));
-        assert_eq!(args.last().unwrap(), "Summarise the results");
+    }
+
+    #[test]
+    fn the_prompt_never_rides_on_the_command_line() {
+        // It goes in on stdin: Windows caps a command line at about 32,000
+        // characters, and the prompt can carry far more than that.
+        for provider in ["claude", "codex"] {
+            let args = build_args(&request(provider, Some("sonnet"))).expect("args");
+
+            assert!(
+                !args.contains(&"Summarise the results".to_owned()),
+                "{provider}"
+            );
+            assert!(!args.contains(&"-p".to_owned()), "{provider}");
+        }
     }
 
     #[test]
