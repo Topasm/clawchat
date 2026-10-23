@@ -1,14 +1,12 @@
 """Bounded conversation context shared by every agent execution provider."""
 
-import json
-
 from models.agent_task import AgentTask
 from models.conversation import Conversation
 from models.message import Message
 from models.project import Project
 from models.todo import Todo
 from services.agents import execution_host_service
-from skills import get_skill
+from skills import get_skill, parse_skill_chain
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,14 +23,10 @@ SKILL_TEXT_PROVIDERS = frozenset({"worker", "paseo"})
 
 def skill_chain_block(task: AgentTask) -> str:
     """The instructions of every skill in the task's chain, in chain order."""
-    try:
-        chain = json.loads(task.skill_chain) if task.skill_chain else []
-    except (json.JSONDecodeError, TypeError):
-        chain = []
     skills = [
         skill
-        for skill_id in chain
-        if isinstance(skill_id, str) and (skill := get_skill(skill_id)) is not None
+        for skill_id in parse_skill_chain(task.skill_chain)
+        if (skill := get_skill(skill_id)) is not None
     ]
     blocks = [
         f"[Skill: {skill.id.replace('_', '-')}]\n{skill.system_prompt.strip()}"
@@ -124,6 +118,36 @@ async def build_execution_instruction(
         return task.instruction
     blocks.append(f"[Task instruction]\n{task.instruction}")
     return "\n\n".join(blocks)
+
+
+_SKILL_BLOCK_FOLLOWERS = ("[Recent conversation]\n", "[Task instruction]\n")
+
+
+def snapshot_for_provider(snapshot: str, task: AgentTask, provider: str) -> str:
+    """``snapshot`` with the skill text present exactly when ``provider`` needs it.
+
+    A retry keeps the earlier run's frozen instruction but may change
+    provider. A worker or Paseo run must carry the chain's skill text, while a
+    server-side chain sends each skill as its system prompt and OpenCode loads
+    the files itself, so the block is added or removed to match. The rest of
+    the snapshot -- rules, workspace, conversation, follow-ups -- is kept.
+    """
+    block = skill_chain_block(task)
+    if not block:
+        return snapshot
+    wanted = provider in SKILL_TEXT_PROVIDERS
+    present = block in snapshot
+    if present == wanted:
+        return snapshot
+    if not wanted:
+        return snapshot.replace(f"{block}\n\n", "", 1)
+    for marker in _SKILL_BLOCK_FOLLOWERS:
+        index = snapshot.find(marker)
+        while index > 0 and snapshot[index - 2 : index] != "\n\n":
+            index = snapshot.find(marker, index + 1)
+        if index >= 0:
+            return f"{snapshot[:index]}{block}\n\n{snapshot[index:]}"
+    return f"{block}\n\n[Task instruction]\n{snapshot}"
 
 
 async def active_execution_instruction(db: AsyncSession, task: AgentTask) -> str:

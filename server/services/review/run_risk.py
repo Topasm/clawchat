@@ -9,11 +9,10 @@ about -- an automation's "don't ask next time" only ever covers low risk.
 
 from __future__ import annotations
 
-import json
-
 from domain.review import ReviewRiskLevel
 from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
+from skills import parse_skill_chain
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,13 +33,7 @@ VAULT_WRITING_SKILLS = frozenset({"obsidian_sync"})
 
 
 def skill_chain(task: AgentTask) -> list[str]:
-    try:
-        chain = json.loads(task.skill_chain) if task.skill_chain else []
-    except (TypeError, ValueError):
-        chain = []
-    if not chain:
-        chain = [task.agent_type]
-    return [str(skill).replace("-", "_") for skill in chain if skill]
+    return parse_skill_chain(task.skill_chain) or [task.agent_type]
 
 
 async def assess(db: AsyncSession, run: AgentRun, task: AgentTask) -> ReviewRiskLevel:

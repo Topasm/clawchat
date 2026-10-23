@@ -8,6 +8,7 @@ capabilities that can be chained on a single AgentTask.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 
@@ -51,6 +52,24 @@ def get_all_skills() -> list[SkillDef]:
 def skill_ids() -> list[str]:
     """Return sorted list of all registered skill ids."""
     return sorted(SKILL_REGISTRY.keys())
+
+
+def parse_skill_chain(raw: str | None) -> list[str]:
+    """The skill ids in a task's ``skill_chain`` JSON, in chain order.
+
+    Unset, malformed or non-list JSON reads as an empty chain, entries that
+    are not strings are dropped, and a hyphenated skill name is read as its
+    id. The ids are not checked against the registry.
+    """
+    if not raw:
+        return []
+    try:
+        chain = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(chain, list):
+        return []
+    return [item.replace("-", "_") for item in chain if isinstance(item, str) and item]
 
 
 # Legacy persona → skill mapping (used during migration).
