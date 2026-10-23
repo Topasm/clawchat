@@ -20,6 +20,8 @@ Model selection and upgrades: [AI model updates](./ai-models.md).
 | [Electron Cutover](./electron-cutover.md)                                                      | Completed removal record and legacy data-import guarantees                                                |
 | [Build Performance](./build-performance.md)                                                    | Renderer/native build layers and performance budgets                                                      |
 | [Deployment](./deployment.md)                                                                  | Docker setup, environment variables, and production config                                                |
+| [Setup Guide](./setup.md)                                                                      | Agent tools (web search, MCP), your own skills, CalDAV and Google calendars, Android modes, make targets |
+| [README Media](./readme-media.md)                                                              | How the README screenshots and walkthrough GIF are rendered and when to re-run them                      |
 | [Remote Access Runbook](./remote-access-runbook.md)                                            | Cloudflare Tunnel (primary) and Tailscale (secondary) remote access setup                                 |
 | [Roadmap](./roadmap.md)                                                                        | Development progress and upcoming work (includes vibe-kanban-inspired upgrades)                           |
 | [Upgrade Reference](./upgrade-reference.md)                                                    | Libraries, patterns, and code examples for planned upgrades                                               |

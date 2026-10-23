@@ -446,3 +446,5 @@ workflow). The desktop app ships the same renderer, so this covers it too.
   (Actions → Record web screenshots → Run workflow); it commits the new
   baselines there. A failing run uploads the new image and a diff as the
   `web-screenshots` artifact.
+- The README's screenshots and walkthrough GIF are rendered the same way, from
+  a richer fixture, by `npm run readme:media`; see [README media](./readme-media.md).
