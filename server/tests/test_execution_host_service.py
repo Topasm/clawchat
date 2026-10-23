@@ -351,6 +351,31 @@ async def test_a_worker_claims_the_run_waiting_for_it(db_session, tmp_path):
     assert job.instruction == "Do the thing"
 
 
+# The worker's CLI receives only this prompt: the skills the work was
+# delegated with have to travel in it.
+async def test_a_claimed_job_carries_the_delegated_skills(db_session, tmp_path):
+    from models.agent_task import AgentTask
+    from skills import get_skill
+
+    project = await _project(db_session)
+    worker = await _host(db_session, label="MacBook", kind="worker")
+    await _bind(db_session, project, worker, str(tmp_path))
+    run = await _queued_run(db_session, project, worker)
+    task = await db_session.get(AgentTask, run.agent_task_id)
+    task.skill_chain = '["code_review"]'
+    await db_session.flush()
+
+    job = await execution_host_service.claim_next_job(db_session, worker)
+
+    review = get_skill("code_review")
+    assert job is not None
+    assert job.instruction == (
+        f"[Skill: {review.name}]\n{review.system_prompt.strip()}\n\nDo the thing"
+    )
+    # The run keeps its own snapshot; only the hand-off to the worker grows.
+    assert run.instruction_snapshot == "Do the thing"
+
+
 # Two polls, or a worker restarted mid-poll, must not both pick up the run.
 async def test_a_claimed_run_is_not_handed_out_twice(db_session, tmp_path):
     project = await _project(db_session)

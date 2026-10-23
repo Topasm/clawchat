@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from skills import get_all_skills, get_skill
+from skills import chain_skill_ids, get_all_skills, get_skill, with_skill_instructions
 from skills.builtins import (
     BUILTIN_SKILLS_DIR,
     SkillFileError,
@@ -179,3 +179,33 @@ def test_user_skills_register_over_builtins_of_the_same_name(tmp_path):
     finally:
         register_builtins()
     assert get_skill("draft").system_prompt != "Draft it our way."
+
+
+@pytest.mark.parametrize(
+    ("skill_chain", "task_type", "expected"),
+    [
+        ('["plan", "code_review"]', "code", ["plan", "code_review"]),
+        (None, "delegate_research", ["research"]),
+        ("not json", "delegate_draft", ["draft"]),
+        ('{"plan": 1}', None, []),
+        (None, "code", []),
+    ],
+)
+def test_chain_skill_ids_reads_the_chain_or_the_delegate_task_type(
+    skill_chain, task_type, expected
+):
+    assert chain_skill_ids(skill_chain, task_type) == expected
+
+
+def test_with_skill_instructions_puts_each_known_skill_ahead_in_chain_order():
+    prompt = with_skill_instructions("Fix the bug", '["plan", "gone", "code_review"]')
+
+    plan = get_skill("plan")
+    review = get_skill("code_review")
+    assert prompt == (
+        f"[Skill: {plan.name}]\n{plan.system_prompt.strip()}\n\n"
+        f"[Skill: {review.name}]\n{review.system_prompt.strip()}\n\n"
+        "Fix the bug"
+    )
+    assert with_skill_instructions("Fix the bug", '["gone"]') == "Fix the bug"
+    assert with_skill_instructions("Fix the bug", None, "code") == "Fix the bug"

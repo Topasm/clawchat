@@ -134,6 +134,32 @@ async def _project_run(db_session, *, status="queued", external_run_id=None):
 
 
 @pytest.mark.asyncio
+async def test_paseo_agent_is_started_with_the_delegated_skills(db_session):
+    from skills import get_skill
+
+    _project, _todo, task, run = await _project_run(db_session)
+    task.skill_chain = '["code_review"]'
+    await db_session.commit()
+    session_factory = async_sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+    adapter = FakePaseoAdapter()
+
+    await paseo_execution_service.execute_run(
+        session_factory,
+        run.id,
+        adapter=adapter,
+        poll_interval=0.001,
+        reconnect_grace_seconds=0.1,
+    )
+
+    review = get_skill("code_review")
+    prompt = adapter.start_agent.await_args.kwargs["prompt"]
+    assert prompt.startswith(f"[Skill: {review.name}]\n{review.system_prompt.strip()}")
+    assert prompt.endswith("Implement the feature and run tests")
+
+
+@pytest.mark.asyncio
 async def test_paseo_execution_creates_workspace_artifact_and_review(db_session):
     project, _todo, _task, run = await _project_run(db_session)
     session_factory = async_sessionmaker(
@@ -162,6 +188,8 @@ async def test_paseo_execution_creates_workspace_artifact_and_review(db_session)
     assert adapter.create_workspace.await_args.kwargs["base_branch"] == "origin/main"
     adapter.start_agent.assert_awaited_once()
     assert adapter.start_agent.await_args.kwargs["provider_model"] == "codex/gpt-5.5"
+    # "general" names no registered skill, so the prompt is the snapshot as is.
+    assert adapter.start_agent.await_args.kwargs["prompt"] == persisted.instruction_snapshot
 
     assert (
         await db_session.execute(select(Artifact).where(Artifact.created_by == run_id))

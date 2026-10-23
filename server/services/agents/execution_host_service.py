@@ -29,6 +29,7 @@ from domain.agent_run import AgentRunStatus
 from exceptions import ValidationError
 from models.execution_host import ExecutionHost, ProjectHostPath
 from models.project import Project
+from skills import with_skill_instructions
 
 #: A remote host is considered gone once it stops checking in. Kept generous:
 #: a laptop that missed one heartbeat is not offline.
@@ -521,7 +522,12 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
         ).scalar_one_or_none()
     return ClaimedJob(
         run_id=run.id,
-        instruction=run.instruction_snapshot,
+        # The worker's CLI gets this one prompt, so the skills ride in it.
+        instruction=with_skill_instructions(
+            run.instruction_snapshot,
+            task.skill_chain if task is not None else None,
+            task.task_type if task is not None else None,
+        ),
         cwd=cwd,
         model=run.model,
         project_id=project.id if project else None,

@@ -8,6 +8,7 @@ capabilities that can be chained on a single AgentTask.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 
@@ -41,6 +42,51 @@ def register_skill(skill: SkillDef) -> None:
 def get_skill(skill_id: str) -> SkillDef | None:
     """Return a registered skill by id, or ``None``."""
     return SKILL_REGISTRY.get(skill_id)
+
+
+def chain_skill_ids(skill_chain: str | None, task_type: str | None = None) -> list[str]:
+    """The skill ids a task was delegated with, in chain order.
+
+    ``skill_chain`` is the task's JSON array; a task without one names its
+    skill in a ``delegate_<skill>`` task type.
+    """
+    try:
+        chain = json.loads(skill_chain) if skill_chain else []
+    except (json.JSONDecodeError, TypeError):
+        chain = []
+    ids = (
+        [item for item in chain if isinstance(item, str)]
+        if isinstance(chain, list)
+        else []
+    )
+    if not ids and task_type and task_type.startswith("delegate_"):
+        ids = [task_type.removeprefix("delegate_")]
+    return ids
+
+
+def with_skill_instructions(
+    instruction: str, skill_chain: str | None, task_type: str | None = None
+) -> str:
+    """Put the delegated skills' instructions ahead of an external run's prompt.
+
+    Home runs a skill chain with one system prompt per step, and OpenCode
+    loads the skill files itself. A desktop worker or Paseo agent only ever
+    receives this one prompt, so the skills ride in it or not at all.
+    Unknown ids are skipped, as a chain may name a skill since removed.
+    """
+    skills = [
+        skill
+        for skill in (
+            get_skill(skill_id) for skill_id in chain_skill_ids(skill_chain, task_type)
+        )
+        if skill is not None
+    ]
+    if not skills:
+        return instruction
+    blocks = [
+        f"[Skill: {skill.name}]\n{skill.system_prompt.strip()}" for skill in skills
+    ]
+    return "\n\n".join([*blocks, instruction])
 
 
 def get_all_skills() -> list[SkillDef]:
