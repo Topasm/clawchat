@@ -72,3 +72,6 @@ htmlcov/
 # Web screenshot runs
 e2e/visual/.data/
 e2e/visual/test-results/
+
+# Graphify code-graph output (graph.json, GRAPH_REPORT.md, graph.html), built locally
+graphify-out/
