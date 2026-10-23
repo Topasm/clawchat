@@ -1,10 +1,12 @@
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -78,6 +80,27 @@ def _run_cli_sync(
         errors="replace",
         env=env,
     )
+
+
+def _system_prompt_file(system_prompt: str | None) -> str | None:
+    """Write a system prompt to a private temp file for ``--system-prompt-file``.
+
+    Not ``--system-prompt``: a command-line argument is capped at about
+    32,000 characters on Windows, and a skill chain's prompts add up. The
+    file is readable only by this user and is removed once the CLI has run.
+    """
+    if not system_prompt:
+        return None
+    fd, path = tempfile.mkstemp(prefix="clawchat-system-", suffix=".md")
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(system_prompt)
+    return path
+
+
+def _remove_quietly(path: str | None) -> None:
+    if path:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
 
 
 def _stream_cli_lines(
@@ -190,8 +213,9 @@ class ClaudeCodeProvider:
         if self.model:
             cmd.extend(["--model", self.model])
 
-        if system_prompt:
-            cmd.extend(["--system-prompt", system_prompt])
+        system_file = _system_prompt_file(system_prompt)
+        if system_file:
+            cmd.extend(["--system-prompt-file", system_file])
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
 
@@ -248,6 +272,7 @@ class ClaudeCodeProvider:
                             yield decoded
         finally:
             thread.join(timeout=5)
+            _remove_quietly(system_file)
 
     def map_error(self, return_code: int, stderr: str) -> ClaudeCodeError:
         """Map CLI errors to structured error types."""
@@ -302,8 +327,9 @@ class ClaudeCodeProvider:
         ]
         if self.model:
             cmd.extend(["--model", self.model])
-        if system_prompt:
-            cmd.extend(["--system-prompt", system_prompt])
+        system_file = _system_prompt_file(system_prompt)
+        if system_file:
+            cmd.extend(["--system-prompt-file", system_file])
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
         timeout = cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS if tools else 120
@@ -327,6 +353,8 @@ class ClaudeCodeProvider:
             return result.stdout.strip()
         except subprocess.TimeoutExpired:
             raise AIUnavailableError("Claude Code timed out")
+        finally:
+            _remove_quietly(system_file)
 
     async def stream_completion(self, messages: list[dict]) -> AsyncIterator[str]:
         """AIService-compatible streaming: converts messages list to a prompt."""
