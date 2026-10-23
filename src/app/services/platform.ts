@@ -75,49 +75,88 @@ const storage = {
   },
 };
 
+const pendingSecureOperations = new Map<string, Promise<unknown>>();
+
+/** Run operations on one key in the order they were asked for. */
+function inKeyOrder<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = pendingSecureOperations.get(key) ?? Promise.resolve();
+  const next = previous.then(operation, operation);
+  const settled = next.catch(() => undefined);
+  pendingSecureOperations.set(key, settled);
+  void settled.then(() => {
+    if (pendingSecureOperations.get(key) === settled) pendingSecureOperations.delete(key);
+  });
+  return next;
+}
+
 /**
- * Secure storage uses the desktop OS credential vault when available. A legacy
- * local value is promoted on first read; the web build and unavailable OS
- * vaults retain the existing storage fallback.
+ * Secure storage uses the desktop OS credential vault when available; the web
+ * build and unavailable OS vaults use platform storage instead.
+ *
+ * A platform-storage copy is always the newest value: every successful vault
+ * write clears it, so it only exists for a legacy session or for a write the
+ * vault refused. The vault can refuse a write while still answering reads --
+ * on macOS an updated, re-signed app may lose write access to the item the
+ * previous build created -- and reading the vault first would then return a
+ * refresh token the server already rotated, which it treats as replay and
+ * answers by revoking the session. So the local copy wins, and is promoted to
+ * the vault whenever the vault accepts it. Operations on one key run in order
+ * so an earlier write can never land after a later one.
  */
 export const secureStorage = {
-  async get(key: string): Promise<string | null> {
-    if (platformApi.secureStorage) {
-      try {
-        const secured = await platformApi.secureStorage.get(key);
-        if (secured !== null) return secured;
-        const legacy = await storage.get(key);
-        if (legacy !== null) {
-          await platformApi.secureStorage.set(key, legacy);
+  get(key: string): Promise<string | null> {
+    return inKeyOrder(key, async () => {
+      const vault = platformApi.secureStorage;
+      if (!vault) return storage.get(key);
+
+      const local = await storage.get(key);
+      if (local !== null) {
+        try {
+          await vault.set(key, local);
           await storage.remove(key);
+        } catch (error) {
+          console.warn(
+            'OS secure storage refused a credential; keeping the newer local copy.',
+            error,
+          );
         }
-        return legacy;
+        return local;
+      }
+
+      try {
+        return await vault.get(key);
       } catch (error) {
         console.warn('OS secure storage is unavailable; using platform storage.', error);
+        return null;
       }
-    }
-    return storage.get(key);
+    });
   },
-  async set(key: string, value: string): Promise<void> {
-    if (platformApi.secureStorage) {
-      try {
-        await platformApi.secureStorage.set(key, value);
-        await storage.remove(key);
-        return;
-      } catch (error) {
-        console.warn('OS secure storage is unavailable; using platform storage.', error);
+  set(key: string, value: string): Promise<void> {
+    return inKeyOrder(key, async () => {
+      const vault = platformApi.secureStorage;
+      if (vault) {
+        try {
+          await vault.set(key, value);
+          await storage.remove(key);
+          return;
+        } catch (error) {
+          console.warn('OS secure storage refused a credential; storing it locally.', error);
+        }
       }
-    }
-    return storage.set(key, value);
+      await storage.set(key, value);
+    });
   },
-  async remove(key: string): Promise<void> {
-    if (platformApi.secureStorage) {
-      try {
-        await platformApi.secureStorage.remove(key);
-      } catch (error) {
-        console.warn('OS secure storage is unavailable while removing a credential.', error);
+  remove(key: string): Promise<void> {
+    return inKeyOrder(key, async () => {
+      const vault = platformApi.secureStorage;
+      if (vault) {
+        try {
+          await vault.remove(key);
+        } catch (error) {
+          console.warn('OS secure storage is unavailable while removing a credential.', error);
+        }
       }
-    }
-    return storage.remove(key);
+      await storage.remove(key);
+    });
   },
 };
