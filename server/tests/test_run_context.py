@@ -1,11 +1,15 @@
 """Agent executions receive bounded recent conversation context."""
 
+import json
+
+import pytest
 from models.agent_task import AgentTask
 from models.conversation import Conversation
 from models.message import Message
 from services.agents import agent_run_service
 from services.agents.run_context_service import build_execution_instruction
 from services.tasks import project_service
+from skills import get_skill
 
 
 async def test_execution_instruction_contains_recent_thread_before_task(db_session):
@@ -207,3 +211,54 @@ async def test_supplied_run_snapshot_is_not_wrapped_again(db_session):
 
     assert run.instruction_snapshot == snapshot
     assert task.instruction == "Original instruction"
+
+
+def _chain_task(task_id: str, chain: list[str]) -> AgentTask:
+    return AgentTask(
+        id=task_id,
+        task_type="delegate_" + chain[0],
+        instruction="Review the retry change",
+        skill_chain=json.dumps(chain),
+    )
+
+
+@pytest.mark.parametrize("provider", ["worker", "paseo"])
+async def test_cli_handoff_runs_carry_the_skill_instructions(db_session, provider):
+    task = _chain_task(f"task_skill_{provider}", ["code_review"])
+    db_session.add(task)
+    await db_session.flush()
+
+    run = await agent_run_service.create_run(db_session, task, provider=provider)
+
+    skill = get_skill("code_review")
+    assert run.instruction_snapshot == (
+        f"[Skill: code-review]\n{skill.system_prompt.strip()}\n\n"
+        "[Task instruction]\nReview the retry change"
+    )
+
+
+async def test_server_side_runs_leave_skills_to_the_chain(db_session):
+    task = _chain_task("task_skill_server", ["code_review"])
+    db_session.add(task)
+    await db_session.flush()
+
+    run = await agent_run_service.create_run(db_session, task, provider="codex_cli")
+
+    assert run.instruction_snapshot == "Review the retry change"
+
+
+async def test_a_skill_chain_travels_in_order(db_session):
+    task = _chain_task("task_skill_chain", ["research", "code_review", "missing_skill"])
+    db_session.add(task)
+    await db_session.flush()
+
+    instruction = await build_execution_instruction(
+        db_session, task, include_skills=True
+    )
+
+    assert instruction.startswith("[Skills]\nApply these skills in order")
+    assert instruction.index("[Skill: research]") < instruction.index(
+        "[Skill: code-review]"
+    )
+    assert "missing" not in instruction
+    assert instruction.endswith("[Task instruction]\nReview the retry change")
