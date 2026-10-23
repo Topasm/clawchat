@@ -201,7 +201,10 @@ async def create_run(
     instruction_snapshot: str | None = None,
     update_todo_status: bool = True,
 ) -> AgentRun:
-    from services.agents.run_context_service import build_execution_instruction
+    from services.agents.run_context_service import (
+        SKILL_TEXT_PROVIDERS,
+        build_execution_instruction,
+    )
 
     active = (
         await db.execute(
@@ -229,7 +232,9 @@ async def create_run(
     frozen_instruction = (
         instruction_snapshot
         if instruction_snapshot is not None
-        else await build_execution_instruction(db, task)
+        else await build_execution_instruction(
+            db, task, include_skills=provider in SKILL_TEXT_PROVIDERS
+        )
     )
     run = AgentRun(
         id=make_id("run_"),
