@@ -429,7 +429,7 @@ async def test_claude_code_gets_only_clawchats_tools(monkeypatch):
 
     captured = {}
 
-    def fake_run(cmd, timeout=120, env=None):
+    def fake_run(cmd, timeout=120, env=None, *, input_text=None):
         captured["cmd"], captured["timeout"], captured["env"] = cmd, timeout, env
         return SimpleNamespace(returncode=0, stdout="done", stderr="")
 

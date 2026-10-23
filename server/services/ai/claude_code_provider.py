@@ -1,10 +1,12 @@
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -57,11 +59,20 @@ class ClaudeCodeError(Exception):
 
 
 def _run_cli_sync(
-    cmd: list[str], timeout: int = 120, env: dict[str, str] | None = None
+    cmd: list[str],
+    timeout: int = 120,
+    env: dict[str, str] | None = None,
+    *,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a CLI command synchronously (safe for any event loop)."""
+    """Run a CLI command synchronously (safe for any event loop).
+
+    The prompt goes in on stdin: a command-line argument is capped at about
+    32,000 characters on Windows, where the server also runs as a sidecar.
+    """
     return subprocess.run(
         cmd,
+        input=input_text,
         capture_output=True,
         timeout=timeout,
         text=True,
@@ -71,13 +82,39 @@ def _run_cli_sync(
     )
 
 
+def _system_prompt_file(system_prompt: str | None) -> str | None:
+    """Write a system prompt to a private temp file for ``--system-prompt-file``.
+
+    Not ``--system-prompt``: a command-line argument is capped at about
+    32,000 characters on Windows, and a skill chain's prompts add up. The
+    file is readable only by this user and is removed once the CLI has run.
+    """
+    if not system_prompt:
+        return None
+    fd, path = tempfile.mkstemp(prefix="clawchat-system-", suffix=".md")
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(system_prompt)
+    return path
+
+
+def _remove_quietly(path: str | None) -> None:
+    if path:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+
+
 def _stream_cli_lines(
-    cmd: list[str], queue: Queue, timeout: int = 180, env: dict[str, str] | None = None
+    cmd: list[str],
+    queue: Queue,
+    timeout: int = 180,
+    env: dict[str, str] | None = None,
+    input_text: str | None = None,
 ):
     """Run CLI and push stdout lines to a queue. Runs in a thread."""
     try:
         proc = subprocess.Popen(
             cmd,
+            stdin=subprocess.PIPE if input_text is not None else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -85,6 +122,12 @@ def _stream_cli_lines(
             errors="replace",
             env=env,
         )
+        if input_text is not None:
+            try:
+                proc.stdin.write(input_text)
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass  # The CLI quit before reading; its stderr says why.
         for line in proc.stdout:
             queue.put(("line", line.rstrip()))
         proc.wait()
@@ -170,18 +213,21 @@ class ClaudeCodeProvider:
         if self.model:
             cmd.extend(["--model", self.model])
 
-        if system_prompt:
-            cmd.extend(["--system-prompt", system_prompt])
+        system_file = _system_prompt_file(system_prompt)
+        if system_file:
+            cmd.extend(["--system-prompt-file", system_file])
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
 
-        cmd.extend(["-p", message])
-
+        # With no prompt argument, --print reads the prompt from stdin.
         queue: Queue = Queue()
         thread = threading.Thread(
             target=_stream_cli_lines,
             args=(cmd, queue),
-            kwargs={"env": cli_tool_args.claude_env(tools) if tools else None},
+            kwargs={
+                "env": cli_tool_args.claude_env(tools) if tools else None,
+                "input_text": message,
+            },
             daemon=True,
         )
         thread.start()
@@ -226,6 +272,7 @@ class ClaudeCodeProvider:
                             yield decoded
         finally:
             thread.join(timeout=5)
+            _remove_quietly(system_file)
 
     def map_error(self, return_code: int, stderr: str) -> ClaudeCodeError:
         """Map CLI errors to structured error types."""
@@ -280,25 +327,34 @@ class ClaudeCodeProvider:
         ]
         if self.model:
             cmd.extend(["--model", self.model])
-        if system_prompt:
-            cmd.extend(["--system-prompt", system_prompt])
+        system_file = _system_prompt_file(system_prompt)
+        if system_file:
+            cmd.extend(["--system-prompt-file", system_file])
         if tools:
             cmd.extend(cli_tool_args.claude_args(tools))
-        cmd.extend(["-p", prompt])
         timeout = cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS if tools else 120
 
         try:
+            # With no prompt argument, --print reads the prompt from stdin.
             if tools:
                 result = await asyncio.to_thread(
-                    _run_cli_sync, cmd, timeout, cli_tool_args.claude_env(tools)
+                    _run_cli_sync,
+                    cmd,
+                    timeout,
+                    cli_tool_args.claude_env(tools),
+                    input_text=prompt,
                 )
             else:
-                result = await asyncio.to_thread(_run_cli_sync, cmd, timeout)
+                result = await asyncio.to_thread(
+                    _run_cli_sync, cmd, timeout, input_text=prompt
+                )
             if result.returncode != 0:
                 raise AIUnavailableError(f"Claude Code error: {result.stderr[:200]}")
             return result.stdout.strip()
         except subprocess.TimeoutExpired:
             raise AIUnavailableError("Claude Code timed out")
+        finally:
+            _remove_quietly(system_file)
 
     async def stream_completion(self, messages: list[dict]) -> AsyncIterator[str]:
         """AIService-compatible streaming: converts messages list to a prompt."""
