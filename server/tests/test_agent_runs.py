@@ -306,6 +306,59 @@ async def test_legacy_agent_run_backfill_is_idempotent(db_session):
 
 
 @pytest.mark.asyncio
+async def test_retrying_a_worker_run_on_the_server_sends_the_skill_once(
+    client, auth_headers, db_session
+):
+    import json
+
+    _project, _todo, task = await create_project_task(db_session)
+    task.skill_chain = json.dumps(["research"])
+    first = await agent_run_service.create_run(db_session, task, provider="worker")
+    assert "[Skill: research]" in first.instruction_snapshot
+    await agent_run_service.mark_starting(db_session, first)
+    await agent_run_service.mark_running(db_session, first)
+    await agent_run_service.mark_failed(db_session, first, "Worker went away")
+    await db_session.commit()
+    state_names = ("active_ai", "active_ai_provider", "session_factory")
+    previous = {
+        name: getattr(app.state, name)
+        for name in state_names
+        if hasattr(app.state, name)
+    }
+    try:
+        app.state.active_ai = FakeAI()
+        app.state.active_ai_provider = "openclaw"
+        app.state.session_factory = async_sessionmaker(
+            db_session.bind, class_=AsyncSession, expire_on_commit=False
+        )
+
+        response = await client.post(
+            f"/api/runs/{first.id}/retry",
+            headers=auth_headers,
+            json={"provider": "openclaw"},
+        )
+        assert response.status_code == 201, response.text
+        snapshot = response.json()["instruction_snapshot"]
+        assert "[Skill:" not in snapshot
+        assert snapshot.endswith("[Task instruction]\nResearch the execution model")
+        second_id = response.json()["id"]
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+            db_session.expire_all()
+            second = await db_session.get(AgentRun, second_id)
+            if second and second.status == "waiting_review":
+                break
+        else:
+            pytest.fail("retried run did not reach review")
+    finally:
+        for name in state_names:
+            if name in previous:
+                setattr(app.state, name, previous[name])
+            elif hasattr(app.state, name):
+                delattr(app.state, name)
+
+
+@pytest.mark.asyncio
 async def test_retry_endpoint_creates_and_executes_next_attempt(
     client, auth_headers, db_session
 ):

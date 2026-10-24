@@ -27,7 +27,7 @@ from services.agents.agent_task_service import (
 )
 from services.agents.run_context_service import active_execution_instruction
 from services.tools.agent_turns import generate_skill_turn
-from skills import SKILL_REGISTRY, get_skill
+from skills import SKILL_REGISTRY, get_skill, parse_skill_chain
 from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
@@ -87,15 +87,9 @@ async def execute_skill_chain(
     Each skill receives the previous skill's output as additional context.
     Progress is reported via WebSocket after each skill completes.
     """
-    try:
-        chain: list[str] = json.loads(task.skill_chain)  # type: ignore[arg-type]
-    except (json.JSONDecodeError, TypeError):
-        await mark_failed(db, task, f"Invalid skill_chain: {task.skill_chain}")
-        await db.commit()
-        return
-
+    chain = parse_skill_chain(task.skill_chain)
     if not chain:
-        await mark_failed(db, task, "Empty skill_chain")
+        await mark_failed(db, task, f"Invalid or empty skill_chain: {task.skill_chain!r}")
         await db.commit()
         return
 

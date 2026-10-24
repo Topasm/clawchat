@@ -7,7 +7,11 @@ from models.agent_task import AgentTask
 from models.conversation import Conversation
 from models.message import Message
 from services.agents import agent_run_service
-from services.agents.run_context_service import build_execution_instruction
+from services.agents.run_context_service import (
+    build_execution_instruction,
+    skill_chain_block,
+    snapshot_for_provider,
+)
 from services.tasks import project_service
 from skills import get_skill
 
@@ -262,3 +266,69 @@ async def test_a_skill_chain_travels_in_order(db_session):
     )
     assert "missing" not in instruction
     assert instruction.endswith("[Task instruction]\nReview the retry change")
+
+
+def _skill_block() -> str:
+    return skill_chain_block(_chain_task("task_block", ["code_review"]))
+
+
+def test_a_retry_on_the_server_drops_the_skill_text_a_worker_carried():
+    task = _chain_task("task_retry_server", ["code_review"])
+    worker_snapshot = (
+        f"[Project rules]\nKeep PRs small\n\n{_skill_block()}\n\n"
+        "[Recent conversation]\nUser: go\n\n"
+        "[Task instruction]\nReview the retry change\n\nFollow-up instruction:\nAgain"
+    )
+
+    assert snapshot_for_provider(worker_snapshot, task, "codex_cli") == (
+        "[Project rules]\nKeep PRs small\n\n"
+        "[Recent conversation]\nUser: go\n\n"
+        "[Task instruction]\nReview the retry change\n\nFollow-up instruction:\nAgain"
+    )
+    assert snapshot_for_provider(worker_snapshot, task, "opencode") == (
+        snapshot_for_provider(worker_snapshot, task, "codex_cli")
+    )
+
+
+@pytest.mark.parametrize("provider", ["worker", "paseo"])
+def test_a_retry_on_a_cli_host_adds_the_skill_text_a_server_run_lacked(provider):
+    task = _chain_task("task_retry_cli", ["code_review"])
+    server_snapshot = (
+        "[Project rules]\nKeep PRs small\n\n"
+        "[Recent conversation]\nUser: go\n\n"
+        "[Task instruction]\nReview the retry change"
+    )
+
+    assert snapshot_for_provider(server_snapshot, task, provider) == (
+        f"[Project rules]\nKeep PRs small\n\n{_skill_block()}\n\n"
+        "[Recent conversation]\nUser: go\n\n"
+        "[Task instruction]\nReview the retry change"
+    )
+
+
+def test_the_skill_text_goes_before_the_task_when_there_is_no_conversation():
+    task = _chain_task("task_retry_bare", ["code_review"])
+
+    assert snapshot_for_provider("Review the retry change", task, "worker") == (
+        f"{_skill_block()}\n\n[Task instruction]\nReview the retry change"
+    )
+    assert snapshot_for_provider(
+        "[Project rules]\nKeep PRs small\n\n[Task instruction]\nReview the retry change",
+        task,
+        "worker",
+    ) == (
+        f"[Project rules]\nKeep PRs small\n\n{_skill_block()}\n\n"
+        "[Task instruction]\nReview the retry change"
+    )
+
+
+def test_a_matching_snapshot_and_a_task_without_skills_are_left_alone():
+    task = _chain_task("task_retry_same", ["code_review"])
+    worker_snapshot = f"{_skill_block()}\n\n[Task instruction]\nReview the retry change"
+    assert snapshot_for_provider(worker_snapshot, task, "worker") == worker_snapshot
+    assert snapshot_for_provider("Review the retry change", task, "codex_cli") == (
+        "Review the retry change"
+    )
+
+    bare = AgentTask(id="task_no_chain", task_type="research", instruction="Look it up")
+    assert snapshot_for_provider("Look it up", bare, "worker") == "Look it up"

@@ -33,6 +33,7 @@ from services.review import (
     artifact_service,
     review_item_service,
 )
+from skills import parse_skill_chain
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -695,13 +696,7 @@ async def list_runs(
 
 
 def _skill_chain(task: AgentTask) -> list[str] | None:
-    if not task.skill_chain:
-        return None
-    try:
-        chain = json.loads(task.skill_chain)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    return [skill for skill in chain if isinstance(skill, str)] or None
+    return parse_skill_chain(task.skill_chain) or None
 
 
 async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunResponse:
