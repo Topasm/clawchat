@@ -1777,4 +1777,5 @@ export const koreanUiTranslations: Record<string, string> = {
   'Changes requested': '수정 요청',
   Approved: '승인됨',
   Rejected: '거부됨',
+  'Set date': '날짜 선택',
 };

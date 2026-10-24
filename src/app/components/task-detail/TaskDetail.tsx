@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import DateField from '../shared/DateField';
 import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -325,13 +326,12 @@ export default function TaskDetail({
           <span
             className={`cc-exec-panel__due-editor${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
           >
-            <input
-              type="date"
-              className="cc-event-form__input cc-exec-panel__due-input"
+            <DateField
+              className="cc-exec-panel__due-input"
               aria-label={translateUi('Due')}
+              placeholder={translateUi('Due')}
               value={task.due_date ? toDateKey(new Date(task.due_date)) : ''}
-              onChange={(e) => {
-                const val = e.target.value;
+              onChange={(val) => {
                 if (!val) {
                   persistField({ due_date: null });
                   return;

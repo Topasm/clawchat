@@ -196,9 +196,13 @@
 }
 
 .cc-exec-panel__due-input {
-  width: auto;
-  padding: 4px 6px;
+  min-height: 0;
+  padding: 3px 6px;
   font-size: 12px;
+}
+
+.cc-exec-panel__due-input .cc-date-field__native {
+  padding: 0 6px;
 }
 
 .cc-exec-panel__due-clear {

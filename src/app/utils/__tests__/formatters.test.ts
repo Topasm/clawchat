@@ -19,11 +19,33 @@ import { changeAppLanguage } from '../../i18n';
 
 describe('formatters', () => {
   describe('formatDate', () => {
-    it('formats a date string', () => {
-      const result = formatDate('2026-01-15T10:00:00.000Z');
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-22T12:00:00.000Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('leaves the year off a date in the current year', () => {
+      expect(formatDate('2026-01-15T10:00:00.000Z')).toBe('Jan 15');
+    });
+
+    it('names the year of a date in another year', () => {
+      const result = formatDate('2025-01-15T10:00:00.000Z');
       expect(result).toMatch(/Jan/);
       expect(result).toMatch(/15/);
-      expect(result).toMatch(/2026/);
+      expect(result).toMatch(/2025/);
+    });
+
+    it('writes Korean dates the Korean way, with the year only when it differs', async () => {
+      await changeAppLanguage('ko');
+      try {
+        expect(formatDate('2026-10-25T10:00:00.000Z')).toBe('10월 25일');
+        expect(formatDate('2025-10-25T10:00:00.000Z')).toBe('2025년 10월 25일');
+      } finally {
+        await changeAppLanguage('en');
+      }
     });
   });
 

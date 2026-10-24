@@ -732,3 +732,62 @@
   color: var(--cc-warning);
   font-weight: 600;
 }
+
+/* --- Date field ------------------------------------------- */
+/* The words come from formatDate; the native input sits over them, unseen,
+   for its picker. Keyboard focus swaps them, so the segments being typed
+   into are the ones on screen. */
+.cc-date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--cc-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-background);
+  color: var(--cc-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cc-date-field:focus-within {
+  border-color: var(--cc-primary);
+}
+
+.cc-date-field--empty .cc-date-field__text {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-date-field__text {
+  white-space: nowrap;
+}
+
+.cc-date-field__native {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--cc-text);
+  font: inherit;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cc-date-field--keyboard .cc-date-field__text {
+  visibility: hidden;
+}
+
+.cc-date-field--keyboard .cc-date-field__native {
+  opacity: 1;
+}
+
+.cc-date-field--block {
+  display: flex;
+  width: 100%;
+}
