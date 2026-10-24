@@ -179,7 +179,7 @@
   gap: 4px;
   padding: 4px 6px 4px 10px;
   border: 1px solid var(--cc-border);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-surface-secondary);
   color: var(--cc-text);
   font-size: 12px;
@@ -199,7 +199,7 @@
   width: 18px;
   height: 18px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: transparent;
   color: var(--cc-text-tertiary);
   font: inherit;
