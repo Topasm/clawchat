@@ -37,6 +37,8 @@ const project = {
   execution_workspace_path: null as string | null,
   execution_workspace_isolation: 'local' as 'local' | 'worktree',
   execution_base_branch: null,
+  autonomy: 'manual' as 'manual' | 'auto_start' | 'auto_start_and_accept',
+  default_skill_chain: null as string[] | null,
   created_at: '2026-09-04T00:00:00Z',
   updated_at: '2026-09-04T00:00:00Z',
   task_count: 1,
@@ -69,6 +71,15 @@ vi.mock('../../hooks/queries', () => ({
   useOrcaRepositoriesQuery: () => ({ data: mocks.orcaRepos }),
   useChooseOrcaRepository: () => ({ mutate: mocks.chooseRepo, isPending: false }),
   useTaskExecutionTelemetryQuery: () => ({ data: [] }),
+  useSkillsQuery: () => ({
+    data: {
+      skills: [
+        { id: 'research', name: 'Research', description: '', tags: [] },
+        { id: 'summarize', name: 'Summarize', description: '', tags: [] },
+        { id: 'plan', name: 'Plan', description: '', tags: [] },
+      ],
+    },
+  }),
 }));
 
 vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: mocks.isMobile }) }));
@@ -387,5 +398,44 @@ describe('ProjectWorkspacePage', () => {
 
     expect(screen.getByText(/starting…/)).toBeInTheDocument();
     expect(screen.getByText(/Orca serve exited via SIGKILL/)).toBeInTheDocument();
+  });
+
+  it('saves the autonomy policy only once a default skill chain is chosen', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+
+    fireEvent.click(screen.getByRole('radio', { name: /Start ready tasks/ }));
+    // A policy without a chain has nothing to run; the server refuses it too.
+    expect(screen.getByRole('button', { name: 'Save autonomy settings' })).toBeDisabled();
+    expect(
+      screen.getByText('Choose at least one skill before the project starts tasks by itself.'),
+    ).toBeInTheDocument();
+
+    const add = screen.getByLabelText('Add a skill');
+    // Planning has its own flow and is never offered for the chain.
+    expect(Array.from((add as HTMLSelectElement).options).map((o) => o.value)).toEqual([
+      '',
+      'research',
+      'summarize',
+    ]);
+    fireEvent.change(add, { target: { value: 'research' } });
+    fireEvent.change(screen.getByLabelText('Add a skill'), { target: { value: 'summarize' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save autonomy settings' }));
+
+    expect(mocks.updateProject).toHaveBeenCalledWith({
+      autonomy: 'auto_start',
+      default_skill_chain: ['research', 'summarize'],
+    });
+  });
+
+  it('shows the settings once the project runs work by itself', () => {
+    project.default_execution_provider = null;
+    project.autonomy = 'auto_start';
+    project.default_skill_chain = ['summarize'];
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+    expect(screen.getByRole('radio', { name: /Start ready tasks/ })).toBeChecked();
+    expect(screen.getByRole('list', { name: 'Skill chain' })).toHaveTextContent('Summarize');
   });
 });

@@ -173,6 +173,12 @@
   color: var(--cc-text-tertiary);
   font-size: 12px;
 }
+/* Who started the run when nobody clicked: one grey line, no colour. */
+.cc-run-card__provenance {
+  margin: 4px 0 0;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
 .cc-run-card__identity p {
   display: flex;
   flex-wrap: wrap;

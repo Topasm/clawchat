@@ -523,6 +523,21 @@
             ],
             "title": "Project Title"
           },
+          "provenance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "scheduled_job",
+                  "policy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
           "provider": {
             "title": "Provider",
             "type": "string"
@@ -1033,6 +1048,21 @@
               }
             ],
             "title": "Project Title"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "scheduled_job",
+                  "policy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
           },
           "provider": {
             "title": "Provider",
@@ -7871,8 +7901,22 @@
         "title": "PlanValidationResult",
         "type": "object"
       },
+      "ProjectAutonomy": {
+        "description": "How much a project does by itself once a task is ready.\n\n``manual`` keeps every start behind a click. ``auto_start`` starts each\nnewly ready leaf task with the project's default skill chain and parks\nevery result in Review. ``auto_start_and_accept`` also adopts results the\nrun could not have used to change anything (risk ``low`` or\n``read_only_tools``); anything riskier still waits for a person.",
+        "enum": [
+          "manual",
+          "auto_start",
+          "auto_start_and_accept"
+        ],
+        "title": "ProjectAutonomy",
+        "type": "string"
+      },
       "ProjectCreate": {
         "properties": {
+          "autonomy": {
+            "$ref": "#/components/schemas/ProjectAutonomy",
+            "default": "manual"
+          },
           "deadline": {
             "anyOf": [
               {
@@ -7906,6 +7950,21 @@
               }
             ],
             "title": "Default Execution Provider"
+          },
+          "default_skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Skill Chain"
           },
           "description": {
             "anyOf": [
@@ -8108,6 +8167,10 @@
             "title": "At Risk Count",
             "type": "integer"
           },
+          "autonomy": {
+            "$ref": "#/components/schemas/ProjectAutonomy",
+            "default": "manual"
+          },
           "blocked_count": {
             "default": 0,
             "minimum": 0.0,
@@ -8181,6 +8244,20 @@
               }
             ],
             "title": "Default Execution Provider"
+          },
+          "default_skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Skill Chain"
           },
           "description": {
             "anyOf": [
@@ -8345,6 +8422,10 @@
       },
       "ProjectResponse": {
         "properties": {
+          "autonomy": {
+            "$ref": "#/components/schemas/ProjectAutonomy",
+            "default": "manual"
+          },
           "completed_task_count": {
             "default": 0,
             "minimum": 0.0,
@@ -8400,6 +8481,20 @@
               }
             ],
             "title": "Default Execution Provider"
+          },
+          "default_skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Skill Chain"
           },
           "description": {
             "anyOf": [
@@ -8783,6 +8878,16 @@
       },
       "ProjectUpdate": {
         "properties": {
+          "autonomy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectAutonomy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "deadline": {
             "anyOf": [
               {
@@ -8816,6 +8921,21 @@
               }
             ],
             "title": "Default Execution Provider"
+          },
+          "default_skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Skill Chain"
           },
           "description": {
             "anyOf": [
