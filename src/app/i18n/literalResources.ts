@@ -1668,7 +1668,7 @@ export const koreanUiTranslations: Record<string, string> = {
   Import: '가져오기',
   'Add to Inbox': '받은함에 추가',
   'Write a task or a note': '할 일이나 메모를 적으세요',
-  'Saved to Inbox': '받은함에 추가했습니다',
+  'Added to Inbox': '받은함에 추가됨',
   'Add a step': '단계 추가',
   'New item': '새 항목',
   'Talk with AI': 'AI와 대화',

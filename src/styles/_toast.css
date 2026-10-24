@@ -2,15 +2,31 @@
    Toast Notifications
    ============================================================ */
 
+/* Bottom centre, clear of the + button in the right corner and of the
+   AI toggle. On a phone it sits above the bottom bar. */
 .cc-toast-container {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 50%;
   z-index: 9999;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
+  transform: translateX(-50%);
   pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .cc-toast-container {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: calc(100vw - 32px);
+  }
+
+  .cc-toast {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 .cc-toast {
@@ -115,7 +131,7 @@
 @keyframes cc-toast-slide-in {
   from {
     opacity: 0;
-    transform: translateX(40px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
