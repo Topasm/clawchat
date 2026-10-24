@@ -251,8 +251,8 @@ export default function useWebSocket(): void {
       chatStore.setStreamingState(true, d.conversation_id);
     };
     const handleToolActivity = (data: unknown) => {
-      const d = data as { tool: string; label: string };
-      useChatStore.getState().setStreamingActivity({ tool: d.tool, label: d.label });
+      const d = data as { tool: string; label: string; kind?: 'tool' | 'phase' };
+      useChatStore.getState().setStreamingActivity({ tool: d.tool, label: d.label, kind: d.kind });
     };
     const handleStreamChunk = (data: unknown) => {
       const d = data as {

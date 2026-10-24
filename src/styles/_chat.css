@@ -1,12 +1,85 @@
 /* --- Chat Bubbles ----------------------------------------- */
 .cc-bubble {
   max-width: 70%;
+  min-width: 0;
   padding: 10px 14px;
   border-radius: var(--cc-radius-lg);
   font-size: var(--cc-font-size, 16px);
   line-height: 1.5;
+  overflow-wrap: anywhere;
   word-break: break-word;
   position: relative;
+}
+
+/* What you typed, as you typed it. */
+.cc-bubble__text {
+  white-space: pre-wrap;
+}
+
+/* An agent reply's markdown, drawn: tight paragraphs, lists, code, links.
+   Long URLs wrap anywhere so the narrow panel keeps its width. */
+.cc-bubble__md p,
+.cc-bubble__md h3,
+.cc-bubble__md ul,
+.cc-bubble__md ol,
+.cc-bubble__md pre,
+.cc-bubble__md blockquote {
+  margin: 0;
+}
+
+.cc-bubble__md > * + * {
+  margin-top: 8px;
+}
+
+.cc-bubble__md h3 {
+  font-size: 1em;
+  font-weight: 700;
+}
+
+.cc-bubble__md ul,
+.cc-bubble__md ol {
+  padding-left: 20px;
+}
+
+.cc-bubble__md li + li {
+  margin-top: 2px;
+}
+
+.cc-bubble__md a {
+  color: var(--cc-link, var(--cc-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.cc-bubble__md code {
+  padding: 1px 5px;
+  border-radius: var(--cc-radius-xs);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.cc-bubble__md pre {
+  padding: 8px 10px;
+  border-radius: var(--cc-radius-sm);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+
+.cc-bubble__md pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.cc-bubble__md blockquote {
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  color: var(--cc-text-secondary);
 }
 
 .cc-bubble--user {

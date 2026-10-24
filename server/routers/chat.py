@@ -30,10 +30,15 @@ from schemas.chat import (
 )
 from schemas.common import PaginatedResponse
 from services.ai import resolve_active_ai
-from services.chat.chat_tools import reply_events
+from services.chat.chat_tools import reply_events, phase
 from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from utils import make_id
+
+def _activity_line(event) -> str:
+    """One SSE line for a tool call or a phase of the reply (see chat_tools)."""
+    return f"data: {json.dumps({'tool_activity': event.payload})}\n\n"
+
 
 router = APIRouter()
 
@@ -333,6 +338,9 @@ async def stream_chat(
         # anything, which is what every Android client experienced.
         action_text = None
         if orchestrator is not None:
+            # The classifier is a model call of its own and can take a while
+            # on a CLI provider; say so rather than show three dots.
+            yield _activity_line(phase("intent", "reading your message"))
             try:
                 async with session_factory() as intent_db:
                     intent_result = await classify_intent(body.content, ai_service)
@@ -363,12 +371,13 @@ async def stream_chat(
             if action_metadata:
                 yield f"data: {json.dumps({'module_data_changed': action_metadata})}\n\n"
         else:
+            yield _activity_line(phase("reply", "thinking"))
             try:
                 async for event in reply_events(
                     session_factory, ai_service, messages, conversation_id=body.conversation_id
                 ):
                     if event.kind == "activity":
-                        yield f"data: {json.dumps({'tool_activity': event.payload})}\n\n"
+                        yield _activity_line(event)
                         continue
                     accumulated += event.text
                     yield f"data: {json.dumps({'token': event.text})}\n\n"

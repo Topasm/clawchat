@@ -7,7 +7,7 @@ for approval when the tool's server requires it.
 """
 
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -35,6 +35,8 @@ class RunToolScope:
     session_factory: Any
     #: Who the calls are recorded as when they reach a device's data.
     requested_by: str | None = None
+    #: Told the tool's name as each call begins, so a chat reply can show it.
+    on_tool_call: Callable[[str], Awaitable[None]] | None = None
 
 
 @dataclass(frozen=True)
@@ -67,11 +69,12 @@ async def run_scope(
     session_factory: Any,
     *,
     requested_by: str | None = None,
+    on_tool_call: Callable[[str], Awaitable[None]] | None = None,
 ) -> AsyncIterator[CliToolAccess]:
     """Expose ``specs`` to the CLI for the duration of one agent or chat turn."""
     token = secrets.token_urlsafe(32)
     _scopes[token] = RunToolScope(
-        run_id, {spec.name: spec for spec in specs}, session_factory, requested_by
+        run_id, {spec.name: spec for spec in specs}, session_factory, requested_by, on_tool_call
     )
     access = CliToolAccess(url=endpoint_url(), token=token)
     marker = current_cli_tools.set(access)
@@ -112,6 +115,8 @@ async def _call_tool(_ctx, params: types.CallToolRequestParams) -> types.CallToo
             content=[types.TextContent(type="text", text=f"There is no tool named {params.name}.")],
             is_error=True,
         )
+    if scope.on_tool_call is not None:
+        await scope.on_tool_call(params.name)
     async with scope.session_factory() as db:
         text = await gateway.invoke(
             db,

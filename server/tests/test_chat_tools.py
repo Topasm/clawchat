@@ -9,7 +9,9 @@ from sqlalchemy import select
 from domain.agent_tools import ToolCallStatus, ToolTrust
 from models.agent_tools import AgentToolCall, McpServer
 from services.chat.chat_tools import TOOLS_HINT, reply_events
-from services.tools import mcp_client
+import mcp_types as types
+
+from services.tools import agent_mcp_endpoint, mcp_client
 from services.tools.agent_mcp_endpoint import current_cli_tools
 from services.tools.tool_loop import AssistantTurn, ToolCallRequest
 
@@ -63,13 +65,23 @@ class CliAI:
 
     supports_native_tool_calling = False
 
-    def __init__(self):
+    def __init__(self, calls=()):
         self.seen_messages = None
         self.scoped = None
+        self.calls = list(calls)
 
     async def stream_completion(self, messages):
         self.seen_messages = messages
         self.scoped = current_cli_tools.get()
+        # What the CLI does on its own requests: call the endpoint with the token it was given.
+        for name in self.calls:
+            marker = agent_mcp_endpoint._request_token.set(self.scoped.token)
+            try:
+                await agent_mcp_endpoint._call_tool(
+                    None, types.CallToolRequestParams(name=name, arguments={})
+                )
+            finally:
+                agent_mcp_endpoint._request_token.reset(marker)
         yield "Plain "
         yield "answer"
 
@@ -127,6 +139,21 @@ async def test_cli_providers_get_a_scoped_endpoint_and_the_hint(db_session, sess
     assert current_cli_tools.get() is None  # the scope ended with the reply
 
 
+async def test_cli_providers_report_each_call_made_through_the_endpoint(
+    db_session, session_factory, monkeypatch
+):
+    await _read_only_server(db_session)
+    monkeypatch.setattr(mcp_client, "call_tool", AsyncMock(return_value=("$5", False)))
+    ai = CliAI(calls=["notes__search"])
+
+    events = await _collect(session_factory, ai)
+
+    # The call is named before the answer, the way the API providers' loop does it.
+    assert [e.kind for e in events] == ["activity", "token", "token"]
+    assert events[0].payload == {"tool": "notes__search", "label": "search from notes"}
+    assert "".join(e.text for e in events) == "Plain answer"
+
+
 async def test_a_failing_loop_surfaces_to_the_caller(db_session, session_factory):
     await _read_only_server(db_session)
 
@@ -175,8 +202,15 @@ async def test_the_sse_stream_carries_tool_activity_before_the_answer(
         for line in resp.text.splitlines()
         if line.startswith("data: ") and line != "data: [DONE]"
     ]
-    assert payloads[1] == {"tool_activity": {"tool": "notes__search", "label": "search from notes"}}
-    assert payloads[2] == {"token": "You noted: Plans start at $5"}
+    # The stream says what it is doing before the answer: the phase it is in
+    # ("thinking"; "reading your message" first when an orchestrator
+    # classifies), then each tool as it is called.
+    activity = [p["tool_activity"] for p in payloads if "tool_activity" in p]
+    assert activity[-2:] == [
+        {"tool": "reply", "label": "thinking", "kind": "phase"},
+        {"tool": "notes__search", "label": "search from notes"},
+    ]
+    assert payloads[1 + len(activity)] == {"token": "You noted: Plans start at $5"}
 
 
 async def test_the_websocket_path_pushes_tool_activity_for_the_streaming_message(

@@ -8,7 +8,7 @@ recorded through the gateway without a run.
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,6 +36,41 @@ class ReplyEvent:
 
 def _activity(name: str) -> ReplyEvent:
     return ReplyEvent("activity", payload={"tool": name, "label": describe_tool(name)})
+
+
+def phase(name: str, label: str) -> ReplyEvent:
+    """A stage of the reply with no tool behind it ("reading your message").
+
+    Carried as tool activity with ``kind: phase`` so the client shows the
+    label itself instead of "Using …".
+    """
+    return ReplyEvent("activity", payload={"tool": name, "label": label, "kind": "phase"})
+
+
+async def _relayed(
+    produce: Callable[[asyncio.Queue[ReplyEvent | None]], Awaitable[None]],
+) -> AsyncIterator[ReplyEvent]:
+    """Run ``produce`` as a task and yield what it puts on the queue, as it happens.
+
+    ``produce`` is handed the queue and must put ``None`` last; that is how
+    tool activity reaches the client while the model is still working.
+    """
+    queue: asyncio.Queue[ReplyEvent | None] = asyncio.Queue()
+
+    async def run() -> None:
+        try:
+            await produce(queue)
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(run())
+    try:
+        while (event := await queue.get()) is not None:
+            yield event
+        await task  # surfaces what the producer raised
+    finally:
+        if not task.done():
+            task.cancel()
 
 
 def _split(messages: list[dict]) -> tuple[str, list[dict], str]:
@@ -66,45 +101,35 @@ async def _loop_events(
 ) -> AsyncIterator[ReplyEvent]:
     """Run the tool loop in a task so tool activity reaches the client as it happens."""
     system, history, user_message = _split(messages)
-    queue: asyncio.Queue[ReplyEvent | None] = asyncio.Queue()
 
-    async def on_tool_call(call: ToolCallRequest) -> None:
-        await queue.put(_activity(call.name))
+    async def produce(queue: asyncio.Queue[ReplyEvent | None]) -> None:
+        async def on_tool_call(call: ToolCallRequest) -> None:
+            await queue.put(_activity(call.name))
 
-    async def run() -> None:
-        try:
-            async with session_factory() as db:
+        async with session_factory() as db:
 
-                async def invoke(spec: ToolSpec, arguments: dict[str, Any]) -> str:
-                    return await gateway.invoke(
-                        db,
-                        run_id=None,
-                        spec=spec,
-                        arguments=arguments,
-                        requested_by=requested_by,
-                    )
-
-                text, _ = await run_tool_loop(
-                    ai,
-                    system_prompt=system + TOOLS_HINT,
-                    user_message=user_message,
-                    specs=specs,
-                    invoke=invoke,
-                    history=history,
-                    on_tool_call=on_tool_call,
+            async def invoke(spec: ToolSpec, arguments: dict[str, Any]) -> str:
+                return await gateway.invoke(
+                    db,
+                    run_id=None,
+                    spec=spec,
+                    arguments=arguments,
+                    requested_by=requested_by,
                 )
-            await queue.put(ReplyEvent("token", text or ""))
-        finally:
-            await queue.put(None)
 
-    task = asyncio.create_task(run())
-    try:
-        while (event := await queue.get()) is not None:
-            yield event
-        await task  # surfaces what the loop raised
-    finally:
-        if not task.done():
-            task.cancel()
+            text, _ = await run_tool_loop(
+                ai,
+                system_prompt=system + TOOLS_HINT,
+                user_message=user_message,
+                specs=specs,
+                invoke=invoke,
+                history=history,
+                on_tool_call=on_tool_call,
+            )
+        await queue.put(ReplyEvent("token", text or ""))
+
+    async for event in _relayed(produce):
+        yield event
 
 
 async def reply_events(
@@ -133,9 +158,18 @@ async def reply_events(
         return
 
     # The CLI's tool calls arrive on other requests, so they need their own
-    # sessions on the same database.
-    async with agent_mcp_endpoint.run_scope(
-        None, specs, session_factory, requested_by=requested_by
-    ):
-        async for token in ai.stream_completion(_with_hint(messages)):
-            yield ReplyEvent("token", token)
+    # sessions on the same database. The endpoint names each call as it
+    # begins, and the stream runs in a task so that name reaches the client
+    # while the CLI is still at work rather than with the finished answer.
+    async def produce(queue: asyncio.Queue[ReplyEvent | None]) -> None:
+        async def on_tool_call(name: str) -> None:
+            await queue.put(_activity(name))
+
+        async with agent_mcp_endpoint.run_scope(
+            None, specs, session_factory, requested_by=requested_by, on_tool_call=on_tool_call
+        ):
+            async for token in ai.stream_completion(_with_hint(messages)):
+                await queue.put(ReplyEvent("token", token))
+
+    async for event in _relayed(produce):
+        yield event

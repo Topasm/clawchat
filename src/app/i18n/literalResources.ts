@@ -1334,6 +1334,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'MCP server removed': 'MCP 서버를 삭제했습니다',
   'MCP servers': 'MCP 서버',
   'Using {{label}}…': '{{label}} 사용 중…',
+  'Reading your message…': '메시지를 읽는 중…',
+  'Thinking…': '생각하는 중…',
   'Offered to the Research skill. Searches run on your own SearXNG instance with JSON output enabled.':
     '리서치 스킬에서 사용합니다. 검색은 JSON 출력을 켠 내 SearXNG 인스턴스에서 실행됩니다.',
   On: '켜기',

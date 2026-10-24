@@ -2,6 +2,7 @@ import type { ChatMessage } from '../../stores/useChatStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CopyIcon, EditIcon, SpinArrowsIcon, TrashIcon, UserIcon } from '../shared/Icons';
 import ActionCard from './ActionCard';
+import MessageMarkdown from './MessageMarkdown';
 import { translateUi } from '../../i18n';
 import { formatTime } from '../../utils/formatters';
 const INTENT_LABELS: Record<string, string> = {
@@ -61,7 +62,13 @@ export default function MessageBubble({
       )}
       <div className={`cc-bubble cc-bubble--${role}`}>
         {!isUser && intentLabel && <div className="cc-bubble__intent">{intentLabel}</div>}
-        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.text}</span>
+        {isUser ? (
+          <span className="cc-bubble__text">{message.text}</span>
+        ) : (
+          <div className="cc-bubble__md">
+            <MessageMarkdown text={message.text} />
+          </div>
+        )}
         {message.metadata && (
           <ActionCard metadata={message.metadata} suppressTaskProgress={suppressTaskProgress} />
         )}
