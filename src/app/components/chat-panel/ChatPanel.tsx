@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import AiSetupBanner from '../shared/AiSetupBanner';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { m } from 'framer-motion';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import type { ChatMessage } from '../../stores/useChatStore';
@@ -18,6 +18,7 @@ import ChatPanelRunStrip from './ChatPanelRunStrip';
 import ChatInput from './ChatInput';
 import { CloseIcon, ExternalLinkIcon, MinusIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import { returnToState } from '../../services/returnTo';
 interface ChatPanelProps {
   isOpen: boolean;
   conversationId: string | null;
@@ -41,6 +42,7 @@ export default function ChatPanel({
   hideHeader = false,
 }: ChatPanelProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const isStreaming = useChatStore(
     (s) => s.isStreaming && s.streamingConversationId === conversationId,
   );
@@ -158,9 +160,13 @@ export default function ChatPanel({
       setCurrentConversationId,
     ],
   );
+  // The full view remembers this screen, so its ← comes back here rather
+  // than to the project page.
   const handlePopOut = () => {
     if (conversationId) {
-      navigate(`/chats/${conversationId}`);
+      navigate(`/chats/${conversationId}`, {
+        state: returnToState(location.pathname, location.search),
+      });
     } else {
       navigate('/projects');
     }

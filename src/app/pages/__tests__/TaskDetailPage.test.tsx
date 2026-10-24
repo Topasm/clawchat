@@ -114,6 +114,35 @@ function renderPage() {
   );
 }
 
+describe('TaskDetailPage back button', () => {
+  function renderFrom(initialEntries: Parameters<typeof MemoryRouter>[0]['initialEntries']) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
+            <Route path="/tasks" element={<div>Task list</div>} />
+            <Route path="/inbox" element={<div>Inbox page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it('returns to the screen the task was opened from', () => {
+    renderFrom([{ pathname: '/tasks/todo-e65a', state: { returnTo: '/inbox?view=all' } }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('Inbox page')).toBeInTheDocument();
+  });
+
+  it('falls back to the task list for a cold deep link', () => {
+    renderFrom(['/tasks/todo-e65a']);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('Task list')).toBeInTheDocument();
+  });
+});
+
 describe('TaskDetailPage project context', () => {
   beforeEach(() => {
     useAuthStore.setState({ serverUrl: 'http://home.local:8000', connectionStatus: 'connected' });

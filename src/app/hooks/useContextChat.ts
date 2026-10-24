@@ -7,6 +7,7 @@ import type { ChatPanelState } from './useChatPanel';
 import { useToastStore } from '../stores/useToastStore';
 import { translateUi } from '../i18n';
 import type { TodoResponse } from '../types/api';
+import { returnToState } from '../services/returnTo';
 
 interface ChatContextState {
   /** What the open screen talks about, when it knows better than its route. */
@@ -29,6 +30,7 @@ const TASK_PATH = /^\/tasks\/([^/]+)$/;
 export function useOpenTaskChat(panel: ChatPanelState | null) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const { mutateAsync: getOrCreate } = useGetOrCreateProjectConversation();
   return useCallback(
     async (taskId: string) => {
@@ -38,7 +40,9 @@ export function useOpenTaskChat(panel: ChatPanelState | null) {
         if (!isCurrent()) return;
         // Outside the app shell there is no panel; the thread's own page will do.
         if (!panel) {
-          navigate(`/chats/${conversation.id}`);
+          navigate(`/chats/${conversation.id}`, {
+            state: returnToState(location.pathname, location.search),
+          });
           return;
         }
         const task = queryClient
@@ -56,7 +60,7 @@ export function useOpenTaskChat(panel: ChatPanelState | null) {
           .addToast('error', translateUi('Could not open the agent conversation.'));
       }
     },
-    [getOrCreate, navigate, panel, queryClient],
+    [getOrCreate, location.pathname, location.search, navigate, panel, queryClient],
   );
 }
 

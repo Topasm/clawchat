@@ -29,7 +29,7 @@ import TaskMoreMenu, { type TaskMenuItem } from './TaskMoreMenu';
 import TaskAgentThreadSection from './TaskAgentThreadSection';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 import { getTaskStage } from '../../utils/taskStage';
-import { CheckIcon } from '../shared/Icons';
+import { CheckIcon, ChevronLeftIcon } from '../shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../../types/api';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
 import { formatDate, formatShortDateTime, hasClockTime } from '../../utils/formatters';
@@ -90,6 +90,8 @@ interface TaskDetailProps {
   menuSlot?: HTMLElement | null;
   /** The host's own entries, listed before the task's. */
   extraMenuItems?: TaskMenuItem[];
+  /** Draws ← at the start of the title row; the page passes it, the pane has its own close. */
+  onBack?: () => void;
 }
 /**
  * A task's detail: the body of the task page, and of the desktop pane that
@@ -101,6 +103,7 @@ export default function TaskDetail({
   onDeleted,
   menuSlot,
   extraMenuItems,
+  onBack,
 }: TaskDetailProps) {
   const navigate = useNavigate();
   const homeReachable = useHomeReachable();
@@ -310,6 +313,17 @@ export default function TaskDetail({
     <div className="cc-detail cc-exec-panel">
       <div className="cc-exec-panel__top">
         <div className="cc-exec-panel__top-row">
+          {onBack && (
+            <button
+              type="button"
+              className="cc-icon-button cc-exec-panel__back"
+              aria-label={translateUi('Back')}
+              title={translateUi('Back')}
+              onClick={onBack}
+            >
+              <ChevronLeftIcon size={18} />
+            </button>
+          )}
           <Checkbox checked={task.status === 'completed'} onChange={() => handleToggle(task.id)} />
           <input
             className="cc-detail__title-input"
