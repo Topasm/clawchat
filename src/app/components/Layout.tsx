@@ -320,7 +320,7 @@ export default function Layout() {
     onToggleChat: toggleChat,
     onNewItem: () => {
       // The Inbox has the input on the page; elsewhere the same input opens.
-      const inboxInput = document.querySelector<HTMLInputElement>('.cc-inbox-capture__input');
+      const inboxInput = document.querySelector<HTMLTextAreaElement>('.cc-inbox-capture__input');
       if (inboxInput) inboxInput.focus();
       else openQuickCapture();
     },

@@ -1674,7 +1674,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Talk with AI': 'AI와 대화',
   'Talk with AI (⌘K)': 'AI와 대화 (⌘K)',
   'Open command palette': '명령 팔레트 열기',
-  'Enter to add': 'Enter로 추가',
+  'Enter to add · Shift+Enter for a new line': 'Enter로 추가 · Shift+Enter로 줄바꿈',
   'Could not move this item': '옮기지 못했습니다',
   'Added to tasks, due {{date}}': '{{date}} 마감으로 추가됨',
   'Could not add to the Inbox': '받은함에 추가하지 못했습니다',

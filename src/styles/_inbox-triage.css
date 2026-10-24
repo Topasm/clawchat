@@ -311,7 +311,7 @@
   position: sticky;
   bottom: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--cc-space-3);
   margin-top: var(--cc-space-5);
   padding: var(--cc-space-3) 0;
@@ -330,6 +330,13 @@
   color: var(--cc-text);
   font: inherit;
   font-size: 14px;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: hidden;
+}
+
+.cc-inbox-capture__hint {
+  padding-bottom: calc((var(--cc-control-height) - 1em) / 2 - 2px);
 }
 
 .cc-inbox-capture__input:focus {
