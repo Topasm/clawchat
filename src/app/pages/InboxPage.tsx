@@ -65,14 +65,16 @@ export default function InboxPage() {
           'success',
           routing.kind === 'task' && routing.note_id
             ? translateUi('Undone. “{{title}}” is a note again', { title })
-            : translateUi('Undone. “{{title}}” is back in the Inbox', { title }),
+            : routing.kind === 'task' && routing.event_id
+              ? translateUi('Undone. “{{title}}” is an event again', { title })
+              : translateUi('Undone. “{{title}}” is back in the Inbox', { title }),
         );
       },
       (error: unknown) => {
         addToast(
           'error',
           next.action === 'undo'
-            ? undoErrorMessage(error)
+            ? undoErrorMessage(error, translateUi('Could not undo'))
             : inboxErrorMessage(error, translateUi('Could not move this item')),
         );
       },
@@ -106,6 +108,7 @@ export default function InboxPage() {
           }
           onOpenTask={(todoId) => navigate(`/tasks/${todoId}`)}
           onOpenNotes={() => navigate('/notes')}
+          onOpenEvent={(eventId) => navigate(`/events/${eventId}`)}
         />
       </div>
       <InboxCaptureBar busy={capturing} onCapture={capture} />

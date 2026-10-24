@@ -199,6 +199,39 @@ describe('InboxPage', () => {
     );
   });
 
+  it('shows an appointment as an event, opens it, and offers to make it a task', () => {
+    const meeting = routing({
+      id: 'route-meeting',
+      kind: 'event',
+      todo_id: 'todo-meeting',
+      event_id: 'evt-1',
+      title: '교수님 면담',
+      original_title: '10월 30일 금요일 오후 2시 교수님 면담',
+      due_date: new Date(2026, 9, 30, 14, 0).toISOString(),
+    });
+    mocks.routings = [meeting, gpuTask];
+    renderPage();
+
+    const [eventRow, taskRow] = within(
+      screen.getByRole('region', { name: /Just organized/ }),
+    ).getAllByRole('listitem');
+    expect(within(eventRow).getByText('Event')).toBeInTheDocument();
+    expect(within(eventRow).getByText(/Oct 30/)).toBeInTheDocument();
+    expect(within(eventRow).getByText(/2:00 PM/)).toBeInTheDocument();
+    fireEvent.click(within(eventRow).getByRole('button', { name: '교수님 면담' }));
+    expect(mocks.navigate).toHaveBeenCalledWith('/events/evt-1');
+
+    fireEvent.click(within(eventRow).getByRole('button', { name: 'Change where this goes' }));
+    expect(screen.queryByRole('menuitemradio', { name: 'Note' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Task' }));
+    expect(mocks.move).toHaveBeenCalledWith({ action: 'event-to-task', eventId: 'evt-1' });
+
+    // A dated task can become an event from the same menu.
+    fireEvent.click(within(taskRow).getByRole('button', { name: 'Change where this goes' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Event' }));
+    expect(mocks.move).toHaveBeenCalledWith({ action: 'to-event', todoId: 'todo-gpu' });
+  });
+
   it('marks an item filed with low confidence and leaves sure ones plain', () => {
     mocks.routings = [
       { ...gpuTask, kind_confidence: null },

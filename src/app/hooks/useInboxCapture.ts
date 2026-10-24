@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, useCreateTodo } from './queries';
 import { useToastStore } from '../stores/useToastStore';
 import { inboxErrorMessage } from '../components/inbox/inboxErrors';
-import { formatMonthDay } from '../utils/formatters';
+import { formatDueMoment } from '../utils/formatters';
 import { translateUi } from '../i18n';
 import type { TodoResponse } from '../types/api';
 
@@ -25,7 +25,7 @@ export default function useInboxCapture() {
         if (todo?.inbox_state === 'none' && todo.due_date) {
           addToast(
             'success',
-            translateUi('Added to tasks, due {{date}}', { date: formatMonthDay(todo.due_date) }),
+            translateUi('Added to tasks, due {{date}}', { date: formatDueMoment(todo.due_date) }),
           );
         }
         return todo;

@@ -250,9 +250,7 @@ private fun InboxRoutingRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ClawStatusChip(
-                        stringResource(if (routing.isTask) R.string.inbox_kind_task else R.string.inbox_kind_note),
-                    )
+                    ClawStatusChip(stringResource(routing.kindLabel()))
                     if (detail.isNotEmpty()) {
                         Text(
                             detail,
@@ -317,13 +315,18 @@ private fun InboxDestinationSheet(
                     if (routing.isTask) onDismiss() else onAction(InboxAction.SwitchKind(routing))
                 }
             }
-            item {
-                InboxDestinationItem(stringResource(R.string.inbox_kind_note), !routing.isTask) {
-                    if (!routing.isTask) onDismiss() else onAction(InboxAction.SwitchKind(routing))
+            if (routing.isEvent) {
+                // An event goes back to being a task; it was never a note.
+                item { InboxDestinationItem(stringResource(R.string.inbox_kind_event), true, onDismiss) }
+            } else {
+                item {
+                    InboxDestinationItem(stringResource(R.string.inbox_kind_note), !routing.isTask) {
+                        if (!routing.isTask) onDismiss() else onAction(InboxAction.SwitchKind(routing))
+                    }
                 }
             }
-            if (projects.isNotEmpty()) item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
-            items(projects, key = { it.id }) { project ->
+            if (projects.isNotEmpty() && !routing.isEvent) item { HorizontalDivider(Modifier.padding(vertical = 4.dp)) }
+            if (!routing.isEvent) items(projects, key = { it.id }) { project ->
                 val current = routing.isTask && currentProject == project.id
                 InboxDestinationItem(stringResource(R.string.inbox_project_option, project.title), current) {
                     if (current) onDismiss() else onAction(InboxAction.MoveToProject(routing, project.id))
@@ -467,3 +470,9 @@ internal fun inboxShortDay(value: String, locale: Locale, zone: ZoneId = ZoneId.
 /** The last segment of a vault folder: `01_Projects/Thesis` → `Thesis`. */
 internal fun inboxFolderName(folder: String?): String? =
     folder?.split('/')?.lastOrNull { it.isNotBlank() }
+
+private fun InboxRouting.kindLabel(): Int = when {
+    isEvent -> R.string.inbox_kind_event
+    isTask -> R.string.inbox_kind_task
+    else -> R.string.inbox_kind_note
+}

@@ -7,7 +7,7 @@ import type { InboxRouting } from '../../types/schemas';
 import type { InboxMove } from '../../hooks/queries';
 import InboxDestinationMenu, { type InboxDestinationOption } from './InboxDestinationMenu';
 import { translateUi } from '../../i18n';
-import { formatMonthDay } from '../../utils/formatters';
+import { formatDueMoment, formatShortDateTime } from '../../utils/formatters';
 
 interface InboxQueueProps {
   /** What the Inbox filed in the last day, newest first. */
@@ -25,7 +25,14 @@ interface InboxQueueProps {
   onMoveNote: (noteId: string, projectId: string | null) => void;
   onOpenTask: (todoId: string) => void;
   onOpenNotes: () => void;
+  onOpenEvent: (eventId: string) => void;
 }
+
+const KIND_LABELS: Record<InboxRouting['kind'], () => string> = {
+  task: () => translateUi('Task'),
+  note: () => translateUi('Note'),
+  event: () => translateUi('Event'),
+};
 
 /** Below this the Inbox filed the item anyway and marks it for a look. */
 const LOW_CONFIDENCE = 0.8;
@@ -53,6 +60,7 @@ export default function InboxQueue({
   onMoveNote,
   onOpenTask,
   onOpenNotes,
+  onOpenEvent,
 }: InboxQueueProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const reviewIds = useMemo(() => new Set(review.map((todo) => todo.id)), [review]);
@@ -60,22 +68,41 @@ export default function InboxQueue({
   const projectTitle = (projectId: string | null | undefined) =>
     projects.find((project) => project.id === projectId)?.title ?? null;
 
+  // The other places an organized item can go. An event comes from a dated
+  // task or goes back to one; a note has no time, so it is never offered one.
   const destinationOptions = (routing: InboxRouting): InboxDestinationOption[] => {
-    const isTask = routing.kind === 'task';
+    const { kind } = routing;
     const options: InboxDestinationOption[] = [
       {
         key: 'task',
         label: translateUi('Task'),
-        current: isTask,
-        onSelect: () => routing.note_id && onMove({ action: 'to-task', noteId: routing.note_id }),
-      },
-      {
-        key: 'note',
-        label: translateUi('Note'),
-        current: !isTask,
-        onSelect: () => routing.todo_id && onMove({ action: 'to-note', todoId: routing.todo_id }),
+        current: kind === 'task',
+        onSelect: () => {
+          if (kind === 'note' && routing.note_id)
+            onMove({ action: 'to-task', noteId: routing.note_id });
+          else if (kind === 'event' && routing.event_id)
+            onMove({ action: 'event-to-task', eventId: routing.event_id });
+        },
       },
     ];
+    if (kind !== 'event') {
+      options.push({
+        key: 'note',
+        label: translateUi('Note'),
+        current: kind === 'note',
+        onSelect: () => routing.todo_id && onMove({ action: 'to-note', todoId: routing.todo_id }),
+      });
+    }
+    if (kind !== 'note') {
+      options.push({
+        key: 'event',
+        label: translateUi('Event'),
+        current: kind === 'event',
+        onSelect: () => routing.todo_id && onMove({ action: 'to-event', todoId: routing.todo_id }),
+      });
+    }
+    if (kind === 'event') return options;
+    const isTask = kind === 'task';
     for (const project of projects) {
       options.push({
         key: `project:${project.id}`,
@@ -92,9 +119,12 @@ export default function InboxQueue({
 
   const destinationDetail = (routing: InboxRouting): string => {
     const parts: string[] = [];
+    if (routing.kind === 'event' && routing.due_date) {
+      parts.push(formatShortDateTime(routing.due_date));
+    }
     if (routing.kind === 'task') {
       if (routing.due_date) {
-        parts.push(translateUi('Due {{date}}', { date: formatMonthDay(routing.due_date) }));
+        parts.push(translateUi('Due {{date}}', { date: formatDueMoment(routing.due_date) }));
       }
       const place =
         projectTitle(todoById.get(routing.todo_id ?? '')?.project_id) ??
@@ -102,6 +132,12 @@ export default function InboxQueue({
       if (place) parts.push(place);
     }
     return parts.join(' · ');
+  };
+
+  const openRouting = (routing: InboxRouting) => {
+    if (routing.kind === 'event' && routing.event_id) onOpenEvent(routing.event_id);
+    else if (routing.kind === 'task' && routing.todo_id) onOpenTask(routing.todo_id);
+    else onOpenNotes();
   };
 
   const toggle = (todoId: string) =>
@@ -152,17 +188,13 @@ export default function InboxQueue({
                         ? translateUi('Filed with low confidence. Check where it went.')
                         : undefined
                     }
-                    onClick={() =>
-                      routing.kind === 'task' && routing.todo_id
-                        ? onOpenTask(routing.todo_id)
-                        : onOpenNotes()
-                    }
+                    onClick={() => openRouting(routing)}
                   >
                     {routing.title}
                   </button>
                   <InboxDestinationMenu options={destinationOptions(routing)} disabled={busy}>
                     <span className={`cc-inbox-kind cc-inbox-kind--${routing.kind}`}>
-                      {routing.kind === 'task' ? translateUi('Task') : translateUi('Note')}
+                      {KIND_LABELS[routing.kind]()}
                     </span>
                     {detail && <span className="cc-inbox-row__detail">{detail}</span>}
                   </InboxDestinationMenu>

@@ -167,6 +167,12 @@
   color: var(--cc-text-secondary);
 }
 
+/* The same tint as a calendar pill: an event is a calendar item. */
+.cc-inbox-kind--event {
+  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
+  color: var(--cc-primary);
+}
+
 /* The destination of a filed item, and the small menu behind it. */
 .cc-inbox-dest {
   position: relative;

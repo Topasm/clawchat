@@ -14,6 +14,7 @@ from exceptions import AppError, NotFoundError
 from models.agent_task import AgentTask
 from models.artifact import Artifact
 from models.attachment import Attachment
+from models.event import Event
 from models.inbox_routing import InboxRouting
 from models.note import Note
 from models.plan_proposal import PlanProposal
@@ -32,6 +33,7 @@ from services.planning.inbox_deadline import (
     due_instant,
     parse_deadline,
 )
+from services.calendar import calendar_service
 from services.review import review_item_service
 
 # How long a move stays under "Just organized" unless the user clears it.
@@ -40,7 +42,9 @@ _TITLE_LIMIT = 500
 
 # Restored on undo of a task move, and the guard that the row is still the
 # capture the move produced.
-_TASK_FIELDS = ("title", "due_date", "inbox_state", "source", "source_id")
+_TASK_FIELDS = ("title", "description", "due_date", "inbox_state", "source", "source_id")
+# An event made from a capture lasts this long unless the text says otherwise.
+DEFAULT_EVENT_LENGTH = timedelta(hours=1)
 # Every column a note move must recreate, other than the timestamps.
 _ROW_FIELDS = (
     "id",
@@ -101,6 +105,21 @@ def _note_row(note: Note) -> dict[str, object]:
     }
 
 
+def _event_row(event: Event) -> dict[str, object]:
+    return {
+        "id": event.id,
+        "title": event.title,
+        "description": event.description,
+        "project_id": event.project_id,
+        "start_time": _encode(event.start_time),
+        "end_time": _encode(event.end_time),
+        "location": event.location,
+        "is_all_day": event.is_all_day,
+        "tags": event.tags,
+        "created_at": _encode(event.created_at),
+    }
+
+
 def deadline_for(todo: Todo, zone: Zone) -> ParsedDeadline | None:
     return parse_deadline(todo.title, capture_day(todo.created_at, zone))
 
@@ -117,8 +136,17 @@ def task_patch(
     deadline: ParsedDeadline | None,
     zone: Zone,
     fallback_due: datetime | None = None,
+    original: str | None = None,
+    current_description: str | None = None,
+    summary: str | None = None,
 ) -> dict[str, object]:
-    """The fields a task move writes: out of the Inbox, with its deadline."""
+    """The fields a task move writes: out of the Inbox, with its deadline.
+
+    The title is what is left once the date expression is removed, or the
+    classifier's ``summary`` of a long capture. Whenever that differs from the
+    text as typed (``original``), the typed text is kept as the description
+    unless the task already has one, so nothing the user wrote is lost.
+    """
     patch: dict[str, object] = {"inbox_state": "none", "automation_error": None}
     if current_due is None:
         if deadline is not None:
@@ -126,6 +154,16 @@ def task_patch(
             patch["title"] = deadline.stripped_title[:_TITLE_LIMIT]
         elif fallback_due is not None:
             patch["due_date"] = fallback_due
+    if summary:
+        patch["title"] = summary[:_TITLE_LIMIT]
+    title = patch.get("title")
+    if (
+        original is not None
+        and isinstance(title, str)
+        and title.strip() != original.strip()
+        and not (current_description or "").strip()
+    ):
+        patch["description"] = original
     return patch
 
 
@@ -171,6 +209,8 @@ async def file_as_task(
         current_due=todo.due_date,
         deadline=deadline_for(todo, zone),
         zone=zone,
+        original=todo.title,
+        current_description=todo.description,
     ).items():
         setattr(todo, field, value)
     routing = record_task_move(
@@ -202,7 +242,10 @@ async def route_on_capture(
     """
     deadline = deadline_for(todo, zone)
     if deadline is not None and is_upcoming(deadline, zone):
-        return await file_as_task(db, todo, origin="auto", zone=zone)
+        # A clock time may mean an appointment rather than a deadline; when a
+        # classifier is there, it tells the two apart (``_route_for``).
+        if deadline.local_time is None or not ai_available:
+            return await file_as_task(db, todo, origin="auto", zone=zone)
     todo.inbox_state = "classifying" if ai_available else "captured"
     await db.flush()
     return None
@@ -212,18 +255,20 @@ async def route_on_capture(
 _FINISHED_RUN_STATES = ("completed", "failed", "cancelled")
 
 
-async def _require_plain_capture(db: AsyncSession, todo: Todo) -> None:
-    """A note has no steps, links, files, comments or live runs to carry over.
+async def _require_plain_capture(
+    db: AsyncSession, todo: Todo, what: str = "a note"
+) -> None:
+    """A note (or an event) has no steps, links, files, comments or live runs to carry over.
 
     Finished runs and plan drafts are only history (an Inbox that used to plan
     by itself left one on many captures); they are detached, and undo puts
     them back.
     """
     if todo.status in {TaskStatus.COMPLETED, TaskStatus.CANCELLED}:
-        raise _cannot_move("A finished task cannot become a note", todo_id=todo.id)
+        raise _cannot_move(f"A finished task cannot become {what}", todo_id=todo.id)
     if todo.parent_id is not None:
         raise _cannot_move(
-            "A step of another task cannot become a note", todo_id=todo.id
+            f"A step of another task cannot become {what}", todo_id=todo.id
         )
     checks = (
         (select(Todo.id).where(Todo.parent_id == todo.id), "it has steps"),
@@ -257,7 +302,7 @@ async def _require_plain_capture(db: AsyncSession, todo: Todo) -> None:
     for query, reason in checks:
         if (await db.execute(query.limit(1))).first() is not None:
             raise _cannot_move(
-                f"This task cannot become a note: {reason}",
+                f"This task cannot become {what}: {reason}",
                 todo_id=todo.id,
                 reason=reason,
             )
@@ -378,13 +423,124 @@ async def note_to_task(
     )
 
 
+def event_window(
+    start: datetime, end: datetime | None, zone: Zone
+) -> tuple[datetime, datetime | None, bool]:
+    """When an event made from a task runs: a clock time lasts an hour unless
+    an end is given; the end of a day (a deadline with no clock) is all day."""
+    local = start.astimezone(as_zone(zone))
+    if (local.hour, local.minute) == (23, 59) and end is None:
+        day_start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        return day_start.astimezone(timezone.utc), None, True
+    return start, end or start + DEFAULT_EVENT_LENGTH, False
+
+
+async def task_to_event(
+    db: AsyncSession,
+    todo: Todo,
+    *,
+    origin: str,
+    zone: Zone,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    location: str | None = None,
+    title: str | None = None,
+    kind_confidence: float | None = None,
+) -> InboxRouting:
+    """Replace a task with a calendar event at ``start`` (its deadline when
+    none is given). The task's text stays on the event; undo brings the task
+    back under its old id."""
+    moment = start or todo.due_date
+    if moment is None:
+        raise _cannot_move("An event needs a date or time", todo_id=todo.id)
+    await _require_plain_capture(db, todo, "an event")
+    await review_item_service.close_task_plan_reviews(db, [todo.id])
+    before = _todo_row(todo)
+    before.update(await _detach_history(db, todo.id))
+    starts, ends, all_day = event_window(
+        moment.replace(tzinfo=moment.tzinfo or timezone.utc), end, zone
+    )
+    heading = (title or todo.title).strip()[:_TITLE_LIMIT] or todo.title[:_TITLE_LIMIT]
+    # Nothing typed is lost: a title cut from the text keeps the text below it.
+    description = todo.description
+    if not (description or "").strip() and heading != todo.title.strip():
+        description = todo.title
+    event = await calendar_service.create_event(
+        db,
+        title=heading,
+        description=description,
+        project_id=todo.project_id,
+        start_time=starts,
+        end_time=ends,
+        location=location,
+        is_all_day=all_day,
+    )
+    await db.delete(todo)
+    await db.flush()
+    return _record(
+        db,
+        origin=origin,
+        kind="event",
+        kind_confidence=kind_confidence,
+        todo_id=str(before["id"]),
+        event_id=event.id,
+        title=event.title,
+        original_title=str(before["title"]),
+        due_date=event.start_time,
+        before_json=json.dumps({"type": "todo_row", **before}),
+    )
+
+
+async def event_to_task(
+    db: AsyncSession, event: Event, *, origin: str
+) -> InboxRouting:
+    """Replace an event with a task due when the event started; undo restores
+    the event under its old id."""
+    before = _event_row(event)
+    start = event.start_time.replace(tzinfo=event.start_time.tzinfo or timezone.utc)
+    if event.is_all_day:
+        start = start + timedelta(hours=23, minutes=59, seconds=59)
+    todo = Todo(
+        title=event.title[:_TITLE_LIMIT],
+        description=event.description,
+        project_id=event.project_id,
+        due_date=start,
+        inbox_state="none",
+        created_at=event.created_at,
+    )
+    db.add(todo)
+    await calendar_service.delete_event(db, event.id)
+    await db.flush()
+    return _record(
+        db,
+        origin=origin,
+        kind="task",
+        todo_id=todo.id,
+        event_id=str(before["id"]),
+        title=todo.title,
+        original_title=event.title,
+        due_date=todo.due_date,
+        before_json=json.dumps({"type": "event_row", **before}),
+    )
+
+
+def _produced_by(routing: InboxRouting) -> str | None:
+    """The id of the item a move made: a task, a note or an event."""
+    if routing.kind == "task":
+        return routing.todo_id
+    if routing.kind == "note":
+        return routing.note_id
+    return routing.event_id
+
+
 async def _later_move(db: AsyncSession, routing: InboxRouting) -> InboxRouting | None:
     """A move made after *routing* to the item *routing* produced."""
-    produced = (
-        InboxRouting.todo_id == routing.todo_id
-        if routing.kind == "task"
-        else InboxRouting.note_id == routing.note_id
-    )
+    if routing.kind == "task":
+        produced = InboxRouting.todo_id == routing.todo_id
+    elif routing.kind == "note":
+        produced = InboxRouting.note_id == routing.note_id
+    else:
+        produced = InboxRouting.event_id == routing.event_id
     return (
         await db.execute(
             select(InboxRouting)
@@ -428,12 +584,20 @@ async def undo(db: AsyncSession, routing_id: str) -> InboxRouting:
             value = before.get(field)
             setattr(todo, field, _decode_time(value) if field == "due_date" else value)
     elif kind == "todo_row":
-        note = await db.get(Note, routing.note_id)
-        if note is None:
-            raise _cannot_move("The note is gone", routing_id=routing.id)
+        if routing.kind == "event":
+            event = await db.get(Event, routing.event_id)
+            if event is None:
+                raise _cannot_move("The event is gone", routing_id=routing.id)
+        else:
+            note = await db.get(Note, routing.note_id)
+            if note is None:
+                raise _cannot_move("The note is gone", routing_id=routing.id)
         if await db.get(Todo, before["id"]) is not None:
             raise _cannot_move("The task already exists", routing_id=routing.id)
-        await db.delete(note)
+        if routing.kind == "event":
+            await calendar_service.delete_event(db, routing.event_id)
+        else:
+            await db.delete(note)
         await db.flush()
         if (
             before.get("project_id")
@@ -443,6 +607,33 @@ async def undo(db: AsyncSession, routing_id: str) -> InboxRouting:
         db.add(_restore_todo(before))
         await db.flush()
         await _reattach_history(db, str(before["id"]), before)
+    elif kind == "event_row":
+        todo = await db.get(Todo, routing.todo_id)
+        if todo is None:
+            raise _cannot_move("The task is gone", routing_id=routing.id)
+        await _require_plain_capture(db, todo, "an event again")
+        if await db.get(Event, before["id"]) is not None:
+            raise _cannot_move("The event already exists", routing_id=routing.id)
+        await db.delete(todo)
+        await db.flush()
+        project_id = before.get("project_id")
+        if project_id and await db.get(Project, project_id) is None:
+            project_id = None
+        event = Event(
+            id=before["id"],
+            title=before["title"],
+            description=before.get("description"),
+            project_id=project_id,
+            start_time=_decode_time(before["start_time"]),
+            end_time=_decode_time(before.get("end_time")),
+            location=before.get("location"),
+            is_all_day=bool(before.get("is_all_day")),
+            tags=before.get("tags"),
+        )
+        created = _decode_time(before.get("created_at"))
+        if created is not None:
+            event.created_at = created
+        db.add(event)
     else:
         todo = await db.get(Todo, routing.todo_id)
         if todo is None:
@@ -497,10 +688,11 @@ async def recent(db: AsyncSession, now: datetime | None = None) -> list[InboxRou
     seen: set[str] = set()
     latest: list[InboxRouting] = []
     for row in await _unacknowledged(db, now):
-        produced = row.todo_id if row.kind == "task" else row.note_id
-        if produced not in seen:
+        if _produced_by(row) not in seen:
             latest.append(row)
-        seen.update(item for item in (row.todo_id, row.note_id) if item)
+        seen.update(
+            item for item in (row.todo_id, row.note_id, row.event_id) if item
+        )
     return latest
 
 

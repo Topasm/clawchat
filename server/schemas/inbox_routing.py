@@ -12,9 +12,10 @@ class InboxRoutingResponse(BaseModel):
 
     id: str
     origin: Literal["auto", "user"]
-    kind: Literal["task", "note"]
+    kind: Literal["task", "note", "event"]
     todo_id: str | None
     note_id: str | None
+    event_id: str | None = None
     title: str
     original_title: str
     due_date: UtcDatetime | None

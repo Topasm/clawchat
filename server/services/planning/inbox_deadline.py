@@ -1,8 +1,9 @@
 """Conservative deadline parsing, anchored to capture time, not refresh time.
 
 One date expression in a title is a deadline: relative days, weekdays,
-``2026-11-03``, ``11월 3일``, ``11/3``, ``Nov 3``, ``3일까지``, optionally with a
-clock time (``오후 2시``, ``14:30``, ``2pm``). A trailing ``까지``/``마감`` or a
+``2026-11-03``, ``11월 3일``, ``11/3``, ``Nov 3``, ``3일까지``, optionally with the
+weekday repeated (``10월 30일 금요일``) and a clock time (``오후 2시``, ``14:30``,
+``2pm``). A trailing ``까지``/``마감`` or a
 leading ``by`` is part of the expression but no longer required. Two or more
 dates may describe a range or a correction, so they are never guessed.
 """
@@ -56,12 +57,14 @@ _DATE = (
     r"|(?P<dd>\d{1,2})\s*일(?=\s*(?:까지|마감))"
 )
 _TIME = (
-    r"(?:(?P<ampm>오전|오후)\s*)?(?P<hh>\d{1,2})\s*시(?!간)(?:\s*(?P<mm>\d{1,2})\s*분|\s*(?P<half>반))?"
+    r"(?:(?P<ampm>오전|오후|아침|새벽|저녁|밤)\s*)?(?P<hh>\d{1,2})\s*시(?!간)(?:\s*(?P<mm>\d{1,2})\s*분|\s*(?P<half>반))?"
     r"|(?P<ch>\d{1,2}):(?P<cm>\d{2})(?:\s*(?P<cap>am|pm))?"
     r"|(?P<eh>\d{1,2})\s*(?P<eap>am|pm)"
 )
+# "10월 30일 금요일" / "Oct 30 (Fri)": the weekday names the same day again.
+_DAY_AFTER_DATE = rf"(?:,?\s*\(?(?:{_DAY}|[월화수목금토일]|mon|tue|wed|thu|fri|sat|sun)\)?(?!\w))?"
 _PATTERN = re.compile(
-    rf"(?<!\w)(?:by\s+)?(?:{_DATE})(?:\s*(?:{_TIME}))?(?:\s*(?:까지|마감))?",
+    rf"(?<!\w)(?:by\s+)?(?:{_DATE}){_DAY_AFTER_DATE}(?:\s*(?:{_TIME}))?(?:\s*(?:까지|마감))?",
     re.IGNORECASE,
 )
 # "이번주" on its own qualifies a weekday elsewhere in the title.
@@ -132,9 +135,9 @@ def _resolve_time(match: re.Match[str]) -> time | None:
     if match.group("hh"):
         hour = int(match.group("hh"))
         minute = int(match.group("mm") or (30 if match.group("half") else 0))
-        if match.group("ampm") == "오후" and hour < 12:
+        if match.group("ampm") in ("오후", "저녁", "밤") and hour < 12:
             hour += 12
-        elif match.group("ampm") == "오전" and hour == 12:
+        elif match.group("ampm") in ("오전", "아침", "새벽") and hour == 12:
             hour = 0
         return time(hour, minute)
     if match.group("ch"):

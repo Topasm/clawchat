@@ -8,10 +8,11 @@ import kotlinx.serialization.Serializable
 data class InboxRouting(
     val id: String,
     val origin: String,
-    /** `task` or `note`: where the capture is now. */
+    /** `task`, `note` or `event`: where the capture is now. */
     val kind: String,
     @SerialName("todo_id") val todoId: String? = null,
     @SerialName("note_id") val noteId: String? = null,
+    @SerialName("event_id") val eventId: String? = null,
     val title: String,
     @SerialName("original_title") val originalTitle: String,
     @SerialName("due_date") val dueDate: String? = null,
@@ -22,6 +23,7 @@ data class InboxRouting(
     @SerialName("kind_confidence") val kindConfidence: Double? = null,
 ) {
     val isTask: Boolean get() = kind == "task"
+    val isEvent: Boolean get() = kind == "event"
 
     /** Filed anyway, but the classifier was unsure; the user may want to fix it. */
     val isLowConfidence: Boolean get() = kindConfidence?.let { it < LOW_CONFIDENCE } ?: false

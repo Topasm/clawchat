@@ -31,7 +31,8 @@ import { getTaskStage } from '../../utils/taskStage';
 import { CheckIcon } from '../shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../../types/api';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatShortDateTime, hasClockTime } from '../../utils/formatters';
+import { toDateKey } from '../../utils/calendarUtils';
 import { translateUi } from '../../i18n';
 import CanonicalDocumentButton from '../shared/CanonicalDocumentButton';
 import { extractCanonicalDoc } from '../../utils/canonicalDoc';
@@ -328,12 +329,19 @@ export default function TaskDetail({
               type="date"
               className="cc-event-form__input cc-exec-panel__due-input"
               aria-label={translateUi('Due')}
-              value={task.due_date ? task.due_date.slice(0, 10) : ''}
+              value={task.due_date ? toDateKey(new Date(task.due_date)) : ''}
               onChange={(e) => {
                 const val = e.target.value;
-                persistField({
-                  due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
-                });
+                if (!val) {
+                  persistField({ due_date: null });
+                  return;
+                }
+                // Moving the day keeps a clock time the task already has.
+                const [y, m, d] = val.split('-').map(Number);
+                const next = task.due_date ? new Date(task.due_date) : new Date();
+                if (!task.due_date || !hasClockTime(task.due_date)) next.setHours(23, 59, 0, 0);
+                next.setFullYear(y, m - 1, d);
+                persistField({ due_date: next.toISOString() });
               }}
             />
             {task.due_date && (
@@ -348,7 +356,10 @@ export default function TaskDetail({
             )}
             {dueInfo && task.due_date && (
               <span className="cc-exec-panel__info-value cc-exec-panel__due-line">
-                {formatDate(task.due_date)} · {dueInfo.label}
+                {hasClockTime(task.due_date)
+                  ? formatShortDateTime(task.due_date)
+                  : formatDate(task.due_date)}{' '}
+                · {dueInfo.label}
               </span>
             )}
           </span>

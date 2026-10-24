@@ -15,7 +15,9 @@ from schemas.calendar import (
     EventUpdate,
 )
 from schemas.common import PaginatedResponse
+from schemas.inbox_routing import InboxRoutingResponse
 from services.calendar import calendar_service, feed_token_service
+from services.planning import inbox_routing_service
 from utils import deserialize_tags
 from ws.notifications import notify_module_data_changed
 
@@ -289,6 +291,22 @@ async def delete_event(
     await calendar_service.delete_event(db, event_id)
     await db.commit()
     await notify_module_data_changed("events")
+
+
+@router.post("/{event_id}/to-task", response_model=InboxRoutingResponse)
+async def convert_event_to_task(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Turn an event into a task due when it started; undo restores the event."""
+    event = await calendar_service.get_event(db, event_id)
+    routing = await inbox_routing_service.event_to_task(db, event, origin="user")
+    await db.commit()
+    await db.refresh(routing)
+    for module in ("events", "todos", "inbox_routings"):
+        await notify_module_data_changed(module)
+    return routing
 
 
 @router.delete("/{event_id}/occurrences/{date}", status_code=204)

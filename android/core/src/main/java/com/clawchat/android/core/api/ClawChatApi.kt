@@ -61,6 +61,9 @@ interface ClawChatApi {
     @POST("api/notes/{id}/to-task")
     suspend fun noteToTask(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
 
+    @POST("api/events/{id}/to-task")
+    suspend fun eventToTask(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxRouting
+
     @GET("api/inbox/project-candidates")
     suspend fun listProjectCandidates(@Tag expectedScope: ExpectedSessionScope): List<ProjectFolderCandidate>
 

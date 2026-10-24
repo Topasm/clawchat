@@ -5836,6 +5836,17 @@
             ],
             "title": "Due Date"
           },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -5843,7 +5854,8 @@
           "kind": {
             "enum": [
               "task",
-              "note"
+              "note",
+              "event"
             ],
             "title": "Kind",
             "type": "string"
@@ -16524,6 +16536,54 @@
         ]
       }
     },
+    "/api/events/{event_id}/to-task": {
+      "post": {
+        "description": "Turn an event into a task due when it started; undo restores the event.",
+        "operationId": "convert_event_to_task_api_events__event_id__to_task_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Convert Event To Task",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
     "/api/execution-hosts": {
       "get": {
         "operationId": "list_execution_hosts_api_execution_hosts_get",
@@ -20950,7 +21010,45 @@
     },
     "/api/today/briefing": {
       "get": {
+        "description": "The briefing for the client's calendar day.\n\nWithout ``utc_offset_minutes`` the day is taken in the schedule settings' zone,\nnever the server's UTC clock.",
         "operationId": "get_briefing_api_today_briefing_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "utc_offset_minutes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 840,
+                  "minimum": -840,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Utc Offset Minutes"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -20959,6 +21057,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -23235,6 +23343,54 @@
           }
         ],
         "summary": "Move Todo Step",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/to-event": {
+      "post": {
+        "description": "Turn a dated task into a calendar event (all day when it has no clock\ntime); undo restores the task.",
+        "operationId": "convert_todo_to_event_api_todos__todo_id__to_event_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxRoutingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Convert Todo To Event",
         "tags": [
           "todos"
         ]
