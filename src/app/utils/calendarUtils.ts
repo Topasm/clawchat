@@ -35,6 +35,18 @@ export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * The query the server needs to bucket by this device's calendar day: the local
+ * date and the UTC offset. Without them the server would use its own clock and
+ * "today" would be yesterday until 09:00 KST.
+ */
+export function localDayQuery(now: Date = new Date()): {
+  date: string;
+  utc_offset_minutes: number;
+} {
+  return { date: toDateKey(now), utc_offset_minutes: -now.getTimezoneOffset() };
+}
+
 /** Weekday names from Sunday, in the app's language ("일", "월" / "Sun", "Mon"). */
 export function dayNames(): string[] {
   return getAppLanguage() === 'ko' ? KO_DAY_NAMES : DAY_NAMES;

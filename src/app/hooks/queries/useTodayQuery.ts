@@ -8,6 +8,7 @@ import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
 import { isInboxTodo } from '../../utils/inboxState';
+import { localDayQuery, toDateKey } from '../../utils/calendarUtils';
 
 interface TodayData {
   todayTasks: TodoResponse[];
@@ -67,7 +68,7 @@ function deriveTodayFromCache(
     needsDateTasks: findTasksNeedingADate(todos),
     inboxCount,
     greeting: getGreeting(),
-    todayDate: now.toISOString().split('T')[0],
+    todayDate: toDateKey(now),
   };
 }
 
@@ -89,7 +90,7 @@ export default function useTodayData(): TodayData {
     queryKey: queryKeys.today,
     queryFn: async () => {
       try {
-        const res = await apiClient.get('/today');
+        const res = await apiClient.get('/today', { params: localDayQuery() });
         const data = TodayResponseSchema.parse(res.data);
         return {
           todayTasks: data.today_tasks,
@@ -135,7 +136,7 @@ export default function useTodayData(): TodayData {
           needsDateTasks: findTasksNeedingADate(todos),
           inboxCount: todos.filter(isInboxTodo).length,
           greeting: getGreeting(),
-          todayDate: now.toISOString().split('T')[0],
+          todayDate: toDateKey(now),
         };
       }
     },
