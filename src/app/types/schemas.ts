@@ -397,7 +397,7 @@ export const ReviewStatusSchema = z.enum([
   'rejected',
   'expired',
 ]);
-export const ReviewRiskLevelSchema = z.enum(['low', 'medium', 'high']);
+export const ReviewRiskLevelSchema = z.enum(['low', 'read_only_tools', 'medium', 'high']);
 export const ReviewReadyTaskSchema = z.object({
   id: z.string(),
   title: z.string(),
