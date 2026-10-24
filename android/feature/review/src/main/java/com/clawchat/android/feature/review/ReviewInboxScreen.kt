@@ -362,10 +362,7 @@ private fun ReviewDetail(
             ClawSectionCard(tone = item.riskLevel.tone) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ClawStatusChip(item.subjectType.localizedLabel(), tone = item.riskLevel.tone)
-                    ClawStatusChip(
-                        stringResource(R.string.review_risk, item.riskLevel.localizedLabel()),
-                        tone = item.riskLevel.tone,
-                    )
+                    ClawStatusChip(item.riskLevel.localizedRiskLine(), tone = item.riskLevel.tone)
                 }
                 Text(
                     item.subjectTitle ?: item.summary,
@@ -697,10 +694,18 @@ private fun ReviewSubjectType.localizedLabel(): String = stringResource(
 private fun ReviewRiskLevel.localizedLabel(): String = stringResource(
     when (this) {
         ReviewRiskLevel.LOW -> R.string.review_risk_low
+        ReviewRiskLevel.READ_ONLY_TOOLS -> R.string.review_risk_read_only_tools
         ReviewRiskLevel.MEDIUM -> R.string.review_risk_medium
         ReviewRiskLevel.HIGH -> R.string.review_risk_high
     },
 )
+
+@Composable
+private fun ReviewRiskLevel.localizedRiskLine(): String = when (this) {
+    // Not a degree of risk but what the run did, so the line says that alone.
+    ReviewRiskLevel.READ_ONLY_TOOLS -> localizedLabel()
+    else -> stringResource(R.string.review_risk, localizedLabel())
+}
 
 @Composable
 private fun AgentRunEvent.localizedType(): String {
@@ -732,6 +737,7 @@ private fun AgentRunEvent.localizedType(): String {
 private val ReviewRiskLevel.tone: ClawTone
     get() = when (this) {
         ReviewRiskLevel.LOW -> ClawTone.Success
+        ReviewRiskLevel.READ_ONLY_TOOLS -> ClawTone.Default
         ReviewRiskLevel.MEDIUM -> ClawTone.Warning
         ReviewRiskLevel.HIGH -> ClawTone.Error
     }

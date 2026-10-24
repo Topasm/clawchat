@@ -1406,6 +1406,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'What is blocking this?': '무엇이 이 작업을 막고 있나요?',
   'the linked task': '연결된 작업',
   'Low risk': '위험 낮음',
+  'Read-only tools': '읽기 전용 도구',
   'High risk': '위험 높음',
   'Worth a close look': '꼼꼼히 확인 필요',
   'Document change': '문서 변경',
