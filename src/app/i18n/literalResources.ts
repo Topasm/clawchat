@@ -1614,7 +1614,8 @@ export const koreanUiTranslations: Record<string, string> = {
     '{{server}}는 {{serverVersion}}, 이 앱은 {{appVersion}}입니다.',
   'Only on this device · waiting to sync to {{workspace}}':
     '이 기기에만 있음 · {{workspace}}에 동기화 대기 중',
-  'Saved to {{workspace}}': '{{workspace}}에 저장됨',
+  'Saved on this device': '이 장치에 저장됨',
+  'Saved on the Home server · {{workspace}}': '{{workspace}} 홈 서버에 저장됨',
   'Saved on this device. It will sync to {{workspace}} when you are back online.':
     '이 기기에 저장했습니다. 다시 연결되면 {{workspace}}에 동기화됩니다.',
   'To quit, choose Quit ClawChat from the menu-bar icon or press ⌘Q.':
