@@ -14,8 +14,8 @@ interface InboxQueueProps {
   routings: InboxRouting[];
   /** Captures that still wait for the user: unsure, failed, or from before auto-organize. */
   review: TodoResponse[];
-  /** Captures the classifier is still reading. */
-  processingIds: ReadonlySet<string>;
+  /** Captures the classifier is still reading; they are not failures yet. */
+  processing: TodoResponse[];
   projects: ProjectResponse[];
   todoById: Map<string, TodoResponse>;
   busy: boolean;
@@ -43,7 +43,7 @@ function folderName(folder: string | null): string | null {
 export default function InboxQueue({
   routings,
   review,
-  processingIds,
+  processing,
   projects,
   todoById,
   busy,
@@ -56,7 +56,7 @@ export default function InboxQueue({
 }: InboxQueueProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const reviewIds = useMemo(() => new Set(review.map((todo) => todo.id)), [review]);
-  const selection = selected.filter((id) => reviewIds.has(id) && !processingIds.has(id));
+  const selection = selected.filter((id) => reviewIds.has(id));
   const projectTitle = (projectId: string | null | undefined) =>
     projects.find((project) => project.id === projectId)?.title ?? null;
 
@@ -125,7 +125,7 @@ export default function InboxQueue({
     setSelected([]);
   };
 
-  const empty = routings.length === 0 && review.length === 0;
+  const empty = routings.length === 0 && review.length === 0 && processing.length === 0;
 
   return (
     <Pane as="main" className="cc-inbox-queue">
@@ -181,6 +181,29 @@ export default function InboxQueue({
         </section>
       )}
 
+      {processing.length > 0 && (
+        <section className="cc-inbox-section" aria-labelledby="cc-inbox-organizing">
+          <h2 className="cc-inbox-section__title" id="cc-inbox-organizing">
+            {translateUi('Organizing')}
+            <span className="cc-inbox-section__count">{processing.length}</span>
+          </h2>
+          <ul className="cc-inbox-list">
+            {processing.map((todo) => (
+              <li key={todo.id} className="cc-inbox-row">
+                <button
+                  type="button"
+                  className="cc-inbox-row__title"
+                  onClick={() => onOpenTask(todo.id)}
+                >
+                  {todo.title}
+                </button>
+                <span className="cc-inbox-row__detail">{translateUi('Organizing…')}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {(review.length > 0 || routings.length > 0) && (
         <section className="cc-inbox-section" aria-labelledby="cc-inbox-review">
           <h2 className="cc-inbox-section__title" id="cc-inbox-review">
@@ -209,9 +232,7 @@ export default function InboxQueue({
               <button
                 type="button"
                 className="cc-btn cc-btn--compact cc-btn--ghost"
-                onClick={() =>
-                  setSelected(review.filter((todo) => !processingIds.has(todo.id)).map((t) => t.id))
-                }
+                onClick={() => setSelected(review.map((t) => t.id))}
               >
                 {translateUi('Select all')}
               </button>
@@ -229,7 +250,6 @@ export default function InboxQueue({
           ) : (
             <ul className="cc-inbox-list">
               {review.map((todo) => {
-                const processing = processingIds.has(todo.id);
                 const isSelected = selection.includes(todo.id);
                 return (
                   <li
@@ -244,29 +264,25 @@ export default function InboxQueue({
                     >
                       {todo.title}
                     </button>
-                    {processing ? (
-                      <span className="cc-inbox-row__detail">{translateUi('Organizing…')}</span>
-                    ) : (
-                      selection.length === 0 && (
-                        <span className="cc-inbox-row__choices">
-                          <button
-                            type="button"
-                            className="cc-btn cc-btn--compact"
-                            disabled={busy}
-                            onClick={() => onMove({ action: 'file-as-task', todoId: todo.id })}
-                          >
-                            {translateUi('Task')}
-                          </button>
-                          <button
-                            type="button"
-                            className="cc-btn cc-btn--compact"
-                            disabled={busy}
-                            onClick={() => onMove({ action: 'to-note', todoId: todo.id })}
-                          >
-                            {translateUi('Note')}
-                          </button>
-                        </span>
-                      )
+                    {selection.length === 0 && (
+                      <span className="cc-inbox-row__choices">
+                        <button
+                          type="button"
+                          className="cc-btn cc-btn--compact"
+                          disabled={busy}
+                          onClick={() => onMove({ action: 'file-as-task', todoId: todo.id })}
+                        >
+                          {translateUi('Task')}
+                        </button>
+                        <button
+                          type="button"
+                          className="cc-btn cc-btn--compact"
+                          disabled={busy}
+                          onClick={() => onMove({ action: 'to-note', todoId: todo.id })}
+                        >
+                          {translateUi('Note')}
+                        </button>
+                      </span>
                     )}
                   </li>
                 );

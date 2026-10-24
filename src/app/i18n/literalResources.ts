@@ -1657,6 +1657,9 @@ export const koreanUiTranslations: Record<string, string> = {
   Selected: '선택됨',
   'Nothing to check': '확인할 것 없음',
   'Organizing…': '정리 중…',
+  Organizing: '정리 중',
+  'Undone. “{{title}}” is back in the Inbox': '되돌렸습니다. “{{title}}”이(가) 받은함에 있습니다',
+  'Undone. “{{title}}” is a note again': '되돌렸습니다. “{{title}}”이(가) 다시 메모가 되었습니다',
   'Inbox is clear. Write a task or a note below.':
     '받은함이 비었습니다. 아래에 할 일이나 메모를 적으세요.',
   'Projects in your vault': 'vault의 프로젝트',
