@@ -213,8 +213,11 @@ class InboxViewModel @Inject constructor(
     private fun switchKind(routing: InboxRouting) {
         val noteId = routing.noteId
         val todoId = routing.todoId
+        val eventId = routing.eventId
         when {
-            !routing.isTask && noteId != null ->
+            routing.isEvent && eventId != null ->
+                moves(InboxMoveKind.TASK) { listOf { key -> repository.eventToTask(key, eventId).routing() } }
+            !routing.isTask && !routing.isEvent && noteId != null ->
                 moves(InboxMoveKind.TASK) { listOf { key -> repository.noteToTask(key, noteId).routing() } }
             routing.isTask && todoId != null ->
                 moves(InboxMoveKind.NOTE) { listOf { key -> repository.toNote(key, todoId).routing() } }

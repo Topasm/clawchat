@@ -27,6 +27,7 @@ class InboxRouting(Base):
     # or undo may delete and recreate under the same id.
     todo_id: Mapped[str | None] = mapped_column(String, nullable=True)
     note_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    event_id: Mapped[str | None] = mapped_column(String, nullable=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     original_title: Mapped[str] = mapped_column(Text, nullable=False)
     due_date: Mapped[datetime | None] = mapped_column(
@@ -51,8 +52,11 @@ class InboxRouting(Base):
 
     __table_args__ = (
         CheckConstraint("origin IN ('auto', 'user')", name="ck_inbox_routings_origin"),
-        CheckConstraint("kind IN ('task', 'note')", name="ck_inbox_routings_kind"),
+        CheckConstraint(
+            "kind IN ('task', 'note', 'event')", name="ck_inbox_routings_kind"
+        ),
         Index("idx_inbox_routings_created_at", "created_at"),
         Index("idx_inbox_routings_todo_id", "todo_id"),
         Index("idx_inbox_routings_note_id", "note_id"),
+        Index("idx_inbox_routings_event_id", "event_id"),
     )

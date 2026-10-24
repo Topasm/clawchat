@@ -38,6 +38,7 @@ server/**/__pycache__
 server/data/
 server/venv/
 server/.venv/
+server/.venv
 server/vendor/
 server/dist/
 server/build/

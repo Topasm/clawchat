@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import apiClient from '../services/apiClient';
+import { localDayQuery } from '../utils/calendarUtils';
 
 export interface BriefingStats {
   events: number;
@@ -38,7 +39,7 @@ export default function useTodayBriefing() {
     if (!serverUrl) return;
     setBriefingLoading(true);
     apiClient
-      .get('/today/briefing')
+      .get('/today/briefing', { params: localDayQuery() })
       .then((res) => setBriefingData(res.data ?? null))
       .catch(() => setBriefingData(null))
       .finally(() => setBriefingLoading(false));

@@ -118,3 +118,22 @@ def test_wider_expressions_resolve_and_leave_the_title(text, local_date, local_t
 def test_a_clock_time_is_the_due_instant():
     parsed = parse_deadline("미팅 11월 3일 오후 2시", date(2026, 10, 16))
     assert due_instant(parsed, "Asia/Seoul") == datetime(2026, 11, 3, 5, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    "title, expected_date, expected_time, stripped",
+    [
+        ("10월 30일 금요일 오후 2시 교수님 면담", date(2026, 10, 30), "14:00", "교수님 면담"),
+        ("Oct 30 (Fri) 2pm meeting", date(2026, 10, 30), "14:00", "meeting"),
+        ("내일 저녁 7시 회식", date(2026, 10, 25), "19:00", "회식"),
+        ("내일 아침 9시 운동", date(2026, 10, 25), "09:00", "운동"),
+    ],
+)
+def test_a_repeated_weekday_and_korean_times_of_day(
+    title, expected_date, expected_time, stripped
+):
+    parsed = parse_deadline(title, date(2026, 10, 24))
+    assert parsed is not None, title
+    assert parsed.local_date == expected_date
+    assert parsed.local_time.strftime("%H:%M") == expected_time
+    assert parsed.stripped_title == stripped

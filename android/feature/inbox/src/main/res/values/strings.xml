@@ -12,6 +12,7 @@
     <string name="inbox_review_title">Couldn\'t sort</string>
     <string name="inbox_kind_task">Task</string>
     <string name="inbox_kind_note">Note</string>
+    <string name="inbox_kind_event">Event</string>
     <string name="inbox_due">Due %1$s</string>
     <string name="inbox_project_option">Project · %1$s</string>
     <string name="inbox_change_destination">Change where this goes</string>

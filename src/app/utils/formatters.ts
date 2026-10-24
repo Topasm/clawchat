@@ -12,15 +12,25 @@ function koreanTime(date: Date): string {
   return `${hours < 12 ? '오전' : '오후'} ${hours % 12 || 12}:${minutes}`;
 }
 
+/**
+ * A bare "YYYY-MM-DD" is a calendar day, so read it on the local clock;
+ * `new Date("2026-10-24")` would be UTC midnight and show the 23rd west of UTC.
+ */
+function parseDateString(dateString: string): Date {
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (bare) return new Date(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3]));
+  return new Date(dateString);
+}
+
 /** "11월 3일" / "Nov 3". */
 export function formatMonthDay(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseDateString(dateString);
   if (getAppLanguage() === 'ko') return `${date.getMonth() + 1}월 ${date.getDate()}일`;
   return date.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 }
 
 export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseDateString(dateString);
   return date.toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',
@@ -105,12 +115,35 @@ export function isOverdue(dateString: string): boolean {
   return date < now;
 }
 
+/**
+ * Whether a due instant names a clock time. The server stores a deadline
+ * with no time as the end of its day (23:59), so that minute means "the day".
+ */
+export function hasClockTime(dateString: string): boolean {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return !(date.getHours() === 23 && date.getMinutes() === 59);
+}
+
+/** "오후 3:00" / "3:00 PM". */
+export function formatClock(date: Date): string {
+  if (getAppLanguage() === 'ko') return koreanTime(date);
+  return date.toLocaleTimeString(appLocale(), { hour: 'numeric', minute: '2-digit' });
+}
+
+/** "11월 3일" / "Nov 3", with the clock time when the deadline has one. */
+export function formatDueMoment(dateString: string): string {
+  if (!hasClockTime(dateString)) return formatMonthDay(dateString);
+  return `${formatMonthDay(dateString)} ${formatClock(new Date(dateString))}`;
+}
+
 export function formatDueDate(dateString: string): string {
   if (!dateString) return '';
-  if (isToday(dateString)) return translateUi('Today');
-  if (isTomorrow(dateString)) return translateUi('Tomorrow');
+  const clock = hasClockTime(dateString) ? ` ${formatClock(new Date(dateString))}` : '';
+  if (isToday(dateString)) return translateUi('Today') + clock;
+  if (isTomorrow(dateString)) return translateUi('Tomorrow') + clock;
   if (isOverdue(dateString)) return translateUi('Overdue');
-  return formatDate(dateString);
+  return formatDate(dateString) + clock;
 }
 
 export function getGreeting(): string {

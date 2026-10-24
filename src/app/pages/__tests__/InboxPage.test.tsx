@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectResponse, TodoResponse } from '../../types/api';
 import type { InboxRouting } from '../../types/schemas';
+import { useToastStore } from '../../stores/useToastStore';
 import InboxPage from '../InboxPage';
 
 const mocks = vi.hoisted(() => ({
@@ -128,6 +129,7 @@ describe('InboxPage', () => {
     mocks.noteAction.mockReset();
     mocks.navigate.mockReset();
     mocks.invalidateQueries.mockReset();
+    useToastStore.setState({ toasts: [] });
   });
 
   it('shows only the input and an empty state when nothing is open', () => {
@@ -156,6 +158,78 @@ describe('InboxPage', () => {
 
     fireEvent.click(within(rows[0]).getByRole('button', { name: 'Undo' }));
     expect(mocks.move).toHaveBeenCalledWith({ action: 'undo', routingId: 'route-gpu' });
+  });
+
+  it('says where an undone item went, by its original text', async () => {
+    const fromNote = routing({
+      id: 'route-from-note',
+      kind: 'task',
+      todo_id: 'todo-from-note',
+      note_id: 'note-from-note',
+      title: 'From a note',
+      original_title: 'From a note',
+    });
+    mocks.routings = [gpuTask, ideaNote, fromNote];
+    mocks.move.mockImplementation(async ({ routingId }: { routingId: string }) =>
+      mocks.routings.find((r) => (r as InboxRouting).id === routingId),
+    );
+    renderPage();
+    const rows = within(screen.getByRole('region', { name: /Just organized/ })).getAllByRole(
+      'listitem',
+    );
+    for (const row of rows) fireEvent.click(within(row).getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(3));
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+      'Undone. “Gpu 컴퓨팅 과제 11월 3일” is back in the Inbox',
+      'Undone. “Item” is back in the Inbox',
+      'Undone. “From a note” is a note again',
+    ]);
+  });
+
+  it('shows a failed undo as an error, not silently', async () => {
+    mocks.routings = [gpuTask];
+    mocks.move.mockRejectedValue({ response: { status: 409, data: {} } });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => [t.type, t.message])).toEqual([
+        ['error', 'Could not undo after later task changes'],
+      ]),
+    );
+  });
+
+  it('shows an appointment as an event, opens it, and offers to make it a task', () => {
+    const meeting = routing({
+      id: 'route-meeting',
+      kind: 'event',
+      todo_id: 'todo-meeting',
+      event_id: 'evt-1',
+      title: '교수님 면담',
+      original_title: '10월 30일 금요일 오후 2시 교수님 면담',
+      due_date: new Date(2026, 9, 30, 14, 0).toISOString(),
+    });
+    mocks.routings = [meeting, gpuTask];
+    renderPage();
+
+    const [eventRow, taskRow] = within(
+      screen.getByRole('region', { name: /Just organized/ }),
+    ).getAllByRole('listitem');
+    expect(within(eventRow).getByText('Event')).toBeInTheDocument();
+    expect(within(eventRow).getByText(/Oct 30/)).toBeInTheDocument();
+    expect(within(eventRow).getByText(/2:00 PM/)).toBeInTheDocument();
+    fireEvent.click(within(eventRow).getByRole('button', { name: '교수님 면담' }));
+    expect(mocks.navigate).toHaveBeenCalledWith('/events/evt-1');
+
+    fireEvent.click(within(eventRow).getByRole('button', { name: 'Change where this goes' }));
+    expect(screen.queryByRole('menuitemradio', { name: 'Note' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Task' }));
+    expect(mocks.move).toHaveBeenCalledWith({ action: 'event-to-task', eventId: 'evt-1' });
+
+    // A dated task can become an event from the same menu.
+    fireEvent.click(within(taskRow).getByRole('button', { name: 'Change where this goes' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Event' }));
+    expect(mocks.move).toHaveBeenCalledWith({ action: 'to-event', todoId: 'todo-gpu' });
   });
 
   it('marks an item filed with low confidence and leaves sure ones plain', () => {
@@ -200,7 +274,7 @@ describe('InboxPage', () => {
     expect(mocks.move).toHaveBeenCalledWith({ action: 'to-task', noteId: 'note-idea' });
   });
 
-  it('offers task or note for captures it was unsure about, and nothing while organizing', () => {
+  it('offers task or note for captures it was unsure about, and lists one still organizing apart', () => {
     mocks.todos = [
       todo({ id: 'unsure', title: '선택지 만드는 모델', inbox_state: 'captured' }),
       todo({ id: 'busy', title: 'Just captured', inbox_state: 'classifying' }),
@@ -208,14 +282,18 @@ describe('InboxPage', () => {
     ];
     renderPage();
 
-    const review = screen.getByRole('region', { name: /Couldn't sort/ });
-    const rows = within(review).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    const busyRow = rows.find((row) => within(row).queryByText('Just captured'))!;
+    // Still being read: its own section, not counted as a failure.
+    const organizing = screen.getByRole('region', { name: /^Organizing/ });
+    const busyRow = within(organizing).getByRole('listitem');
+    expect(within(busyRow).getByText('Just captured')).toBeInTheDocument();
     expect(within(busyRow).getByText('Organizing…')).toBeInTheDocument();
     expect(within(busyRow).queryByRole('button', { name: 'Task' })).not.toBeInTheDocument();
 
-    const unsureRow = rows.find((row) => within(row).queryByText('선택지 만드는 모델'))!;
+    const review = screen.getByRole('region', { name: /Couldn't sort/ });
+    expect(within(review).getByText('1')).toBeInTheDocument();
+    const rows = within(review).getAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    const unsureRow = rows[0];
     fireEvent.click(within(unsureRow).getByRole('button', { name: 'Note' }));
     expect(mocks.move).toHaveBeenCalledWith({ action: 'to-note', todoId: 'unsure' });
     fireEvent.click(within(unsureRow).getByRole('button', { name: 'Task' }));

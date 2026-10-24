@@ -74,11 +74,23 @@ def _event_to_response(event: Event) -> EventResponse:
 @router.get("/briefing")
 async def get_briefing(
     request: Request,
+    client_date: date | None = Query(None, alias="date"),
+    utc_offset_minutes: int | None = Query(None, ge=-840, le=840),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
+    """The briefing for the client's calendar day.
+
+    Without ``utc_offset_minutes`` the day is taken in the schedule settings' zone,
+    never the server's UTC clock.
+    """
     ai_service = resolve_active_ai(request.app.state)
-    result = await generate_briefing(db, ai_service)
+    zone = (
+        timezone(timedelta(minutes=utc_offset_minutes))
+        if utc_offset_minutes is not None
+        else None
+    )
+    result = await generate_briefing(db, ai_service, today=client_date, zone=zone)
     return {
         "summary": result.get("summary", ""),
         "highlights": result.get("highlights", []),
@@ -86,7 +98,7 @@ async def get_briefing(
         "load_assessment": result.get("load_assessment", "moderate"),
         "load_message": result.get("load_message", ""),
         "stats": result.get("stats", {}),
-        "date": str(date.today()),
+        "date": result.get("date") or str(client_date or date.today()),
     }
 
 

@@ -44,7 +44,7 @@ async def undo_routing(routing_id: str, db: AsyncSession = Depends(get_db)):
     routing = await inbox_routing_service.undo(db, routing_id)
     await db.commit()
     await db.refresh(routing)
-    for module in ("todos", "notes", "inbox_routings"):
+    for module in ("todos", "notes", "events", "inbox_routings"):
         await notify_module_data_changed(module)
     return routing
 

@@ -12,7 +12,7 @@ import {
 import { useNoteAction } from '../hooks/queries/useNoteQueries';
 import InboxQueue from '../components/inbox/InboxQueue';
 import InboxCaptureBar from '../components/inbox/InboxCaptureBar';
-import { inboxErrorMessage } from '../components/inbox/inboxErrors';
+import { inboxErrorMessage, undoErrorMessage } from '../components/inbox/inboxErrors';
 import useInboxGraphRevision from '../hooks/useInboxGraphRevision';
 import useInboxPlacement from '../hooks/useInboxPlacement';
 import useInboxSections from '../hooks/useInboxSections';
@@ -46,7 +46,6 @@ export default function InboxPage() {
 
   const review = useMemo(
     () => [
-      ...sections.processing,
       ...sections.questioning,
       ...sections.planReady,
       ...sections.errors,
@@ -54,15 +53,32 @@ export default function InboxPage() {
     ],
     [sections],
   );
-  const processingIds = useMemo(
-    () => new Set(sections.processing.map((todo) => todo.id)),
-    [sections.processing],
-  );
 
   const runMove = (next: InboxMove) =>
-    move.mutateAsync(next).catch((error: unknown) => {
-      addToast('error', inboxErrorMessage(error, translateUi('Could not move this item')));
-    });
+    move.mutateAsync(next).then(
+      (routing) => {
+        // An undo is otherwise silent: the row leaves "Just organized" and the
+        // item is back as a capture (or a note), so say where it went.
+        if (next.action !== 'undo') return;
+        const title = routing.original_title || routing.title;
+        addToast(
+          'success',
+          routing.kind === 'task' && routing.note_id
+            ? translateUi('Undone. “{{title}}” is a note again', { title })
+            : routing.kind === 'task' && routing.event_id
+              ? translateUi('Undone. “{{title}}” is an event again', { title })
+              : translateUi('Undone. “{{title}}” is back in the Inbox', { title }),
+        );
+      },
+      (error: unknown) => {
+        addToast(
+          'error',
+          next.action === 'undo'
+            ? undoErrorMessage(error, translateUi('Could not undo'))
+            : inboxErrorMessage(error, translateUi('Could not move this item')),
+        );
+      },
+    );
   const runMoves = async (moves: InboxMove[]) => {
     for (const next of moves) await runMove(next);
   };
@@ -78,7 +94,7 @@ export default function InboxPage() {
         <InboxQueue
           routings={routings.data?.items ?? []}
           review={review}
-          processingIds={processingIds}
+          processing={sections.processing}
           projects={projects}
           todoById={sections.todoById}
           busy={busy}
@@ -92,6 +108,7 @@ export default function InboxPage() {
           }
           onOpenTask={(todoId) => navigate(`/tasks/${todoId}`)}
           onOpenNotes={() => navigate('/notes')}
+          onOpenEvent={(eventId) => navigate(`/events/${eventId}`)}
         />
       </div>
       <InboxCaptureBar busy={capturing} onCapture={capture} />

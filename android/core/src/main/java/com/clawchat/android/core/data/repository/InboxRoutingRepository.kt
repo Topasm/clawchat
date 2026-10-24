@@ -94,6 +94,8 @@ class InboxRoutingRepository @Inject constructor(
 
     suspend fun noteToTask(workspace: String, noteId: String) = scoped(workspace) { api.noteToTask(noteId, it) }
 
+    suspend fun eventToTask(workspace: String, eventId: String) = scoped(workspace) { api.eventToTask(eventId, it) }
+
     suspend fun undoPlacement(workspace: String, changeSetId: String) =
         scoped(workspace) { api.undoInboxPlacement(changeSetId, it) }
 

@@ -39,7 +39,9 @@ export function useInboxProjectCandidatesQuery() {
 export type InboxMove =
   | { action: 'to-note'; todoId: string }
   | { action: 'file-as-task'; todoId: string }
+  | { action: 'to-event'; todoId: string }
   | { action: 'to-task'; noteId: string }
+  | { action: 'event-to-task'; eventId: string }
   | { action: 'undo'; routingId: string };
 
 function movePath(move: InboxMove): string {
@@ -48,8 +50,12 @@ function movePath(move: InboxMove): string {
       return `/todos/${encodeURIComponent(move.todoId)}/to-note`;
     case 'file-as-task':
       return `/todos/${encodeURIComponent(move.todoId)}/file-as-task`;
+    case 'to-event':
+      return `/todos/${encodeURIComponent(move.todoId)}/to-event`;
     case 'to-task':
       return `/notes/${encodeURIComponent(move.noteId)}/to-task`;
+    case 'event-to-task':
+      return `/events/${encodeURIComponent(move.eventId)}/to-task`;
     case 'undo':
       return `/inbox/routings/${encodeURIComponent(move.routingId)}/undo`;
   }
@@ -66,6 +72,7 @@ export function useInboxMove() {
     onSettled: () => {
       void client.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
       void client.invalidateQueries({ queryKey: queryKeys.todos });
+      void client.invalidateQueries({ queryKey: queryKeys.events });
       void client.invalidateQueries({ queryKey: ['notes'] });
     },
     retry: false,

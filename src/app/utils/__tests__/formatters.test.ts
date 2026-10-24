@@ -12,6 +12,8 @@ import {
   getGreeting,
   formatShortDateTime,
   formatMonthDay,
+  formatDueMoment,
+  hasClockTime,
 } from '../formatters';
 import { changeAppLanguage } from '../../i18n';
 
@@ -145,12 +147,25 @@ describe('formatters', () => {
       vi.useRealTimers();
     });
 
+    // A deadline with no clock time is stored as the end of its day (23:59 local).
+    const endOfDay = (y: number, m: number, d: number) =>
+      new Date(y, m - 1, d, 23, 59).toISOString();
+
     it('returns "Today" for today', () => {
-      expect(formatDueDate('2026-02-22T08:00:00.000Z')).toBe('Today');
+      expect(formatDueDate(endOfDay(2026, 2, 22))).toBe('Today');
     });
 
     it('returns "Tomorrow" for tomorrow', () => {
-      expect(formatDueDate('2026-02-23T08:00:00.000Z')).toBe('Tomorrow');
+      expect(formatDueDate(endOfDay(2026, 2, 23))).toBe('Tomorrow');
+    });
+
+    it('keeps the clock time when the deadline has one', () => {
+      const at3pm = new Date(2026, 1, 23, 15, 0).toISOString();
+      expect(hasClockTime(at3pm)).toBe(true);
+      expect(hasClockTime(endOfDay(2026, 2, 23))).toBe(false);
+      expect(formatDueDate(at3pm)).toBe('Tomorrow 3:00 PM');
+      expect(formatDueMoment(at3pm)).toBe('Feb 23 3:00 PM');
+      expect(formatDueMoment(endOfDay(2026, 2, 23))).toBe('Feb 23');
     });
 
     it('returns "Overdue" for past dates', () => {

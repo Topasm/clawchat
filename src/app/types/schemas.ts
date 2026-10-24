@@ -303,9 +303,10 @@ export const NoteResponseSchema = z.object({
 export const InboxRoutingResponseSchema = z.object({
   id: z.string(),
   origin: z.enum(['auto', 'user']),
-  kind: z.enum(['task', 'note']),
+  kind: z.enum(['task', 'note', 'event']),
   todo_id: z.string().nullable(),
   note_id: z.string().nullable(),
+  event_id: z.string().nullable().optional(),
   title: z.string(),
   original_title: z.string(),
   due_date: z.string().nullable(),

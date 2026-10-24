@@ -12,6 +12,7 @@
     <string name="inbox_review_title">분류 실패</string>
     <string name="inbox_kind_task">작업</string>
     <string name="inbox_kind_note">메모</string>
+    <string name="inbox_kind_event">일정</string>
     <string name="inbox_due">%1$s 마감</string>
     <string name="inbox_project_option">프로젝트 · %1$s</string>
     <string name="inbox_change_destination">목적지 바꾸기</string>

@@ -1,7 +1,7 @@
 """Async service for generating daily briefings."""
 
 import logging
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,21 +12,40 @@ from models.agent_task import AgentTask
 from models.event import Event
 from models.todo import Todo
 from services.ai.ai_service import AIService
+from services.notifications import schedule_settings
 from utils import parse_json_object
 
 logger = logging.getLogger(__name__)
 
 
-async def gather_briefing_data(db: AsyncSession) -> dict:
-    today = date.today()
-    today_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
-    today_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
-    upcoming_end = datetime.combine(today + timedelta(days=3), time.max, tzinfo=timezone.utc)
+def _in_zone(moment: datetime, zone: tzinfo) -> datetime:
+    """``moment`` on the wall clock of ``zone``; a naive value is a UTC instant."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(zone)
+
+
+async def gather_briefing_data(
+    db: AsyncSession, *, today: date | None = None, zone: tzinfo | None = None
+) -> dict:
+    """Today's and the next three days' items, bucketed by the user's calendar day.
+
+    ``zone`` defaults to the schedule settings' zone (the server's own when none is
+    set), and ``today`` to the current date there. Windows are half-open local days
+    expressed in UTC, so a 23:30 task the night before never counts as today's.
+    """
+    if zone is None:
+        zone = (await schedule_settings.load(db)).zone
+    if today is None:
+        today = datetime.now(timezone.utc).astimezone(zone).date()
+    today_start = datetime.combine(today, time.min, tzinfo=zone).astimezone(timezone.utc)
+    today_end = today_start + timedelta(days=1)
+    upcoming_end = today_start + timedelta(days=4)
 
     # Today's events
     events_q = (
         select(Event)
-        .where(Event.start_time >= today_start, Event.start_time <= today_end)
+        .where(Event.start_time >= today_start, Event.start_time < today_end)
         .order_by(Event.start_time.asc())
     )
     events = list((await db.execute(events_q)).scalars().all())
@@ -34,7 +53,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     # Upcoming events (next 3 days, excluding today)
     upcoming_events_q = (
         select(Event)
-        .where(Event.start_time > today_end, Event.start_time <= upcoming_end)
+        .where(Event.start_time >= today_end, Event.start_time < upcoming_end)
         .order_by(Event.start_time.asc())
     )
     upcoming_events = list((await db.execute(upcoming_events_q)).scalars().all())
@@ -44,7 +63,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         select(Todo)
         .where(
             Todo.due_date >= today_start,
-            Todo.due_date <= today_end,
+            Todo.due_date < today_end,
             Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
@@ -55,8 +74,8 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     upcoming_todos_q = (
         select(Todo)
         .where(
-            Todo.due_date > today_end,
-            Todo.due_date <= upcoming_end,
+            Todo.due_date >= today_end,
+            Todo.due_date < upcoming_end,
             Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.due_date.asc())
@@ -80,7 +99,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
-            Todo.due_date > today_end,
+            Todo.due_date >= today_end,
         ),
     )
     in_progress = list((await db.execute(in_progress_q)).scalars().all())
@@ -106,17 +125,19 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         "inbox_count": inbox_count,
         "agent_tasks": agent_tasks,
         "date": today,
+        "zone": zone,
     }
 
 
 def _format_briefing_prompt(data: dict) -> str:
+    zone = data.get("zone") or timezone.utc
     lines = [f"Today is {data['date'].strftime('%A, %B %d, %Y')}."]
     lines.append("")
 
     if data["events"]:
         lines.append("## Today's Events")
         for e in data["events"]:
-            t = e.start_time.strftime("%H:%M") if e.start_time else "all day"
+            t = _in_zone(e.start_time, zone).strftime("%H:%M") if e.start_time else "all day"
             lines.append(f"- {t}: {e.title}" + (f" @ {e.location}" if e.location else ""))
         lines.append("")
 
@@ -129,7 +150,7 @@ def _format_briefing_prompt(data: dict) -> str:
     if data["overdue_todos"]:
         lines.append("## Overdue Tasks")
         for t in data["overdue_todos"]:
-            due = t.due_date.strftime("%b %d") if t.due_date else "unknown"
+            due = _in_zone(t.due_date, zone).strftime("%b %d") if t.due_date else "unknown"
             lines.append(f"- {t.title} (was due {due}, id: {t.id})")
         lines.append("")
 
@@ -142,14 +163,14 @@ def _format_briefing_prompt(data: dict) -> str:
     if data.get("upcoming_todos"):
         lines.append("## Upcoming (next 3 days)")
         for t in data["upcoming_todos"][:5]:
-            due = t.due_date.strftime("%b %d") if t.due_date else ""
+            due = _in_zone(t.due_date, zone).strftime("%b %d") if t.due_date else ""
             lines.append(f"- {t.title} (due {due})")
         lines.append("")
 
     if data.get("upcoming_events"):
         lines.append("## Upcoming Events (next 3 days)")
         for e in data["upcoming_events"][:5]:
-            t = e.start_time.strftime("%a %H:%M") if e.start_time else "all day"
+            t = _in_zone(e.start_time, zone).strftime("%a %H:%M") if e.start_time else "all day"
             lines.append(f"- {t}: {e.title}")
         lines.append("")
 
@@ -191,8 +212,18 @@ Rules:
 - Always respond with valid JSON only"""
 
 
-async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
-    data = await gather_briefing_data(db)
+async def generate_briefing(
+    db: AsyncSession,
+    ai_service: AIService,
+    *,
+    today: date | None = None,
+    zone: tzinfo | None = None,
+) -> dict:
+    """The briefing for ``today`` in ``zone`` (see ``gather_briefing_data``).
+
+    Every result carries ``date``, the calendar day it describes.
+    """
+    data = await gather_briefing_data(db, today=today, zone=zone)
 
     stats = {
         "events": len(data["events"]),
@@ -214,6 +245,7 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
             "suggestions": [],
             "load_assessment": "light",
             "load_message": "Nothing on the agenda today.",
+            "date": data["date"].isoformat(),
         }
 
     prompt_text = _format_briefing_prompt(data)
@@ -233,6 +265,7 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
                 "load_assessment": parsed.get("load_assessment", "moderate"),
                 "load_message": parsed.get("load_message", ""),
                 "stats": stats,
+                "date": data["date"].isoformat(),
             }
         # Fallback: LLM didn't return valid JSON
         return {
@@ -241,6 +274,7 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
             "suggestions": [],
             "load_assessment": _compute_load(stats),
             "load_message": "",
+            "date": data["date"].isoformat(),
         }
     except AIUnavailableError:
         logger.warning("LLM unavailable for briefing, using plain text fallback")
@@ -250,6 +284,7 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
             "suggestions": [],
             "load_assessment": _compute_load(stats),
             "load_message": "",
+            "date": data["date"].isoformat(),
         }
 
 

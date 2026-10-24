@@ -927,6 +927,27 @@ async def convert_todo_to_note(
     return routing
 
 
+@router.post("/{todo_id}/to-event", response_model=InboxRoutingResponse)
+async def convert_todo_to_event(
+    todo_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Turn a dated task into a calendar event (all day when it has no clock
+    time); undo restores the task."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
+    routing = await inbox_routing_service.task_to_event(
+        db, todo, origin="user", zone=await _user_zone(db)
+    )
+    await db.commit()
+    await db.refresh(routing)
+    for module in ("todos", "events", "inbox_routings"):
+        await notify_module_data_changed(module)
+    return routing
+
+
 @router.post("/{todo_id}/file-as-task", response_model=InboxRoutingResponse)
 async def file_todo_as_task(
     todo_id: str,

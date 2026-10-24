@@ -150,3 +150,63 @@ async def test_today_keeps_inbox_workflow_items_out_of_schedule_buckets(
     assert [todo["title"] for todo in body["today_tasks"]] == ["Organised today task"]
     assert captured.id not in {todo["id"] for todo in body["overdue_tasks"]}
     assert processing.id not in {todo["id"] for todo in body["today_tasks"]}
+
+
+@pytest.mark.asyncio
+async def test_briefing_buckets_by_the_given_local_day(db_session):
+    """02:35 KST on Oct 24 is still Oct 23 in UTC; the briefing follows the client."""
+    from datetime import date, timedelta
+    from zoneinfo import ZoneInfo
+
+    from services.notifications.briefing_service import gather_briefing_data
+
+    seoul = ZoneInfo("Asia/Seoul")
+    late_23rd = Todo(  # 23:30 KST Oct 23 = 14:30 UTC: yesterday's, not today's
+        title="late yesterday",
+        due_date=datetime(2026, 10, 23, 14, 30, tzinfo=timezone.utc),
+    )
+    early_24th = Todo(  # 00:30 KST Oct 24 = 15:30 UTC Oct 23: today's
+        title="early today",
+        due_date=datetime(2026, 10, 23, 15, 30, tzinfo=timezone.utc),
+    )
+    db_session.add_all([late_23rd, early_24th])
+    await db_session.commit()
+
+    data = await gather_briefing_data(db_session, today=date(2026, 10, 24), zone=seoul)
+
+    assert data["date"] == date(2026, 10, 24)
+    assert [t.title for t in data["pending_todos"]] == ["early today"]
+    assert [t.title for t in data["overdue_todos"]] == ["late yesterday"]
+
+    offset = timezone(timedelta(minutes=540))
+    same = await gather_briefing_data(db_session, today=date(2026, 10, 24), zone=offset)
+    assert [t.title for t in same["pending_todos"]] == ["early today"]
+
+
+@pytest.mark.asyncio
+async def test_briefing_route_passes_the_client_day_through(
+    client, auth_headers, monkeypatch
+):
+    from datetime import date, timedelta
+
+    import routers.today as today_router
+
+    seen: dict = {}
+
+    async def fake_briefing(_db, _ai, *, today=None, zone=None):
+        seen["today"] = today
+        seen["zone"] = zone
+        return {"summary": "quiet", "stats": {}, "date": today.isoformat()}
+
+    monkeypatch.setattr(today_router, "generate_briefing", fake_briefing)
+
+    response = await client.get(
+        "/api/today/briefing",
+        params={"date": "2026-10-24", "utc_offset_minutes": 540},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["date"] == "2026-10-24"
+    assert seen["today"] == date(2026, 10, 24)
+    assert seen["zone"].utcoffset(None) == timedelta(minutes=540)
