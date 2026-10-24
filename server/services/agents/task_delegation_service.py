@@ -61,7 +61,27 @@ class DelegationRuntime:
     opencode_adapter: Any | None = None
 
 
-SkillSource = Literal["requested", "assigned", "auto"]
+SkillSource = Literal["requested", "assigned", "auto", "policy"]
+
+
+def validated_skill_chain(chain: list[str], *, require_ready: bool) -> list[str]:
+    """A caller-supplied chain, checked the way a requested skill is."""
+    chain = [str(skill).replace("-", "_") for skill in chain if skill]
+    unknown = [skill for skill in chain if skill not in SKILL_REGISTRY]
+    if not chain or unknown:
+        raise AppError(
+            code="UNKNOWN_SKILL",
+            message=f"Unknown skill: {', '.join(unknown) or '(none)'}",
+            status_code=422,
+            details={"skills": unknown},
+        )
+    if require_ready and "plan" in chain:
+        raise AppError(
+            code="PLAN_EXECUTION_UNSUPPORTED",
+            message="Use the planning workflow instead of executing the plan skill",
+            status_code=422,
+        )
+    return chain
 
 
 async def choose_skill_chain(
@@ -127,11 +147,25 @@ async def delegate_todo_to_skill(
     body: DelegateRequest,
     runtime: DelegationRuntime,
     user_id: str,
+    *,
+    skill_chain: list[str] | None = None,
+    payload: dict[str, Any] | None = None,
 ) -> dict:
+    """Start one run of ``todo_id``. Commits.
+
+    ``skill_chain`` lets a server-side caller (a project's autonomy policy)
+    run a whole chain instead of the one skill a request names; ``payload``
+    is kept on the task as its provenance, the way a scheduled job keeps its
+    job id there.
+    """
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
-    skill_chain, skill_source = await choose_skill_chain(body, todo, runtime.active_ai)
+    if skill_chain is not None:
+        skill_chain = validated_skill_chain(skill_chain, require_ready=body.require_ready)
+        skill_source: SkillSource = "policy"
+    else:
+        skill_chain, skill_source = await choose_skill_chain(body, todo, runtime.active_ai)
     skill_id = skill_chain[0]
 
     if body.require_ready:
@@ -144,6 +178,7 @@ async def delegate_todo_to_skill(
         instruction=f"Handle: {todo.title}\n{todo.description or ''}",
         todo_id=todo.id,
         skill_chain=json.dumps(skill_chain),
+        payload_json=json.dumps(payload) if payload else None,
     )
     db.add(task)
     await db.flush()

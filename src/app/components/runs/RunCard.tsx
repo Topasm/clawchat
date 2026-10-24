@@ -99,6 +99,9 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           </p>
         </div>
       </div>
+      {run.provenance === 'policy' && (
+        <p className="cc-run-card__provenance">{translateUi("Started by the project's policy")}</p>
+      )}
       {run.status === 'running' && (
         <div
           className="cc-run-progress"

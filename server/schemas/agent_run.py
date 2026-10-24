@@ -104,6 +104,9 @@ class AgentRunResponse(BaseModel):
     error: str | None = None
     usage: dict[str, Any] | None = None
     is_adopted: bool = False
+    #: Who started the run without a click: a scheduled job, the project's
+    #: autonomy policy, or nobody (a person did).
+    provenance: Literal["scheduled_job", "policy"] | None = None
     # A tool call the run is paused on until the user allows or denies it.
     pending_tool_call: PendingToolCall | None = None
     created_at: UtcDatetime

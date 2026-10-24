@@ -19,7 +19,9 @@ from schemas.project import (
     ProjectResponse,
     ProjectUpdate,
 )
+from domain.project import ProjectAutonomy
 from services.agents import execution_host_service
+from services.automation import project_autonomy_service
 from services.tasks import project_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,6 +94,13 @@ async def update_project(
     )
     await db.commit()
     await db.refresh(project)
+    if "autonomy" in body.model_fields_set and project.autonomy != ProjectAutonomy.MANUAL:
+        # Switching the policy on starts what is ready right now, so the
+        # effect is visible without waiting for the next approval.
+        await project_autonomy_service.start_ready_tasks(
+            db, project.id, trigger="policy_enabled"
+        )
+        await db.refresh(project)
     await notify_module_data_changed("projects")
     await notify_module_data_changed("todos")
     return await project_service.build_project_response(db, project)

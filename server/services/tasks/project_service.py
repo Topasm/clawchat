@@ -1,11 +1,12 @@
 """First-class project CRUD and legacy-root compatibility helpers."""
 
+import json
 from datetime import datetime, timezone
 
-from domain.project import ProjectStatus
+from domain.project import ProjectAutonomy, ProjectStatus
 from domain.graph_insights import GraphDueRisk
 from domain.task import TaskStatus
-from exceptions import NotFoundError
+from exceptions import NotFoundError, ValidationError
 from models.conversation import Conversation
 from models.execution_host import ExecutionHost
 from models.project import Project
@@ -19,8 +20,40 @@ from services.review import review_item_service
 from services.tasks import graph_insights_service
 from sqlalchemy import case, func, select
 from domain.review import ReviewStatus
+from skills import SKILL_REGISTRY
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import apply_model_updates, make_id
+
+
+def serialize_skill_chain(chain: list[str] | None) -> str | None:
+    """The project's default skill chain as stored, checked against the catalogue.
+
+    ``plan`` is refused: it has its own proposal lifecycle and the policy
+    never runs it. An empty chain is stored as null.
+    """
+    if chain is None:
+        return None
+    cleaned = [str(skill).strip().replace("-", "_") for skill in chain if str(skill).strip()]
+    if not cleaned:
+        return None
+    unknown = [skill for skill in cleaned if skill not in SKILL_REGISTRY]
+    if unknown:
+        raise ValidationError("Unknown skill", details={"skills": unknown})
+    if "plan" in cleaned:
+        raise ValidationError(
+            "The plan skill has its own proposal flow and cannot be in a default chain",
+            details={"reason": "plan_in_skill_chain"},
+        )
+    return json.dumps(cleaned)
+
+
+def require_policy_consistent(project: Project) -> None:
+    """A project that starts work by itself must know what to run."""
+    if project.autonomy != ProjectAutonomy.MANUAL and not project.default_skill_chain:
+        raise ValidationError(
+            "Choose a default skill chain before the project starts tasks by itself",
+            details={"reason": "skill_chain_required"},
+        )
 
 
 async def get_project(db: AsyncSession, project_id: str) -> Project:
@@ -44,6 +77,8 @@ async def create_project(
     execution_workspace_path: str | None = None,
     execution_workspace_isolation: str = "local",
     execution_base_branch: str | None = None,
+    autonomy: ProjectAutonomy | str = ProjectAutonomy.MANUAL,
+    default_skill_chain: list[str] | None = None,
 ) -> Project:
     project = Project(
         id=make_id("project_"),
@@ -58,7 +93,10 @@ async def create_project(
         execution_workspace_path=execution_workspace_path,
         execution_workspace_isolation=execution_workspace_isolation,
         execution_base_branch=execution_base_branch,
+        autonomy=autonomy,
+        default_skill_chain=serialize_skill_chain(default_skill_chain),
     )
+    require_policy_consistent(project)
     db.add(project)
     await db.flush()
 
@@ -130,7 +168,16 @@ async def update_project(
     **updates,
 ) -> Project:
     project = await get_project(db, project_id)
+    if "default_skill_chain" in updates:
+        updates = {
+            **updates,
+            "default_skill_chain": serialize_skill_chain(updates["default_skill_chain"]),
+        }
+    if updates.get("autonomy") is None:
+        # None means "leave it"; the column itself never holds null.
+        updates.pop("autonomy", None)
     apply_model_updates(project, updates)
+    require_policy_consistent(project)
     root = await db.get(Todo, project.root_task_id) if project.root_task_id else None
     if root is not None:
         if "title" in updates:

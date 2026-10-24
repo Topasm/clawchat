@@ -18,8 +18,9 @@ import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
 import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import { projectStatusLabel } from '../components/projects/projectStatus';
-import type { ProjectOverviewResponse } from '../types/api';
+import type { ProjectAutonomy, ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
+import SkillChainPicker from '../components/shared/SkillChainPicker';
 import { useChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
 import { useChatContextStore } from '../hooks/useContextChat';
 import usePlatform from '../hooks/usePlatform';
@@ -225,6 +226,7 @@ export default function ProjectWorkspacePage() {
     project.pending_review_count > 0 ||
     !!project.execution_host_id ||
     !!project.default_execution_provider ||
+    (project.autonomy ?? 'manual') !== 'manual' ||
     projectTasks.some(
       (task) => !!task.assignee || !!telemetryByTask.get(task.id)?.latest_run_status,
     );
@@ -299,6 +301,7 @@ export default function ProjectWorkspacePage() {
         className="cc-dialog__content--wide cc-project-settings-dialog"
       >
         <ProjectExecutionSettings project={project} />
+        <ProjectAutonomySettings project={project} />
       </Dialog>
 
       <div
@@ -609,6 +612,108 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
             {updateProject.isPending
               ? translateUi('Saving\u2026')
               : translateUi('Save execution settings')}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+const AUTONOMY_CHOICES: Array<{
+  value: ProjectAutonomy;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'manual',
+    label: 'Ask before every run',
+    description: 'Nothing starts until you press Start on a task.',
+  },
+  {
+    value: 'auto_start',
+    label: 'Start ready tasks',
+    description:
+      'Each task that becomes ready starts with the chain below. Every result waits in Review.',
+  },
+  {
+    value: 'auto_start_and_accept',
+    label: 'Start, and accept results that changed nothing',
+    description:
+      'A result that could not have changed anything is accepted as it lands. One that could have changed files still waits for you.',
+  },
+];
+
+/**
+ * What the project does by itself once a task is ready.
+ *
+ * The policy is the project's, not a task's: it starts every newly ready
+ * leaf with one default chain, so the chain is chosen here, once. The
+ * server refuses a policy without a chain, so the form does too.
+ */
+function ProjectAutonomySettings({ project }: { project: ProjectOverviewResponse }) {
+  const updateProject = useUpdateProject(project.id, 'Autonomy settings saved');
+  const [autonomy, setAutonomy] = useState<ProjectAutonomy>(project.autonomy ?? 'manual');
+  const [chain, setChain] = useState<string[]>(project.default_skill_chain ?? []);
+  useEffect(() => {
+    setAutonomy(project.autonomy ?? 'manual');
+    setChain(project.default_skill_chain ?? []);
+  }, [project]);
+  const needsChain = autonomy !== 'manual' && chain.length === 0;
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    updateProject.mutate({ autonomy, default_skill_chain: chain.length ? chain : null });
+  };
+  return (
+    <section className="cc-project-workspace__section cc-project-autonomy">
+      <div className="cc-project-workspace__section-header">
+        <div>
+          <h2>{translateUi('Autonomy')}</h2>
+          <p>{translateUi('What this project does by itself once a task is ready.')}</p>
+        </div>
+      </div>
+      <form className="cc-project-autonomy__form" onSubmit={save}>
+        <fieldset className="cc-project-autonomy__choices">
+          <legend>{translateUi('When a task becomes ready')}</legend>
+          {AUTONOMY_CHOICES.map((choice) => (
+            <label key={choice.value} className="cc-project-autonomy__choice">
+              <input
+                type="radio"
+                name="project-autonomy"
+                value={choice.value}
+                checked={autonomy === choice.value}
+                onChange={() => setAutonomy(choice.value)}
+              />
+              <span>
+                <strong>{translateUi(choice.label)}</strong>
+                <small>{translateUi(choice.description)}</small>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <div className="cc-project-autonomy__chain">
+          <span className="cc-project-autonomy__label">{translateUi('Default skill chain')}</span>
+          <SkillChainPicker value={chain} onChange={setChain} />
+          {needsChain ? (
+            <small className="cc-project-autonomy__hint cc-project-autonomy__hint--warning">
+              {translateUi('Choose at least one skill before the project starts tasks by itself.')}
+            </small>
+          ) : (
+            <small className="cc-project-autonomy__hint">
+              {translateUi(
+                'The policy skips planning, stops when the machine is off or the daily limit is reached, and says so in the project thread.',
+              )}
+            </small>
+          )}
+        </div>
+        <div className="cc-project-execution-form__actions">
+          <button
+            type="submit"
+            className="cc-btn cc-btn--primary"
+            disabled={updateProject.isPending || needsChain}
+          >
+            {updateProject.isPending
+              ? translateUi('Saving\u2026')
+              : translateUi('Save autonomy settings')}
           </button>
         </div>
       </form>

@@ -25,6 +25,20 @@ AUTO_APPROVED_NOTE = "Approved automatically: this automation does not ask for l
 CLEAN_APPROVALS_BEFORE_OFFER = 2
 
 
+def task_provenance(task: AgentTask) -> str | None:
+    """Who started this task without a click: ``scheduled_job``, ``policy`` or None."""
+    try:
+        payload = json.loads(task.payload_json) if task.payload_json else {}
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("scheduled_job_id"):
+        return "scheduled_job"
+    provenance = payload.get("provenance")
+    return provenance if isinstance(provenance, str) and provenance else None
+
+
 async def scheduled_job_for_task(db: AsyncSession, task: AgentTask) -> ScheduledJob | None:
     """The automation that fired this task, if one did."""
     try:
@@ -79,4 +93,5 @@ __all__ = [
     "offers_skip_review",
     "recent_decisions",
     "scheduled_job_for_task",
+    "task_provenance",
 ]
