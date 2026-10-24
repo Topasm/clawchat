@@ -22,12 +22,14 @@ export default function useInboxCapture() {
       .mutateAsync({ title, source: 'quick_capture', inbox_state: 'classifying' })
       .then((todo) => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoutings });
-        if (todo?.inbox_state === 'none' && todo.due_date) {
-          addToast(
-            'success',
-            translateUi('Added to tasks, due {{date}}', { date: formatDueMoment(todo.due_date) }),
-          );
-        }
+        // One toast per capture: where the line went. A dated line is filed
+        // as a task at once; anything else waits in the Inbox.
+        addToast(
+          'success',
+          todo?.inbox_state === 'none' && todo.due_date
+            ? translateUi('Added to tasks, due {{date}}', { date: formatDueMoment(todo.due_date) })
+            : translateUi('Added to Inbox'),
+        );
         return todo;
       })
       .catch((error: unknown) => {

@@ -116,26 +116,30 @@ export default function AttentionPage() {
         )}
       </header>
 
+      {/* Stays at the top while the list scrolls, so the view can be
+          switched from anywhere in a long run log. */}
       <div
         className="cc-attention-views"
         role="tablist"
         aria-label={translateUi('Attention views')}
       >
-        {VIEWS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={view === option.value}
-            className={`cc-attention-view${view === option.value ? ' cc-attention-view--active' : ''}`}
-            onClick={() => showView(option.value)}
-          >
-            {translateUi(option.label)}
-            {option.value === 'now' && !isLoading && total > 0 && (
-              <span className="cc-section__count">{total}</span>
-            )}
-          </button>
-        ))}
+        <div className="cc-attention-views__group">
+          {VIEWS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={view === option.value}
+              className={`cc-attention-view${view === option.value ? ' cc-attention-view--active' : ''}`}
+              onClick={() => showView(option.value)}
+            >
+              {translateUi(option.label)}
+              {option.value === 'now' && !isLoading && total > 0 && (
+                <span className="cc-section__count">{total}</span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {approvedAgentRun && (

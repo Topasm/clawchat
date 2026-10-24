@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import AiSetupBanner from '../components/shared/AiSetupBanner';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import {
   useMessagesQuery,
@@ -18,12 +18,16 @@ import StreamingIndicator from '../components/chat-panel/StreamingIndicator';
 import ChatInput from '../components/chat-panel/ChatInput';
 import { getProjectIcon } from '../utils/projectIcons';
 import { ChevronLeftIcon } from '../components/shared/Icons';
+import { readReturnTo } from '../services/returnTo';
 import { translateUi } from '../i18n';
 export default function ChatPage() {
   const { conversationId } = useParams<{
     conversationId: string;
   }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Opened from the side panel: ← goes back to that screen.
+  const returnTo = readReturnTo(location.state);
   const {
     data: queryMessages = [],
     fetchNextPage,
@@ -166,8 +170,10 @@ export default function ChatPage() {
         <button
           type="button"
           className="cc-chat-page__back"
-          onClick={() => navigate(project ? `/projects/${project.id}` : '/projects')}
-          aria-label={translateUi(project ? 'Back to project' : 'Back to chats')}
+          onClick={() => navigate(returnTo ?? (project ? `/projects/${project.id}` : '/projects'))}
+          aria-label={translateUi(
+            returnTo ? 'Back' : project ? 'Back to project' : 'Back to chats',
+          )}
         >
           <ChevronLeftIcon size={16} />
         </button>

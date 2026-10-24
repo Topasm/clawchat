@@ -5,6 +5,7 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 import { useServerHealthStore } from '../../../stores/useServerHealthStore';
 import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import AiSetupBanner from '../AiSetupBanner';
+import ServerVersionBanner from '../ServerVersionBanner';
 import ServerVersionNotice from '../ServerVersionNotice';
 import StorageLocationBadge from '../StorageLocationBadge';
 import WorkspaceMenu from '../WorkspaceMenu';
@@ -123,11 +124,11 @@ describe('AiSetupBanner', () => {
 });
 
 describe('ServerVersionNotice', () => {
-  it('asks to update an older Home to the app release', () => {
+  it('names this app and the Home server, and asks to update the older Home', () => {
     render(<ServerVersionNotice serverVersion="1.4.30" serverName="Home" appVersion="1.4.43" />);
     const notice = screen.getByRole('status');
-    expect(notice).toHaveTextContent('Home runs 1.4.30; this app is 1.4.43.');
-    expect(notice).toHaveTextContent('Update Home to 1.4.43');
+    expect(notice).toHaveTextContent('This app is 1.4.43; the Home server (Home) runs 1.4.30.');
+    expect(notice).toHaveTextContent('Update the Home server to 1.4.43');
   });
 
   it('asks to update an older app to the server release', () => {
@@ -141,6 +142,56 @@ describe('ServerVersionNotice', () => {
     );
     expect(container).toBeEmptyDOMElement();
     rerender(<ServerVersionNotice serverVersion={undefined} appVersion="1.4.43" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('ServerVersionBanner', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ serverUrl: 'https://home.example:8443', token: 'jwt' });
+    useWorkspaceStore.setState({
+      profiles: [
+        { id: 'ws-home', kind: 'remote', name: 'ClawChat', serverUrl: 'https://home.example:8443' },
+      ] as never,
+      activeWorkspaceId: 'ws-home',
+    });
+  });
+
+  it('shows one line in the shell when the app and the Home server differ', () => {
+    useServerHealthStore.getState().setHealth('https://home.example:8443', {
+      version: '1.4.58',
+      status: 'ok',
+      aiConnected: true,
+      aiProvider: 'codex_cli',
+      aiModel: '',
+    });
+    render(
+      <MemoryRouter>
+        <ServerVersionBanner appVersion="1.4.57" />
+      </MemoryRouter>,
+    );
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveTextContent('This app is 1.4.57; the Home server (ClawChat) runs 1.4.58.');
+    expect(banner).toHaveTextContent('Update this app to 1.4.58');
+    expect(screen.getByRole('link', { name: 'Connection' })).toHaveAttribute(
+      'href',
+      '/connections',
+    );
+  });
+
+  it('stays out of the way while the releases match', () => {
+    useServerHealthStore.getState().setHealth('https://home.example:8443', {
+      version: '1.4.57',
+      status: 'ok',
+      aiConnected: true,
+      aiProvider: 'codex_cli',
+      aiModel: '',
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <ServerVersionBanner appVersion="1.4.57" />
+      </MemoryRouter>,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 });

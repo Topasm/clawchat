@@ -63,6 +63,31 @@ describe('QuickCaptureModal', () => {
 
     resolvePost({ data: { id: 'todo-1', title: 'Buy milk', inbox_state: 'classifying' } });
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    // One toast for the one action, not "Task created" and "Saved" both.
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      'Added to Inbox',
+    ]);
+  });
+
+  it('says where a dated line went, once', async () => {
+    apiMocks.post.mockResolvedValue({
+      data: {
+        id: 'todo-3',
+        title: 'Pay rent Friday',
+        inbox_state: 'none',
+        due_date: '2026-10-30T23:59:00Z',
+      },
+    });
+    renderModal();
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: 'Pay rent Friday' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    expect(useToastStore.getState().toasts[0].message).toMatch(/^Added to tasks, due /);
+    await waitFor(() => expect(apiMocks.post).toHaveBeenCalledTimes(1));
+    expect(useToastStore.getState().toasts).toHaveLength(1);
   });
 
   it('adds a step to the task it was opened for', async () => {

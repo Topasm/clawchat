@@ -1334,6 +1334,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'MCP server removed': 'MCP 서버를 삭제했습니다',
   'MCP servers': 'MCP 서버',
   'Using {{label}}…': '{{label}} 사용 중…',
+  'Reading your message…': '메시지를 읽는 중…',
+  'Thinking…': '생각하는 중…',
   'Offered to the Research skill. Searches run on your own SearXNG instance with JSON output enabled.':
     '리서치 스킬에서 사용합니다. 검색은 JSON 출력을 켠 내 SearXNG 인스턴스에서 실행됩니다.',
   On: '켜기',
@@ -1604,14 +1606,17 @@ export const koreanUiTranslations: Record<string, string> = {
   'AI not connected': 'AI 연결 안 됨',
   'Briefings and chat replies use plain text until an AI provider is set up.':
     'AI 제공자를 설정하기 전까지 브리핑과 채팅 답변은 일반 텍스트로 표시됩니다.',
-  'Update {{server}} to {{version}} so every feature in this app works.':
-    '이 앱의 모든 기능을 쓰려면 {{server}}를 {{version}}(으)로 업데이트하세요.',
-  'Update this app to {{version}} to match {{server}}.':
-    '{{server}}와 맞추려면 이 앱을 {{version}}(으)로 업데이트하세요.',
+  'Update the Home server to {{version}} so every feature in this app works.':
+    '이 앱의 모든 기능을 쓰려면 홈 서버를 {{version}}(으)로 업데이트하세요.',
+  'Update this app to {{version}} to match the Home server.':
+    '홈 서버와 맞추려면 이 앱을 {{version}}(으)로 업데이트하세요.',
   'Install the same release on both so they work together.':
     '함께 동작하도록 양쪽에 같은 릴리스를 설치하세요.',
-  '{{server}} runs {{serverVersion}}; this app is {{appVersion}}.':
-    '{{server}}는 {{serverVersion}}, 이 앱은 {{appVersion}}입니다.',
+  'This app is {{appVersion}}; {{server}} runs {{serverVersion}}.':
+    '이 앱은 {{appVersion}}, {{server}}는 {{serverVersion}}입니다.',
+  'the Home server ({{workspace}})': '홈 서버({{workspace}})',
+  'the Home server': '홈 서버',
+  Connection: '연결',
   'Only on this device · waiting to sync to {{workspace}}':
     '이 기기에만 있음 · {{workspace}}에 동기화 대기 중',
   'Saved on this device': '이 장치에 저장됨',
@@ -1668,13 +1673,13 @@ export const koreanUiTranslations: Record<string, string> = {
   Import: '가져오기',
   'Add to Inbox': '받은함에 추가',
   'Write a task or a note': '할 일이나 메모를 적으세요',
-  'Saved to Inbox': '받은함에 추가했습니다',
+  'Added to Inbox': '받은함에 추가됨',
   'Add a step': '단계 추가',
   'New item': '새 항목',
   'Talk with AI': 'AI와 대화',
   'Talk with AI (⌘K)': 'AI와 대화 (⌘K)',
   'Open command palette': '명령 팔레트 열기',
-  'Enter to add': 'Enter로 추가',
+  'Enter to add · Shift+Enter for a new line': 'Enter로 추가 · Shift+Enter로 줄바꿈',
   'Could not move this item': '옮기지 못했습니다',
   'Added to tasks, due {{date}}': '{{date}} 마감으로 추가됨',
   'Could not add to the Inbox': '받은함에 추가하지 못했습니다',

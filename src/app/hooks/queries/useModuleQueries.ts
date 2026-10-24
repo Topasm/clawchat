@@ -135,7 +135,10 @@ export function useCreateTodo() {
       }
       useToastStore.getState().addToast('error', translateUi('Failed to create task'));
     },
-    onSuccess: (created) => {
+    onSuccess: (created, variables) => {
+      // A capture says what the Inbox did with it (useInboxCapture); a
+      // second "Task created" here would be the same news twice.
+      if (variables.inbox_state === 'classifying') return;
       if (queuedCreateResults.has(created)) {
         // Say where the task is: only here until the workspace is reachable.
         useToastStore.getState().addToast(

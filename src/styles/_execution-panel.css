@@ -21,6 +21,13 @@
   margin-top: 5px;
 }
 
+/* ← shares that axis too (a 32px button on a 28px line), pulled left so the
+   title keeps its column. */
+.cc-exec-panel__back {
+  margin-left: -8px;
+  margin-top: -2px;
+}
+
 /* Where a delegated task is, small at the end of the title row, so nothing
    below moves when the task is handed off. */
 .cc-exec-panel__top-row .cc-stage-dots {

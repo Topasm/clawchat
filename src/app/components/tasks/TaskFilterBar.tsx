@@ -19,9 +19,9 @@ interface TaskViewMenuProps {
 }
 
 /**
- * The one control over the task list: "View ▾" names the sort and opens a
- * menu with search, sort, completed tasks, blocked tasks and tags. Nothing is
- * removed from the old filter bar; it is folded into one place.
+ * The controls over the task list: a search box in the header, and "View ▾",
+ * which names the sort and opens a menu with sort, completed tasks, blocked
+ * tasks and tags. Search sits outside the menu so it is found at a glance.
  */
 export default function TaskViewMenu({ statusFilter, onStatusFilterChange }: TaskViewMenuProps) {
   const [open, setOpen] = useState(false);
@@ -63,18 +63,24 @@ export default function TaskViewMenu({ statusFilter, onStatusFilterChange }: Tas
     };
   }, [open]);
 
-  // The search shortcut opens the menu on its search field.
+  // The search shortcut (/) lands in the header's search box.
   useEffect(() => {
-    const handler = () => {
-      setOpen(true);
-      requestAnimationFrame(() => searchInputRef.current?.focus());
-    };
+    const handler = () => searchInputRef.current?.focus();
     window.addEventListener(OPEN_SEARCH_EVENT, handler);
     return () => window.removeEventListener(OPEN_SEARCH_EVENT, handler);
   }, []);
 
   return (
     <div className="cc-task-view" ref={rootRef}>
+      <input
+        ref={searchInputRef}
+        className="cc-task-view__search"
+        type="search"
+        aria-label={translateUi('Search tasks')}
+        placeholder={translateUi('Search tasks…')}
+        value={filters.searchQuery}
+        onChange={(e) => setSearch(e.target.value)}
+      />
       <button
         type="button"
         className={`cc-task-view__trigger${hasActiveFilters ? ' cc-task-view__trigger--filtered' : ''}`}
@@ -90,17 +96,8 @@ export default function TaskViewMenu({ statusFilter, onStatusFilterChange }: Tas
       </button>
       {open && (
         <div className="cc-task-view__popover" role="dialog" aria-label={translateUi('View')}>
-          <input
-            ref={searchInputRef}
-            className="cc-task-view__search cc-kanban-filter__search-input"
-            type="search"
-            aria-label={translateUi('Search tasks')}
-            placeholder={translateUi('Search tasks…')}
-            value={filters.searchQuery}
-            onChange={(e) => setSearch(e.target.value)}
-          />
           <div
-            className="cc-task-view__group"
+            className="cc-task-view__group cc-task-view__group--first"
             role="radiogroup"
             aria-label={translateUi('Sort tasks')}
           >
@@ -171,7 +168,7 @@ export default function TaskViewMenu({ statusFilter, onStatusFilterChange }: Tas
   );
 }
 
-/** The search shortcut: opens the View menu on its search field. */
+/** The search shortcut: focuses the header's search box. */
 export function focusTaskSearch() {
   window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
 }

@@ -162,7 +162,11 @@
 /* "View ▾": the one control over the list. */
 .cc-task-view {
   position: relative;
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .cc-task-view__trigger {
@@ -215,10 +219,13 @@
   box-shadow: var(--cc-shadow-overlay);
 }
 
+/* The search box lives in the header, beside View. */
 .cc-task-view__search {
   box-sizing: border-box;
-  width: 100%;
-  padding: 7px 10px;
+  width: 200px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 10px;
   border: 0;
   border-radius: var(--cc-radius-md);
   background: var(--cc-surface-secondary);
@@ -227,9 +234,24 @@
   font-size: 13px;
 }
 
+.cc-task-view__search::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
 .cc-task-view__search:focus {
   outline: 2px solid var(--cc-primary);
   outline-offset: 1px;
+}
+
+@media (max-width: 768px) {
+  .cc-task-view {
+    flex: 1;
+  }
+
+  .cc-task-view__search {
+    flex: 1;
+    width: auto;
+  }
 }
 
 .cc-task-view__group {
@@ -238,6 +260,11 @@
   gap: 2px;
   padding-top: 6px;
   border-top: 1px solid var(--cc-border);
+}
+
+.cc-task-view__group--first {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .cc-task-view__option,

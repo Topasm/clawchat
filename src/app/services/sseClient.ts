@@ -9,6 +9,8 @@ const MAX_RETRIES = 2;
 export interface ToolActivity {
   tool: string;
   label: string;
+  /** `phase`: a stage of the reply with no tool behind it ("reading your message"). */
+  kind?: 'tool' | 'phase';
 }
 
 interface SSECallbacks {

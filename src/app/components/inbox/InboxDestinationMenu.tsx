@@ -51,6 +51,7 @@ export default function InboxDestinationMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={translateUi('Change where this goes')}
+        title={translateUi('Change where this goes')}
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
       >

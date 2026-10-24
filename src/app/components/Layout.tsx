@@ -58,6 +58,7 @@ import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
 import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
+import ServerVersionBanner from './shared/ServerVersionBanner';
 import { useServerHealthStore } from '../stores/useServerHealthStore';
 import { useServerHealthPolling } from '../hooks/useServerHealth';
 import { activeWorkspaceName, workspaceAddressLabel } from '../utils/workspaceLocation';
@@ -320,7 +321,7 @@ export default function Layout() {
     onToggleChat: toggleChat,
     onNewItem: () => {
       // The Inbox has the input on the page; elsewhere the same input opens.
-      const inboxInput = document.querySelector<HTMLInputElement>('.cc-inbox-capture__input');
+      const inboxInput = document.querySelector<HTMLTextAreaElement>('.cc-inbox-capture__input');
       if (inboxInput) inboxInput.focus();
       else openQuickCapture();
     },
@@ -577,6 +578,7 @@ export default function Layout() {
           style={cssVars(colors, fontSize)}
         >
           <UpdateNotification />
+          <ServerVersionBanner />
           <ToastContainer />
           <OfflineIndicator />
           <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />

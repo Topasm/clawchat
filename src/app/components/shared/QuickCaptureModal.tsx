@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
 import { useCreateTodo, useTodosQuery } from '../../hooks/queries';
 import useInboxCapture from '../../hooks/useInboxCapture';
-import { useToastStore } from '../../stores/useToastStore';
 import { hapticSuccess } from '../../utils/haptics';
 import InboxCaptureBar from '../inbox/InboxCaptureBar';
 import { translateUi } from '../../i18n';
@@ -23,7 +22,6 @@ export default function QuickCaptureModal({
 }: QuickCaptureModalProps) {
   const { capture, busy: capturing } = useInboxCapture();
   const createTodo = useCreateTodo();
-  const addToast = useToastStore((s) => s.addToast);
   const { data: todos = [] } = useTodosQuery();
   const parentTitle = defaultParentId
     ? todos.find((todo) => todo.id === defaultParentId)?.title
@@ -39,10 +37,7 @@ export default function QuickCaptureModal({
   const add = (title: string) => {
     const saved = defaultParentId
       ? createTodo.mutateAsync({ title, parent_id: defaultParentId, inbox_state: 'none' })
-      : capture(title).then((todo) => {
-          // A dated line is filed at once and the capture already said so.
-          if (todo?.inbox_state !== 'none') addToast('success', translateUi('Saved to Inbox'));
-        });
+      : capture(title);
     return saved.then(() => {
       hapticSuccess();
       onClose();

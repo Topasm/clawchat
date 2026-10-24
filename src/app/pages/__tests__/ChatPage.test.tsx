@@ -104,6 +104,27 @@ describe('ChatPage agent answer mode', () => {
     expect(screen.getByText('Project workspace')).toBeInTheDocument();
   });
 
+  it('returns to the screen the panel was popped out from', () => {
+    mocks.projects = [{ id: 'project-1', title: 'ClawChat improvements', task_count: 0 }];
+    mocks.conversations = [{ id: 'conv-1', title: 'Thread', project_id: 'project-1' }];
+    mocks.runs = [];
+
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/chats/conv-1', state: { returnTo: '/tasks/todo-task' } }]}
+      >
+        <Routes>
+          <Route path="/chats/:conversationId" element={<ChatPage />} />
+          <Route path="/projects/:projectId" element={<div>Project workspace</div>} />
+          <Route path="/tasks/:taskId" element={<div>Task page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('Task page')).toBeInTheDocument();
+  });
+
   it('uses run metadata to recover the task scope of a root-scoped run thread', () => {
     mocks.projects = [
       {
