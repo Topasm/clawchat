@@ -57,6 +57,7 @@
     <string name="review_subject_data_source_write">공개된 파일 변경</string>
     <string name="review_subject_unknown">검토</string>
     <string name="review_risk_low">낮음</string>
+    <string name="review_risk_read_only_tools">읽기 전용 도구</string>
     <string name="review_risk_medium">보통</string>
     <string name="review_risk_high">높음</string>
 

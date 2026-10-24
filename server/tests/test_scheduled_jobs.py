@@ -415,6 +415,30 @@ async def test_an_automation_told_not_to_ask_adopts_low_risk_results_itself(
     }
 
 
+async def test_a_result_that_only_looked_things_up_is_still_asked(
+    db_session, session_factory, monkeypatch
+):
+    # "Don't ask next time" covers low risk alone: a read-only chain that used
+    # web search or a read-only server waits in Review like any other result.
+    async def looked_things_up(db, run, task):
+        return ReviewRiskLevel.READ_ONLY_TOOLS
+
+    monkeypatch.setattr(run_risk, "assess", looked_things_up)
+    job, run = await _fired(
+        db_session, session_factory, ReportingAI(),
+        skill_chain=["summarize"], auto_approve_low_risk=True,
+    )
+    assert run.status == AgentRunStatus.WAITING_REVIEW
+    assert not run.is_adopted
+    review = await _review_for(db_session, run.id)
+    assert (review.status, review.risk_level) == (
+        ReviewStatus.PENDING, ReviewRiskLevel.READ_ONLY_TOOLS,
+    )
+    response = await review_item_service.build_review_response(db_session, review)
+    assert response.metadata["automation"]["offer_skip_review"] is False
+    assert response.metadata["automation"]["auto_approved"] is False
+
+
 async def test_a_result_that_could_have_changed_files_is_still_asked(
     db_session, session_factory
 ):

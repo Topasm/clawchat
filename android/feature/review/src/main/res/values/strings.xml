@@ -58,6 +58,7 @@
     <string name="review_subject_data_source_write">Change to a shared file</string>
     <string name="review_subject_unknown">Review</string>
     <string name="review_risk_low">Low</string>
+    <string name="review_risk_read_only_tools">Read-only tools</string>
     <string name="review_risk_medium">Medium</string>
     <string name="review_risk_high">High</string>
 

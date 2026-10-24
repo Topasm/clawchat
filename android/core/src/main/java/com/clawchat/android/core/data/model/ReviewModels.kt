@@ -81,6 +81,8 @@ enum class ReviewStatus {
 @Serializable
 enum class ReviewRiskLevel {
     @SerialName("low") LOW,
+    /** Nothing it could have changed, but it looked things up (web search, a read-only server). */
+    @SerialName("read_only_tools") READ_ONLY_TOOLS,
     @SerialName("medium") MEDIUM,
     @SerialName("high") HIGH,
 }

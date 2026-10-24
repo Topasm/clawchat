@@ -41,6 +41,26 @@ class ReviewModelsTest {
     }
 
     @Test
+    fun `a result that only looked things up is its own level, not low`() {
+        val payload = """
+            {
+              "id": "review_2",
+              "subject_type": "agent_run",
+              "subject_id": "run_2",
+              "status": "pending",
+              "summary": "Review research result",
+              "risk_level": "read_only_tools",
+              "requested_at": "2026-10-24T12:00:00Z"
+            }
+        """.trimIndent()
+
+        val item = json.decodeFromString<ReviewItem>(payload)
+
+        assertEquals(ReviewRiskLevel.READ_ONLY_TOOLS, item.riskLevel)
+        assertTrue(item.riskLevel != ReviewRiskLevel.LOW)
+    }
+
+    @Test
     fun `decision request uses canonical server value and omits no context`() {
         val request = ReviewDecisionRequest(
             decision = ReviewDecision.CHANGES_REQUESTED,
