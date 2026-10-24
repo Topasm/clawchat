@@ -3,24 +3,26 @@ import { useTodosQuery } from '../../hooks/queries';
 import { translateUi } from '../../i18n';
 import { isInboxTodo, isTaskTodo } from '../../utils/inboxState';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
+import { isDueThisWeek } from '../../utils/calendarUtils';
 import { ChevronRightIcon } from '../shared/Icons';
-
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * What to do once today is clear: sort what is waiting in the inbox, and look
- * at what is due later this week. A line shows only when it has something.
+ * at what is due later this week -- the calendar week the week view opens
+ * on, not a rolling seven days. A line shows only when it has something.
  */
 export default function TodayNext() {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
-  const now = Date.now();
+  const now = new Date();
   const inboxCount = todos.filter(isInboxTodo).length;
-  const dueThisWeek = todos.filter((todo) => {
-    if (!todo.due_date || !isTaskTodo(todo) || isTerminalTaskStatus(todo.status)) return false;
-    const due = new Date(todo.due_date).getTime();
-    return due > now && due - now <= WEEK_MS;
-  }).length;
+  const dueThisWeek = todos.filter(
+    (todo) =>
+      Boolean(todo.due_date) &&
+      isTaskTodo(todo) &&
+      !isTerminalTaskStatus(todo.status) &&
+      isDueThisWeek(todo.due_date as string, now),
+  ).length;
   const lines = [
     inboxCount > 0 && {
       key: 'inbox',

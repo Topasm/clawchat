@@ -83,6 +83,24 @@ export function startOfWeek(d: Date): Date {
   return out;
 }
 
+/** The last moment of the week view's week (Saturday 23:59:59.999) that holds `d`. */
+export function endOfWeek(d: Date): Date {
+  const out = startOfWeek(d);
+  out.setDate(out.getDate() + 7);
+  out.setMilliseconds(-1);
+  return out;
+}
+
+/**
+ * "This week" as the week view draws it: from now to Saturday night. Today's
+ * "Due this week" line counts with this, so what it promises is what the
+ * week view shows when it opens.
+ */
+export function isDueThisWeek(dueDate: string, now: Date = new Date()): boolean {
+  const due = new Date(dueDate).getTime();
+  return !Number.isNaN(due) && due > now.getTime() && due <= endOfWeek(now).getTime();
+}
+
 /** Build an array of dates for the month grid (includes leading/trailing days). */
 export function getMonthGrid(year: number, month: number): Date[] {
   const first = new Date(year, month, 1);
