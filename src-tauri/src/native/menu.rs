@@ -1,43 +1,62 @@
 use tauri::{
-    menu::{MenuBuilder, MenuItem, SubmenuBuilder},
-    AppHandle,
+    menu::{Menu, MenuBuilder, MenuItem, SubmenuBuilder},
+    AppHandle, Wry,
 };
 
 use super::command::{dispatch, AppMenuCommand};
+use super::labels::{text, Label, Language};
 
 pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
+    app.set_menu(build(app, super::labels::current())?)?;
+    app.on_menu_event(|app, event| {
+        if let Some(command) = AppMenuCommand::from_id(event.id().as_ref()) {
+            dispatch(app, command.native_command(), command.source());
+        }
+    });
+    Ok(())
+}
+
+/// Rebuild the menu bar in another language; the handlers stay as they are,
+/// since every item keeps its id.
+pub(super) fn refresh(app: &AppHandle, language: Language) -> tauri::Result<()> {
+    app.set_menu(build(app, language)?)?;
+    Ok(())
+}
+
+fn build(app: &AppHandle, language: Language) -> tauri::Result<Menu<Wry>> {
+    let label = |item: Label| text(language, item);
     let settings = MenuItem::with_id(
         app,
         AppMenuCommand::Settings.id(),
-        "Settings…",
+        label(Label::Settings),
         true,
         Some("CmdOrCtrl+Comma"),
     )?;
     let connections = MenuItem::with_id(
         app,
         AppMenuCommand::Connections.id(),
-        "Connections…",
+        label(Label::Connections),
         true,
         None::<&str>,
     )?;
     let show = MenuItem::with_id(
         app,
         AppMenuCommand::ShowMain.id(),
-        "Show ClawChat",
+        label(Label::ShowClawChat),
         true,
         None::<&str>,
     )?;
     let quick_capture = MenuItem::with_id(
         app,
         AppMenuCommand::QuickCapture.id(),
-        "Quick Capture",
+        label(Label::QuickCapture),
         true,
         Some("CmdOrCtrl+Shift+Space"),
     )?;
     let diagnostics = MenuItem::with_id(
         app,
         AppMenuCommand::Diagnostics.id(),
-        "Open Diagnostics",
+        label(Label::OpenDiagnostics),
         true,
         None::<&str>,
     )?;
@@ -48,18 +67,18 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
         .item(&settings)
         .item(&connections)
         .separator()
-        .hide_with_text("Hide ClawChat")
-        .hide_others_with_text("Hide Others")
-        .show_all_with_text("Show All")
+        .hide_with_text(label(Label::HideClawChat))
+        .hide_others_with_text(label(Label::HideOthers))
+        .show_all_with_text(label(Label::ShowAll))
         .separator()
-        .quit_with_text("Quit ClawChat")
+        .quit_with_text(label(Label::QuitClawChat))
         .build()?;
-    let file_menu = SubmenuBuilder::new(app, "File")
+    let file_menu = SubmenuBuilder::new(app, label(Label::File))
         .item(&quick_capture)
         .separator()
-        .close_window_with_text("Close Window")
+        .close_window_with_text(label(Label::CloseWindow))
         .build()?;
-    let edit_menu = SubmenuBuilder::new(app, "Edit")
+    let edit_menu = SubmenuBuilder::new(app, label(Label::Edit))
         .undo()
         .redo()
         .separator()
@@ -68,16 +87,18 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
         .paste()
         .select_all()
         .build()?;
-    let view_menu = SubmenuBuilder::new(app, "View").item(&show).build()?;
-    let window_menu = SubmenuBuilder::new(app, "Window")
+    let view_menu = SubmenuBuilder::new(app, label(Label::View))
+        .item(&show)
+        .build()?;
+    let window_menu = SubmenuBuilder::new(app, label(Label::Window))
         .minimize()
         .separator()
         .close_window()
         .build()?;
-    let help_menu = SubmenuBuilder::new(app, "Help")
+    let help_menu = SubmenuBuilder::new(app, label(Label::Help))
         .item(&diagnostics)
         .build()?;
-    let menu = MenuBuilder::new(app)
+    MenuBuilder::new(app)
         .items(&[
             &application_menu,
             &file_menu,
@@ -86,12 +107,5 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
             &window_menu,
             &help_menu,
         ])
-        .build()?;
-    app.set_menu(menu)?;
-    app.on_menu_event(|app, event| {
-        if let Some(command) = AppMenuCommand::from_id(event.id().as_ref()) {
-            dispatch(app, command.native_command(), command.source());
-        }
-    });
-    Ok(())
+        .build()
 }

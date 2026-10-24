@@ -153,6 +153,15 @@ export function getAppLanguage(): AppLanguage {
   return currentLanguage;
 }
 
+/** Called with the new language whenever it changes; returns the unsubscribe. */
+export function onAppLanguageChange(listener: (language: AppLanguage) => void): () => void {
+  const wrapped = () => listener(currentLanguage);
+  languageListeners.add(wrapped);
+  return () => {
+    languageListeners.delete(wrapped);
+  };
+}
+
 export function useTranslation() {
   useSyncExternalStore(
     (listener) => {

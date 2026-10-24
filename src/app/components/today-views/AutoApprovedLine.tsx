@@ -37,7 +37,7 @@ export default function AutoApprovedLine() {
     if (conversationId && panel) {
       panel.open(conversationId, {
         kind: 'run',
-        title: 'Task Agent',
+        title: translateUi('Task Agent'),
         subtitle: latest.subject_title ?? automation.title,
       });
     } else if (conversationId) {

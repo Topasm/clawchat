@@ -15,6 +15,7 @@ export const TAURI_COMMANDS = {
   appOpenCameraSettings: 'app_open_camera_settings',
   appOpenCanonicalDocument: 'app_open_canonical_document',
   appSetWorkspaceViewMode: 'app_set_workspace_view_mode',
+  appSetLanguage: 'app_set_language',
   secureStorageGet: 'secure_storage_get',
   secureStorageSet: 'secure_storage_set',
   secureStorageRemove: 'secure_storage_remove',

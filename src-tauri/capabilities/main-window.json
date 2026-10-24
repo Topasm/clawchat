@@ -29,6 +29,7 @@
     "allow-app-open-camera-settings",
     "allow-app-open-canonical-document",
     "allow-app-set-workspace-view-mode",
+    "allow-app-set-language",
     "allow-secure-storage-get",
     "allow-secure-storage-set",
     "allow-secure-storage-remove",

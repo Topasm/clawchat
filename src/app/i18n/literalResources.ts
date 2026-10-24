@@ -1769,4 +1769,11 @@ export const koreanUiTranslations: Record<string, string> = {
   'The AI tool is not installed on that machine.': '그 기기에 AI 도구가 설치되어 있지 않습니다.',
   'The run took too long and was stopped.': '너무 오래 걸려서 멈췄습니다.',
   'The result was rejected.': '결과가 거절됐습니다.',
+  Database: '데이터베이스',
+  Sessions: '세션',
+  'Server Config': '서버 구성',
+  'Data Mgmt': '데이터 관리',
+  'Changes requested': '수정 요청',
+  Approved: '승인됨',
+  Rejected: '거부됨',
 };

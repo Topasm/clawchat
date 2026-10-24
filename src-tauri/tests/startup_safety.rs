@@ -1,6 +1,7 @@
 const LIB_SOURCE: &str = include_str!("../src/lib.rs");
 const NATIVE_SOURCE: &str = include_str!("../src/native.rs");
 const NATIVE_COMMAND_SOURCE: &str = include_str!("../src/native/command.rs");
+const NATIVE_LABELS_SOURCE: &str = include_str!("../src/native/labels.rs");
 const NATIVE_MENU_SOURCE: &str = include_str!("../src/native/menu.rs");
 const NATIVE_SHORTCUT_SOURCE: &str = include_str!("../src/native/shortcuts.rs");
 const NATIVE_TRAY_SOURCE: &str = include_str!("../src/native/tray.rs");
@@ -118,11 +119,19 @@ fn macos_reopen_and_close_share_the_observable_restore_lifecycle() {
 #[test]
 fn macos_menu_and_tray_expose_recovery_safe_application_commands() {
     assert!(NATIVE_SOURCE.contains("menu::setup(app)"));
-    assert!(NATIVE_MENU_SOURCE.contains("\"Settings…\""));
+    // The words live in one table, in both languages, and the menu reads them.
+    assert!(NATIVE_LABELS_SOURCE.contains("\"Settings…\""));
+    assert!(NATIVE_LABELS_SOURCE.contains("\"설정…\""));
+    assert!(NATIVE_LABELS_SOURCE.contains("\"Quick Capture\""));
+    assert!(NATIVE_LABELS_SOURCE.contains("\"Connections…\""));
+    assert!(NATIVE_LABELS_SOURCE.contains("\"Open Diagnostics\""));
+    assert!(NATIVE_MENU_SOURCE.contains("label(Label::Settings)"));
     assert!(NATIVE_MENU_SOURCE.contains("Some(\"CmdOrCtrl+Comma\")"));
-    assert!(NATIVE_MENU_SOURCE.contains("\"Quick Capture\""));
-    assert!(NATIVE_MENU_SOURCE.contains("\"Connections…\""));
-    assert!(NATIVE_MENU_SOURCE.contains("\"Open Diagnostics\""));
+    assert!(NATIVE_MENU_SOURCE.contains("label(Label::QuickCapture)"));
+    assert!(NATIVE_MENU_SOURCE.contains("label(Label::OpenDiagnostics)"));
+    // The renderer can relabel both menus once it knows its language.
+    assert!(NATIVE_SOURCE.contains("pub fn set_language(app: &AppHandle, tag: &str)"));
+    assert!(APP_COMMAND_SOURCE.contains("crate::native::set_language(&app, &language)"));
     assert!(NATIVE_COMMAND_SOURCE.contains("app.emit(\"open-settings\", ())"));
     assert!(NATIVE_COMMAND_SOURCE.contains("navigate(app, \"/diagnostics\", source)"));
     assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum AppMenuCommand"));

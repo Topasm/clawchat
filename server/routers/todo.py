@@ -96,6 +96,7 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import deserialize_tags, serialize_tags
 from utils.inbox_display import get_next_action
+from utils.request_language import request_language
 from ws.notifications import notify_module_data_changed
 
 router = APIRouter()
@@ -1126,6 +1127,7 @@ async def generate_graph_plan(
                 "active_ai_provider",
                 "openclaw",
             ),
+            language=request_language(request),
         )
         await notify_module_data_changed("todos")
         await notify_module_data_changed("reviews")

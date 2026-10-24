@@ -134,6 +134,12 @@ pub fn app_set_badge_count<R: Runtime>(app: AppHandle<R>, count: u32) -> Result<
         .map_err(|error| format!("failed to set application badge: {error}"))
 }
 
+/// The renderer reports its language so the menu bar and tray read in it.
+#[tauri::command]
+pub fn app_set_language(app: AppHandle, language: String) -> Result<(), String> {
+    crate::native::set_language(&app, &language)
+}
+
 #[tauri::command]
 pub fn app_set_workspace_view_mode<R: Runtime>(
     app: AppHandle<R>,
