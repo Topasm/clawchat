@@ -14,11 +14,18 @@
   margin-bottom: 10px;
 }
 
+/* Everything on the title row centres on the title's first line (28px): the
+   check, the stage and the ⋮ menu share one axis instead of each sitting at
+   its own height. */
+.cc-exec-panel__top-row > .cc-checkbox {
+  margin-top: 5px;
+}
+
 /* Where a delegated task is, small at the end of the title row, so nothing
    below moves when the task is handed off. */
 .cc-exec-panel__top-row .cc-stage-dots {
   flex: none;
-  margin-top: 6px;
+  min-height: 28px;
   font-size: 12px;
 }
 
@@ -380,6 +387,7 @@
 .cc-exec-panel__top-row .cc-detail__title-input {
   flex: 1;
   min-width: 0;
+  line-height: 28px;
 }
 
 .cc-exec-panel__meta-line {

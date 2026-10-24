@@ -798,8 +798,14 @@
   flex: none;
 }
 
+/* A 28px square like the pane's other icon buttons, so the ⋮ centres on the
+   same line as whatever stands beside it (the AI segment, a title). */
 .cc-task-menu__trigger {
-  min-width: 32px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
   font-size: 18px;
   line-height: 1;
 }
