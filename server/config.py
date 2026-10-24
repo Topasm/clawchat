@@ -281,6 +281,10 @@ class Settings(BaseSettings):
     run_heartbeat_timeout_minutes: int = 10
     run_input_reminder_minutes: int = 30
 
+    # A project's autonomy policy starts at most this many runs per project
+    # per UTC day; past it the policy stops and says so in the project thread.
+    project_autonomy_daily_cap: int = 20
+
     # Proactive nudges
     enable_nudges: bool = False
     nudge_interval_hours: int = 4

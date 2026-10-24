@@ -15,8 +15,11 @@ from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from database import Base
 from domain.project import (
+    PROJECT_AUTONOMY_CHECK_SQL,
+    PROJECT_AUTONOMY_VALUES,
     PROJECT_STATUS_CHECK_SQL,
     PROJECT_STATUS_VALUES,
+    ProjectAutonomy,
     ProjectStatus,
 )
 from utils import make_id
@@ -95,6 +98,17 @@ class Project(Base):
         String,
         nullable=True,
     )
+    #: What the project does by itself once a task becomes ready; see
+    #: ``services.automation.project_autonomy_service``.
+    autonomy: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default=ProjectAutonomy.MANUAL,
+        server_default=ProjectAutonomy.MANUAL.value,
+    )
+    #: JSON array of skill ids the policy runs on each ready task; null means
+    #: the policy has nothing to run and stays put.
+    default_skill_chain: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -117,6 +131,16 @@ class Project(Base):
                 f"Invalid project status {value!r}; expected one of: {allowed}"
             ) from exc
 
+    @validates("autonomy")
+    def _validate_autonomy(self, _key: str, value: str | ProjectAutonomy) -> str:
+        try:
+            return ProjectAutonomy(value).value
+        except (TypeError, ValueError) as exc:
+            allowed = ", ".join(PROJECT_AUTONOMY_VALUES)
+            raise ValueError(
+                f"Invalid project autonomy {value!r}; expected one of: {allowed}"
+            ) from exc
+
     @validates("execution_workspace_isolation")
     def _validate_execution_workspace_isolation(self, _key: str, value: str) -> str:
         if value not in {"local", "worktree"}:
@@ -133,6 +157,7 @@ class Project(Base):
             "execution_workspace_isolation IN ('local', 'worktree')",
             name="ck_projects_execution_workspace_isolation",
         ),
+        CheckConstraint(PROJECT_AUTONOMY_CHECK_SQL, name="ck_projects_autonomy_valid"),
         Index("idx_projects_status", "status"),
         Index("idx_projects_updated_at", "updated_at"),
         Index("uq_projects_root_task_id", "root_task_id", unique=True),

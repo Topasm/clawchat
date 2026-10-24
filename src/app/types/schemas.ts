@@ -330,6 +330,8 @@ export const ProjectFolderCandidateSchema = z.object({
 });
 
 export const ProjectStatusSchema = z.enum(['planned', 'active', 'completed', 'archived']);
+/** What a project does by itself once a task is ready. */
+export const ProjectAutonomySchema = z.enum(['manual', 'auto_start', 'auto_start_and_accept']);
 
 export const ProjectResponseSchema = z.object({
   id: z.string(),
@@ -346,6 +348,8 @@ export const ProjectResponseSchema = z.object({
   execution_workspace_path: z.string().nullable().optional(),
   execution_workspace_isolation: z.enum(['local', 'worktree']).default('local'),
   execution_base_branch: z.string().nullable().optional(),
+  autonomy: ProjectAutonomySchema.default('manual'),
+  default_skill_chain: z.array(z.string()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   task_count: z.number().int().nonnegative(),
@@ -377,6 +381,8 @@ export const ProjectCreateSchema = z.object({
   execution_workspace_path: z.string().nullable().optional(),
   execution_workspace_isolation: z.enum(['local', 'worktree']).optional(),
   execution_base_branch: z.string().nullable().optional(),
+  autonomy: ProjectAutonomySchema.optional(),
+  default_skill_chain: z.array(z.string()).nullable().optional(),
 });
 
 export const ProjectUpdateSchema = ProjectCreateSchema.partial();
@@ -397,7 +403,7 @@ export const ReviewStatusSchema = z.enum([
   'rejected',
   'expired',
 ]);
-export const ReviewRiskLevelSchema = z.enum(['low', 'medium', 'high']);
+export const ReviewRiskLevelSchema = z.enum(['low', 'read_only_tools', 'medium', 'high']);
 export const ReviewReadyTaskSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -929,6 +935,7 @@ export type InboxTriageProposedWorkstream = z.infer<typeof InboxTriageProposedWo
 export type InboxTriagePreviewResponse = z.infer<typeof InboxTriagePreviewResponseSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type ProjectAutonomy = z.infer<typeof ProjectAutonomySchema>;
 export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;
 export type ProjectOverviewResponse = z.infer<typeof ProjectOverviewResponseSchema>;
 export type ProjectCreate = z.infer<typeof ProjectCreateSchema>;
@@ -1171,6 +1178,7 @@ export const AgentRunResponseSchema = z.object({
   error: z.string().nullable(),
   usage: z.record(z.string(), z.unknown()).nullable(),
   is_adopted: z.boolean(),
+  provenance: z.enum(['scheduled_job', 'policy']).nullable().optional(),
   pending_tool_call: PendingToolCallSchema.nullable().optional(),
   created_at: z.string(),
   started_at: z.string().nullable(),

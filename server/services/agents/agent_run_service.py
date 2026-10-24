@@ -26,7 +26,12 @@ from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
 from services.agents import execution_host_service, run_thread_service
 from services.notifications import run_push
-from services.automation.job_provenance import AUTO_APPROVED_NOTE, scheduled_job_for_task
+from services.automation.job_provenance import (
+    AUTO_APPROVED_NOTE,
+    scheduled_job_for_task,
+    task_provenance,
+)
+from services.automation import project_autonomy_service
 from services.review import run_risk
 from services.review import (
     agent_review_handoff_service,
@@ -430,6 +435,23 @@ async def mark_waiting_review(
                 note=AUTO_APPROVED_NOTE,
             )
             return
+        if risk_level in project_autonomy_service.ACCEPTED_RISK_LEVELS and (
+            await project_autonomy_service.accepts_result(db, task, run)
+        ):
+            # The project's policy started this run and accepts what could
+            # not have changed anything. Approving it runs the policy again
+            # for whatever this result made ready.
+            await decide_run(
+                db, run.id, ReviewStatus.APPROVED, expected_status=AgentRunStatus.WAITING_REVIEW
+            )
+            await review_item_service.set_subject_review_status(
+                db,
+                ReviewSubjectType.AGENT_RUN,
+                run.id,
+                ReviewStatus.APPROVED,
+                note=project_autonomy_service.POLICY_APPROVED_NOTE,
+            )
+            return
     else:
         run.status = AgentRunStatus.COMPLETED
         run.is_adopted = True
@@ -594,6 +616,11 @@ async def decide_run(
 
             graph_revision = await current_graph_revision(db)
             newly_ready_tasks = []
+        if newly_ready_tasks and run.project_id:
+            # The project's policy, if it has one, starts what this freed up.
+            await project_autonomy_service.start_ready_tasks(
+                db, run.project_id, trigger="review_approved"
+            )
         await notify_run_state(db, run, task)
         return AgentRunReviewOutcome(
             run_id=run.id,
@@ -754,6 +781,7 @@ async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunRespons
         skill_chain=_skill_chain(task),
         instruction=task.instruction,
         usage=usage,
+        provenance=task_provenance(task),
         pending_tool_call=await _pending_tool_call(db, run),
     )
 

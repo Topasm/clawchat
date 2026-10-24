@@ -75,6 +75,7 @@ internal fun runNotice(data: Map<String, String>, strings: RunNoticeStrings): Ru
             val risk = strings.get(
                 when (data["risk_level"]) {
                     "low" -> R.string.push_run_risk_low
+                    "read_only_tools" -> R.string.push_run_risk_read_only_tools
                     "medium" -> R.string.push_run_risk_medium
                     "high" -> R.string.push_run_risk_high
                     else -> R.string.push_run_risk_unknown

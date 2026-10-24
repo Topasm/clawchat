@@ -7,8 +7,14 @@ import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRu
 import { translateUi } from '../../i18n';
 import { formatShortDateTime } from '../../utils/formatters';
 
-function riskLabel(level: string): string {
+/**
+ * The server's risk level in words. "Read-only tools" is not a degree of
+ * risk but what the run did: nothing it could have changed, yet it looked
+ * things up (web search, a read-only server), so it is named apart from low.
+ */
+export function riskLabel(level: string): string {
   if (level === 'low') return translateUi('Low risk');
+  if (level === 'read_only_tools') return translateUi('Read-only tools');
   if (level === 'high') return translateUi('High risk');
   return translateUi('Worth a close look');
 }
@@ -25,6 +31,24 @@ export interface ReviewAutomation {
   offer_skip_review: boolean;
   /** This result was adopted without asking; Today lists those. */
   auto_approved: boolean;
+}
+
+export interface ReviewPolicy {
+  project_id: string | null;
+  trigger: string | null;
+  /** The project's policy adopted this result without asking. */
+  auto_approved: boolean;
+}
+
+/** The project policy that started this run, when one did. */
+export function reviewPolicy(item: ReviewItemResponse): ReviewPolicy | null {
+  const raw = item.metadata.policy as Partial<ReviewPolicy> | undefined;
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    project_id: typeof raw.project_id === 'string' ? raw.project_id : null,
+    trigger: typeof raw.trigger === 'string' ? raw.trigger : null,
+    auto_approved: raw.auto_approved === true,
+  };
 }
 
 /** The automation that produced this result, when one did. */
@@ -106,6 +130,7 @@ export default function ReviewItemCard({
   const updateJob = useUpdateScheduledJob();
   const impact = agentRunApprovalImpact(item);
   const automation = reviewAutomation(item);
+  const policy = reviewPolicy(item);
   const changed = reviewChangedFiles(item);
   const open = item.status === 'pending' || item.status === 'changes_requested';
   // "Don't ask next time" lives on the card, not in a settings screen: the
@@ -138,6 +163,13 @@ export default function ReviewItemCard({
         <span>{subjectLabel(item)}</span>
         {automation && (
           <span>{translateUi('Automation · {{title}}', { title: automation.title })}</span>
+        )}
+        {policy && (
+          <span>
+            {policy.auto_approved
+              ? translateUi("Accepted by the project's policy")
+              : translateUi("Started by the project's policy")}
+          </span>
         )}
         {item.project_title && <span>{item.project_title}</span>}
         <time dateTime={item.requested_at}>{formatShortDateTime(item.requested_at)}</time>

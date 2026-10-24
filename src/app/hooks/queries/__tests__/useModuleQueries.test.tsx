@@ -324,6 +324,7 @@ describe('todo mutations', () => {
       root_task_id: 'root-1',
       graph_revision: 4,
       execution_workspace_isolation: 'local',
+      autonomy: 'manual',
       created_at: todo.created_at,
       updated_at: todo.updated_at,
       task_count: 3,

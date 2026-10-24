@@ -38,6 +38,7 @@ export type {
   TaskGraphInsightsResponse,
   ProjectTodoResponse,
   ProjectStatus,
+  ProjectAutonomy,
   ProjectResponse,
   ProjectOverviewResponse,
   ProjectCreate,

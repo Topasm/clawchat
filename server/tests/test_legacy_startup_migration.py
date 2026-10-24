@@ -30,7 +30,7 @@ _REVISION_CHAIN = (
     "d6f8a1c3e520",
     "e2b7c4d81a35",
 )
-_HEAD_REVISION = "d4e8a1b7c952"
+_HEAD_REVISION = "b7e2d4f6a1c8"
 
 # The correction list exactly as the pre-Alembic startup path ran it. Frozen
 # here on purpose: this test only means something if it reproduces the schema

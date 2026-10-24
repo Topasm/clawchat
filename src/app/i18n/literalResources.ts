@@ -395,6 +395,34 @@ export const koreanUiTranslations: Record<string, string> = {
   Exec: '실행',
   'Execution activity': '실행 활동',
   'Execution provider': '실행 제공자',
+  Autonomy: '자율 실행',
+  'What this project does by itself once a task is ready.':
+    '할 일이 준비되면 이 프로젝트가 스스로 하는 일입니다.',
+  'When a task becomes ready': '할 일이 준비되면',
+  'Ask before every run': '매번 물어보기',
+  'Nothing starts until you press Start on a task.':
+    '할 일에서 시작을 누르기 전에는 아무것도 시작하지 않습니다.',
+  'Start ready tasks': '준비된 할 일 시작',
+  'Each task that becomes ready starts with the chain below. Every result waits in Review.':
+    '준비되는 할 일마다 아래 스킬 체인으로 시작합니다. 결과는 모두 검토에서 기다립니다.',
+  'Start, and accept results that changed nothing':
+    '시작하고, 아무것도 바꾸지 않은 결과는 받아들이기',
+  'A result that could not have changed anything is accepted as it lands. One that could have changed files still waits for you.':
+    '아무것도 바꿀 수 없었던 결과는 도착하는 대로 받아들입니다. 파일을 바꿨을 수 있는 결과는 여전히 기다립니다.',
+  'Default skill chain': '기본 스킬 체인',
+  'Choose at least one skill before the project starts tasks by itself.':
+    '프로젝트가 스스로 할 일을 시작하려면 스킬을 하나 이상 고르세요.',
+  'The policy skips planning, stops when the machine is off or the daily limit is reached, and says so in the project thread.':
+    '계획 스킬은 건너뛰고, 기기가 꺼져 있거나 하루 한도에 닿으면 멈춘 뒤 프로젝트 대화에 알립니다.',
+  'Save autonomy settings': '자율 실행 설정 저장',
+  'Autonomy settings saved': '자율 실행 설정을 저장했습니다',
+  'Skill chain': '스킬 체인',
+  'Remove {{skill}}': '{{skill}} 빼기',
+  'No skills chosen': '고른 스킬 없음',
+  'Add a skill': '스킬 추가',
+  'Add a skill…': '스킬 추가…',
+  "Started by the project's policy": '프로젝트 정책이 시작함',
+  "Accepted by the project's policy": '프로젝트 정책이 받아들임',
   Failed: '실패',
   'Failed to delete attachment': '첨부파일을 삭제하지 못했습니다.',
   'Failed to organize': '정리하지 못했습니다.',
@@ -1406,6 +1434,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'What is blocking this?': '무엇이 이 작업을 막고 있나요?',
   'the linked task': '연결된 작업',
   'Low risk': '위험 낮음',
+  'Read-only tools': '읽기 전용 도구',
   'High risk': '위험 높음',
   'Worth a close look': '꼼꼼히 확인 필요',
   'Document change': '문서 변경',

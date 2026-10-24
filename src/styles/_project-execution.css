@@ -78,6 +78,150 @@
   }
 }
 
+/* --- Project autonomy ---------------------------------------------------- */
+.cc-project-autonomy__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cc-project-autonomy__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cc-project-autonomy__choices legend,
+.cc-project-autonomy__label {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cc-project-autonomy__choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  cursor: pointer;
+}
+
+.cc-project-autonomy__choice:has(input:checked) {
+  border-color: var(--cc-primary);
+  background: var(--cc-selected-surface);
+}
+
+.cc-project-autonomy__choice input {
+  margin-top: 3px;
+  accent-color: var(--cc-primary);
+}
+
+.cc-project-autonomy__choice span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-project-autonomy__choice strong {
+  color: var(--cc-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cc-project-autonomy__choice small {
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
+
+.cc-project-autonomy__chain {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cc-project-autonomy__hint {
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-project-autonomy__hint--warning {
+  color: var(--cc-warning);
+}
+
+/* A skill chain: the steps a run applies, in order, and one place to add the next. */
+.cc-skill-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-skill-chain__steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-skill-chain__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cc-skill-chain__step + .cc-skill-chain__step::before {
+  content: '→';
+  margin-right: 2px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-skill-chain__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: var(--cc-radius-pill);
+  background: transparent;
+  color: var(--cc-text-tertiary);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cc-skill-chain__remove:hover {
+  background: var(--cc-hover-surface, var(--cc-border-subtle));
+  color: var(--cc-text);
+}
+
+.cc-skill-chain__empty {
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-skill-chain__add {
+  min-height: 32px;
+  max-width: 220px;
+}
+
 /* Where a project runs -----------------------------------------------------
  *
  * One block per registered machine, because a path means nothing without the
