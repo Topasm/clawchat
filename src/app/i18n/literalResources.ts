@@ -1604,14 +1604,17 @@ export const koreanUiTranslations: Record<string, string> = {
   'AI not connected': 'AI 연결 안 됨',
   'Briefings and chat replies use plain text until an AI provider is set up.':
     'AI 제공자를 설정하기 전까지 브리핑과 채팅 답변은 일반 텍스트로 표시됩니다.',
-  'Update {{server}} to {{version}} so every feature in this app works.':
-    '이 앱의 모든 기능을 쓰려면 {{server}}를 {{version}}(으)로 업데이트하세요.',
-  'Update this app to {{version}} to match {{server}}.':
-    '{{server}}와 맞추려면 이 앱을 {{version}}(으)로 업데이트하세요.',
+  'Update the Home server to {{version}} so every feature in this app works.':
+    '이 앱의 모든 기능을 쓰려면 홈 서버를 {{version}}(으)로 업데이트하세요.',
+  'Update this app to {{version}} to match the Home server.':
+    '홈 서버와 맞추려면 이 앱을 {{version}}(으)로 업데이트하세요.',
   'Install the same release on both so they work together.':
     '함께 동작하도록 양쪽에 같은 릴리스를 설치하세요.',
-  '{{server}} runs {{serverVersion}}; this app is {{appVersion}}.':
-    '{{server}}는 {{serverVersion}}, 이 앱은 {{appVersion}}입니다.',
+  'This app is {{appVersion}}; {{server}} runs {{serverVersion}}.':
+    '이 앱은 {{appVersion}}, {{server}}는 {{serverVersion}}입니다.',
+  'the Home server ({{workspace}})': '홈 서버({{workspace}})',
+  'the Home server': '홈 서버',
+  Connection: '연결',
   'Only on this device · waiting to sync to {{workspace}}':
     '이 기기에만 있음 · {{workspace}}에 동기화 대기 중',
   'Saved on this device': '이 장치에 저장됨',

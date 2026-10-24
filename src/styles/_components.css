@@ -642,6 +642,25 @@
   color: var(--cc-text);
 }
 
+/* The shell's line: flush with the top edge, the way to Connection at the end. */
+.cc-version-notice--banner {
+  justify-content: center;
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.cc-version-notice__link {
+  flex-shrink: 0;
+  color: var(--cc-link, var(--cc-primary));
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cc-version-notice__link:hover {
+  text-decoration: underline;
+}
+
 .cc-ai-setup-banner__text {
   flex: 1;
   min-width: 0;
