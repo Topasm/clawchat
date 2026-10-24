@@ -104,11 +104,22 @@
   font-size: 12px;
 }
 
-/* Needs you / All runs / Review history: one segmented control above the content. */
+/* Needs you / All runs / Review history: one segmented control above the
+   content. The strip sticks to the top of the scrolling page, so the view
+   can be switched from the bottom of a long run log. */
 .cc-attention-views {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  margin: calc(-1 * var(--cc-space-2)) 0 var(--cc-space-2);
+  padding: var(--cc-space-2) 0;
+  background: var(--cc-background);
+}
+
+.cc-attention-views__group {
   display: inline-flex;
   gap: 2px;
-  margin-bottom: var(--cc-space-4);
   padding: 2px;
   border-radius: var(--cc-radius-md);
   background: var(--cc-surface-secondary);
