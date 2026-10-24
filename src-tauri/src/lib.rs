@@ -161,6 +161,8 @@ pub fn run() {
             commands::app::app_open_camera_settings,
             commands::app::app_open_canonical_document,
             commands::app::app_set_workspace_view_mode,
+            commands::app::app_set_language,
+            commands::app::app_set_window_theme,
             commands::app::secure_storage_get,
             commands::app::secure_storage_set,
             commands::app::secure_storage_remove,

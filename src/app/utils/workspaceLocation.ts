@@ -46,20 +46,34 @@ export function workspaceAddressLabel(serverUrl: string | null | undefined): str
 }
 
 export type ItemStorageLocation =
-  | { kind: 'workspace'; workspaceName: string }
+  /** In the private workspace's database on this very device. */
+  | { kind: 'device'; workspaceName: string }
+  /** On a Home server this app is a client of. */
+  | { kind: 'server'; workspaceName: string }
   /** Saved in this browser or app only, waiting to reach the workspace. */
   | { kind: 'pending'; workspaceName: string };
 
 /**
- * A task created while the workspace was unreachable keeps its optimistic
- * `temp-` id until the queued create reaches the server and the list is
- * refetched. Everything else came from the workspace.
+ * Where an item lives. A task created while the workspace was unreachable
+ * keeps its optimistic `temp-` id until the queued create reaches the server
+ * and the list is refetched. Everything else is in the workspace, which is
+ * either this device's own or a Home server elsewhere.
  */
 export function itemStorageLocation(
   item: { id: string },
-  workspaceName: string,
+  workspace: { name: string; kind: WorkspaceProfile['kind'] },
 ): ItemStorageLocation {
-  return item.id.startsWith('temp-')
-    ? { kind: 'pending', workspaceName }
-    : { kind: 'workspace', workspaceName };
+  if (item.id.startsWith('temp-')) return { kind: 'pending', workspaceName: workspace.name };
+  return workspace.kind === 'local'
+    ? { kind: 'device', workspaceName: workspace.name }
+    : { kind: 'server', workspaceName: workspace.name };
+}
+
+/** The open workspace's name and kind, for `itemStorageLocation`. */
+export function activeWorkspace(state: {
+  profiles: WorkspaceProfile[];
+  activeWorkspaceId: string;
+}): { name: string; kind: WorkspaceProfile['kind'] } {
+  const profile = state.profiles.find((item) => item.id === state.activeWorkspaceId);
+  return { name: activeWorkspaceName(state), kind: profile?.kind ?? 'local' };
 }

@@ -73,6 +73,18 @@ logger = logging.getLogger(__name__)
 _CLOSED_TASK_STATUSES = (TaskStatus.COMPLETED, TaskStatus.CANCELLED)
 
 
+_PLAN_INSTRUCTION = {
+    "en": "Plan subtasks for: {title}",
+    "ko": "하위 단계 계획: {title}",
+}
+
+
+def plan_instruction(title: str, language: str = "en") -> str:
+    """The default instruction of a planning run, in the reader's language."""
+    template = _PLAN_INSTRUCTION.get(language, _PLAN_INSTRUCTION["en"])
+    return template.format(title=title)
+
+
 async def generate_proposal(
     db: AsyncSession,
     ai_service,
@@ -81,8 +93,13 @@ async def generate_proposal(
     additional_instructions: str | None = None,
     model_provider: str | None = None,
     proposal_id: str | None = None,
+    language: str = "en",
 ) -> PlanResponse:
-    """Generate one immutable proposal without holding a DB transaction over I/O."""
+    """Generate one immutable proposal without holding a DB transaction over I/O.
+
+    `language` is the reader's (`en` or `ko`): the run's instruction line is
+    shown on run cards, so it is written in it when nothing else was asked.
+    """
     todo = await db.get(Todo, todo_id)
     if todo is None:
         raise NotFoundError("Todo not found")
@@ -98,7 +115,7 @@ async def generate_proposal(
         agent_type="plan",
         task_type="plan_todo",
         todo_id=todo.id,
-        instruction=additional_instructions or f"Plan subtasks for: {todo.title}",
+        instruction=additional_instructions or plan_instruction(todo.title, language),
         status="running",
         skill_chain='["plan"]',
         started_at=datetime.now(timezone.utc),

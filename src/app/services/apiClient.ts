@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig, type Method } from 'axios';
+import { getAppLanguage } from '../i18n';
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
 import { getOfflineQueueScope, offlineQueue } from './offlineQueue';
@@ -55,6 +56,9 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Text the server writes for the reader (the briefing, a run's default
+  // instruction) comes back in the app's language.
+  config.headers['Accept-Language'] = getAppLanguage();
   return config;
 });
 

@@ -41,17 +41,24 @@ describe('isLocalHostMode', () => {
 });
 
 describe('itemStorageLocation', () => {
+  const home = { name: 'Home', kind: 'remote' as const };
+  const device = { name: 'This device', kind: 'local' as const };
+
   it('marks a task created offline as held on this device', () => {
-    expect(itemStorageLocation({ id: 'temp-1700000000000' }, 'Home')).toEqual({
+    expect(itemStorageLocation({ id: 'temp-1700000000000' }, home)).toEqual({
       kind: 'pending',
       workspaceName: 'Home',
     });
   });
 
-  it('names the workspace a synced task is saved to', () => {
-    expect(itemStorageLocation({ id: 'b7c1d6' }, 'Home')).toEqual({
-      kind: 'workspace',
+  it('tells a task on a Home server from one in the workspace on this device', () => {
+    expect(itemStorageLocation({ id: 'b7c1d6' }, home)).toEqual({
+      kind: 'server',
       workspaceName: 'Home',
+    });
+    expect(itemStorageLocation({ id: 'b7c1d6' }, device)).toEqual({
+      kind: 'device',
+      workspaceName: 'This device',
     });
   });
 });

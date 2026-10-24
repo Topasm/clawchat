@@ -160,10 +160,16 @@ describe('StorageLocationBadge', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('names the workspace a synced task is saved to on its detail page', () => {
+  it('says a synced task is on the Home server, by name, on its detail page', () => {
     useRemoteHome();
     render(<StorageLocationBadge item={{ id: 'task-1' }} variant="line" />);
-    expect(screen.getByRole('note')).toHaveTextContent('Saved to Home');
+    expect(screen.getByRole('note')).toHaveTextContent('Saved on the Home server · Home');
+  });
+
+  it('says a task in the private workspace is on this device', () => {
+    render(<StorageLocationBadge item={{ id: 'task-1' }} variant="line" />);
+    expect(screen.getByRole('note')).toHaveTextContent('Saved on this device');
+    expect(screen.getByRole('note')).toHaveClass('cc-storage-line--device');
   });
 
   it('distinguishes the pending line from a saved one', () => {

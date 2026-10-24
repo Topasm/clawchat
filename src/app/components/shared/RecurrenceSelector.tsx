@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { translateUi } from '../../i18n';
+import DateField from './DateField';
 interface RecurrenceSelectorProps {
   value: string | undefined;
   onChange: (rule: string | undefined) => void;
@@ -164,11 +165,11 @@ export default function RecurrenceSelector({ value, onChange }: RecurrenceSelect
           </select>
 
           {endsType === 'on_date' && (
-            <input
-              type="date"
-              className="cc-event-form__input cc-mt-8"
+            <DateField
+              className="cc-date-field--block cc-mt-8"
+              aria-label={translateUi('On date')}
               value={endDate}
-              onChange={(e) => handleEndDateChange(e.target.value)}
+              onChange={handleEndDateChange}
             />
           )}
 

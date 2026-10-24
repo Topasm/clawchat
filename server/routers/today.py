@@ -22,6 +22,7 @@ from services.calendar import event_suggestion_service as suggestions
 from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
+from utils.request_language import request_language
 
 router = APIRouter(tags=["today"])
 
@@ -90,7 +91,13 @@ async def get_briefing(
         if utc_offset_minutes is not None
         else None
     )
-    result = await generate_briefing(db, ai_service, today=client_date, zone=zone)
+    result = await generate_briefing(
+        db,
+        ai_service,
+        today=client_date,
+        zone=zone,
+        language=request_language(request),
+    )
     return {
         "summary": result.get("summary", ""),
         "highlights": result.get("highlights", []),

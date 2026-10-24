@@ -338,23 +338,16 @@
   font-size: 12px;
 }
 
-.cc-flow__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
+/* Prerequisites from other tasks, as tags above the list. */
 .cc-flow__lead {
   display: flex;
-  flex: none;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 4px;
-  max-width: 132px;
 }
 
 .cc-flow__lead button {
   overflow: hidden;
+  max-width: 220px;
   padding: 3px 6px;
   border: 1px dashed var(--cc-border);
   border-radius: var(--cc-radius-sm);
@@ -396,7 +389,7 @@
 
 .cc-flow__pick input {
   box-sizing: border-box;
-  width: 132px;
+  width: 220px;
   padding: 3px 6px;
   border: 1px solid var(--cc-primary);
   border-radius: var(--cc-radius-sm);
@@ -411,51 +404,81 @@
   color: var(--cc-text);
 }
 
-.cc-flow__scroll {
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.cc-flow__canvas {
+/* The checklist: one row per step, top to bottom in running order, joined by
+   a thin rail through the check marks. */
+.cc-flow__list {
   position: relative;
-  min-height: 64px;
+  display: flex;
+  flex-direction: column;
 }
 
-/* A box is two lines: the step, then one word on where it stands. Done is a
-   filled grey box with dim words, the step in progress has a blue edge, a
-   waiting step a thin one. */
+/* A row is a check, the step, and a few grey words on where it stands. Done
+   is dim with a filled check, the step in progress has a blue check, a
+   waiting step says what it waits for in amber. */
 .cc-flow__box {
   position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   box-sizing: border-box;
-  padding: 0 10px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
-  white-space: nowrap;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: var(--cc-radius-row);
+}
+
+/* The rail: from the row's top edge to its bottom through the check, ending
+   at the first and last rows. */
+.cc-flow__box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 14.25px;
+  width: 1.5px;
+  background: var(--cc-connector);
+  pointer-events: none;
+}
+
+.cc-flow__box:first-child::before {
+  top: 50%;
+}
+
+.cc-flow__box:last-child::before {
+  bottom: 50%;
+}
+
+.cc-flow__box:first-child:last-child::before {
+  display: none;
+}
+
+/* A step that runs beside the one above it (a fork) steps in, with an elbow
+   from the rail. */
+.cc-flow__box--branch {
+  margin-left: 20px;
+}
+
+.cc-flow__box--branch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  width: 20px;
+  height: 1.5px;
+  background: var(--cc-connector);
+  pointer-events: none;
 }
 
 .cc-flow__box:hover {
-  border-color: var(--cc-text-tertiary);
+  background: var(--cc-hover-surface);
 }
 
 .cc-flow__box--selected {
-  border-color: var(--cc-primary);
-  box-shadow: 0 0 0 1px var(--cc-primary);
+  background: var(--cc-selected-surface);
 }
 
 .cc-flow__box--drop {
-  border-style: dashed;
-}
-
-.cc-flow__box--done {
-  border-color: transparent;
-  background: var(--cc-surface-secondary);
+  outline: 1px dashed var(--cc-border-strong);
+  outline-offset: -1px;
 }
 
 .cc-flow__box--done .cc-flow__title,
@@ -463,8 +486,8 @@
   color: var(--cc-text-tertiary);
 }
 
-.cc-flow__box--active {
-  border: 1.5px solid var(--cc-primary);
+.cc-flow__box--active .cc-flow__check {
+  border-color: var(--cc-primary);
 }
 
 .cc-flow__box--active .cc-flow__meta {
@@ -476,80 +499,12 @@
   color: var(--cc-warning);
 }
 
-/* The lines of the flow: grey, turning in quarter-circles at a fork or join. */
-.cc-flow__line {
-  position: absolute;
-  height: 0;
-  margin-top: -0.75px;
-  border-top: 1.5px solid var(--cc-connector);
-  pointer-events: none;
-}
-
-.cc-flow__line--down {
-  width: 0;
-  height: auto;
-  margin-top: 0;
-  margin-left: -0.75px;
-  border-top: 0;
-  border-left: 1.5px solid var(--cc-connector);
-}
-
-.cc-flow__turn {
-  position: absolute;
-  box-sizing: border-box;
-  border: 0 solid var(--cc-connector);
-  pointer-events: none;
-}
-
-/* Leaving the row: along the top edge and down the right (or up it). */
-.cc-flow__turn--out-down {
-  margin-top: -0.75px;
-  border-top-width: 1.5px;
-  border-right-width: 1.5px;
-  border-top-right-radius: 100%;
-}
-
-.cc-flow__turn--out-up {
-  margin-top: 0.75px;
-  border-bottom-width: 1.5px;
-  border-right-width: 1.5px;
-  border-bottom-right-radius: 100%;
-}
-
-/* Arriving on the next row: down the left edge and along the bottom (or top). */
-.cc-flow__turn--in-down {
-  margin-top: 0.75px;
-  border-bottom-width: 1.5px;
-  border-left-width: 1.5px;
-  border-bottom-left-radius: 100%;
-}
-
-.cc-flow__turn--in-up {
-  margin-top: -0.75px;
-  border-top-width: 1.5px;
-  border-left-width: 1.5px;
-  border-top-left-radius: 100%;
-}
-
-.cc-flow__arrow {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  margin-top: -3.75px;
-  margin-left: -5px;
-  border-top: 1.5px solid var(--cc-connector);
-  border-right: 1.5px solid var(--cc-connector);
-  transform: rotate(45deg);
-  pointer-events: none;
-}
-
-.cc-flow__box--proposed {
+.cc-flow__box--proposed .cc-flow__check {
   border-style: dashed;
   border-color: var(--cc-primary);
 }
 
 .cc-flow__box--excluded {
-  border-style: dashed;
   opacity: 0.45;
 }
 
@@ -605,13 +560,16 @@
 }
 
 .cc-flow__check {
+  position: relative;
+  z-index: 1;
   flex: none;
+  box-sizing: border-box;
   width: 14px;
   height: 14px;
   padding: 0;
   border: 1.5px solid var(--cc-border-strong);
   border-radius: 50%;
-  background: none;
+  background: var(--cc-background);
   cursor: pointer;
 }
 
@@ -620,10 +578,19 @@
   background: var(--cc-success);
 }
 
+/* A folded group's mark: a plain filled dot, not a button. */
+.cc-flow__check--still {
+  border-color: var(--cc-text-tertiary);
+  background: var(--cc-text-tertiary);
+  cursor: default;
+}
+
 .cc-flow__label {
   display: flex;
   flex: 1;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -634,18 +601,17 @@
 }
 
 .cc-flow__title {
-  overflow: hidden;
+  flex: 1 1 160px;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .cc-flow__meta {
-  overflow: hidden;
+  flex: none;
   color: var(--cc-text-tertiary);
   font-size: 11.5px;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -678,18 +644,24 @@
   cursor: pointer;
 }
 
+/* The next step is typed in a dashed row under the list, in line with the
+   steps' words. */
 .cc-flow__tail {
-  position: absolute;
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  margin-left: 32px;
   border: 1px dashed var(--cc-border-strong);
-  border-radius: var(--cc-radius-md);
+  border-radius: var(--cc-radius-row);
+}
+
+/* With no steps yet there is no rail to line up with. */
+.cc-flow__list:empty + .cc-flow__tail {
+  margin-left: 0;
 }
 
 .cc-flow__tail .cc-flow__input {
-  min-height: 0;
-  height: 100%;
+  min-height: 34px;
   border: 0;
   background: none;
 }
@@ -705,10 +677,8 @@
   font-size: 12px;
 }
 
-.cc-flow__unordered-boxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.cc-flow__unordered .cc-flow__box::before {
+  display: none;
 }
 
 /* -- Task paths and menu ------------------------------------- */
@@ -798,8 +768,14 @@
   flex: none;
 }
 
+/* A 28px square like the pane's other icon buttons, so the ⋮ centres on the
+   same line as whatever stands beside it (the AI segment, a title). */
 .cc-task-menu__trigger {
-  min-width: 32px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
   font-size: 18px;
   line-height: 1;
 }

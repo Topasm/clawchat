@@ -5,6 +5,7 @@ import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
 import { FolderIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import { countLabel } from './adminCounts';
 export default function DataTab() {
   const { data, isLoading } = useAdminDataQuery();
   if (!useAuthStore.getState().serverUrl) {
@@ -24,7 +25,7 @@ export default function DataTab() {
       <div className="cc-admin-stats">
         {data.modules.map((m) => (
           <div key={m.name} className="cc-admin-stat">
-            <div className="cc-admin-stat__label">{m.name}</div>
+            <div className="cc-admin-stat__label">{countLabel(m.name)}</div>
             <div className="cc-admin-stat__value">{m.count.toLocaleString()}</div>
             {m.oldest && (
               <div style={{ fontSize: 11, color: 'var(--cc-text-tertiary)', marginTop: 4 }}>

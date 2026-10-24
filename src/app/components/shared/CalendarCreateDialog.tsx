@@ -3,6 +3,7 @@ import Dialog from './Dialog';
 import RecurrenceSelector from './RecurrenceSelector';
 import { useCreateTodo } from '../../hooks/queries';
 import { translateUi } from '../../i18n';
+import DateField from './DateField';
 
 interface CalendarCreateDialogProps {
   open: boolean;
@@ -96,12 +97,11 @@ export default function CalendarCreateDialog({
           <label className="cc-event-form__label" htmlFor="evt-date">
             {translateUi('Due date')}
           </label>
-          <input
+          <DateField
             id="evt-date"
-            className="cc-event-form__input"
-            type="date"
+            className="cc-date-field--block"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={setDate}
           />
           <span className="cc-event-form__hint">
             {translateUi('Runs from today until this day.')}

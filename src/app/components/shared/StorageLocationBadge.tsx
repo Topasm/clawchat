@@ -1,12 +1,13 @@
 import { translateUi } from '../../i18n';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
-import { activeWorkspaceName, itemStorageLocation } from '../../utils/workspaceLocation';
+import { activeWorkspace, itemStorageLocation } from '../../utils/workspaceLocation';
 
 interface StorageLocationBadgeProps {
   item: { id: string };
   /**
    * `chip` marks only items still held on this device, so lists stay quiet;
-   * `line` always says where the item lives.
+   * `line` always says where the item lives: on this device, or on which
+   * Home server.
    */
   variant?: 'chip' | 'line';
 }
@@ -15,8 +16,10 @@ export default function StorageLocationBadge({
   item,
   variant = 'chip',
 }: StorageLocationBadgeProps) {
-  const workspaceName = useWorkspaceStore(activeWorkspaceName);
-  const location = itemStorageLocation(item, workspaceName);
+  // Two primitive selections, so the store never hands back a fresh object.
+  const name = useWorkspaceStore((state) => activeWorkspace(state).name);
+  const kind = useWorkspaceStore((state) => activeWorkspace(state).kind);
+  const location = itemStorageLocation(item, { name, kind });
   const pendingText = translateUi('Only on this device · waiting to sync to {{workspace}}', {
     workspace: location.workspaceName,
   });
@@ -38,7 +41,11 @@ export default function StorageLocationBadge({
     <div className={`cc-storage-line cc-storage-line--${location.kind}`} role="note">
       {location.kind === 'pending'
         ? pendingText
-        : translateUi('Saved to {{workspace}}', { workspace: location.workspaceName })}
+        : location.kind === 'device'
+          ? translateUi('Saved on this device')
+          : translateUi('Saved on the Home server · {{workspace}}', {
+              workspace: location.workspaceName,
+            })}
     </div>
   );
 }

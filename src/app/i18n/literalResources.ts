@@ -1614,7 +1614,8 @@ export const koreanUiTranslations: Record<string, string> = {
     '{{server}}는 {{serverVersion}}, 이 앱은 {{appVersion}}입니다.',
   'Only on this device · waiting to sync to {{workspace}}':
     '이 기기에만 있음 · {{workspace}}에 동기화 대기 중',
-  'Saved to {{workspace}}': '{{workspace}}에 저장됨',
+  'Saved on this device': '이 장치에 저장됨',
+  'Saved on the Home server · {{workspace}}': '{{workspace}} 홈 서버에 저장됨',
   'Saved on this device. It will sync to {{workspace}} when you are back online.':
     '이 기기에 저장했습니다. 다시 연결되면 {{workspace}}에 동기화됩니다.',
   'To quit, choose Quit ClawChat from the menu-bar icon or press ⌘Q.':
@@ -1769,4 +1770,13 @@ export const koreanUiTranslations: Record<string, string> = {
   'The AI tool is not installed on that machine.': '그 기기에 AI 도구가 설치되어 있지 않습니다.',
   'The run took too long and was stopped.': '너무 오래 걸려서 멈췄습니다.',
   'The result was rejected.': '결과가 거절됐습니다.',
+  Database: '데이터베이스',
+  Sessions: '세션',
+  'Server Config': '서버 구성',
+  'Data Mgmt': '데이터 관리',
+  'Changes requested': '수정 요청',
+  Approved: '승인됨',
+  Rejected: '거부됨',
+  'Set date': '날짜 선택',
+  'after · {{title}}': '{{title}} 다음',
 };

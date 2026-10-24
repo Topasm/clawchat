@@ -113,6 +113,8 @@ export const tauriPlatformApi: NativePlatformApi = {
   },
   appWindow: {
     setWorkspaceViewMode,
+    setLanguage: (language) => invoke<void>(TAURI_COMMANDS.appSetLanguage, { language }),
+    setTheme: (theme) => invoke<void>(TAURI_COMMANDS.appSetWindowTheme, { theme }),
   },
   secureStorage: {
     get: (key) => invoke<string | null>(TAURI_COMMANDS.secureStorageGet, { key }),

@@ -129,6 +129,16 @@
   padding-right: 0;
 }
 
+/* In the rail a dot with no words beside it says nothing, so the worker line
+   and a run merely going (or just done) hide there. A run that needs the user
+   keeps its amber or red dot, and its hover says what it is; the workspace dot
+   is the menu itself and its hover names the workspace and its state. */
+.cc-sidebar--collapsed .cc-worker-status,
+.cc-sidebar--collapsed .cc-active-runs--running,
+.cc-sidebar--collapsed .cc-active-runs--done {
+  display: none;
+}
+
 .cc-sidebar--collapsed .cc-offline-badge {
   display: none;
 }

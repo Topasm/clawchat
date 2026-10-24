@@ -193,9 +193,10 @@ async def test_briefing_route_passes_the_client_day_through(
 
     seen: dict = {}
 
-    async def fake_briefing(_db, _ai, *, today=None, zone=None):
+    async def fake_briefing(_db, _ai, *, today=None, zone=None, language="en"):
         seen["today"] = today
         seen["zone"] = zone
+        seen["language"] = language
         return {"summary": "quiet", "stats": {}, "date": today.isoformat()}
 
     monkeypatch.setattr(today_router, "generate_briefing", fake_briefing)
@@ -207,6 +208,7 @@ async def test_briefing_route_passes_the_client_day_through(
     )
 
     assert response.status_code == 200
+    assert seen["language"] == "en"
     assert response.json()["date"] == "2026-10-24"
     assert seen["today"] == date(2026, 10, 24)
     assert seen["zone"].utcoffset(None) == timedelta(minutes=540)

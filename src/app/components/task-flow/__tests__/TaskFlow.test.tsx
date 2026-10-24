@@ -122,6 +122,29 @@ describe('TaskFlow', () => {
     expect(screen.getByText('Done 1/3')).toBeVisible();
   });
 
+  it('lists steps top to bottom, stepping a fork in and naming what a join waits on', () => {
+    mocks.todos.push(todo('figures', { title: 'Figures', parent_id: 'hw', sort_order: 15 }));
+    mocks.relationships.push(edge('figures', 'read'), edge('submit', 'figures'));
+    renderFlow();
+    const steps = screen.getByRole('list', { name: 'Steps' });
+    const rows = within(steps).getAllByRole('listitem');
+
+    expect(steps).toHaveClass('cc-flow__list');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Read'),
+      expect.stringContaining('Write kernel'),
+      expect.stringContaining('Figures'),
+      expect.stringContaining('Submit'),
+    ]);
+    // Figures runs beside Write kernel, so it steps in and says what it follows;
+    // the row right after what it waits on says nothing more.
+    expect(rows[1]).not.toHaveClass('cc-flow__box--branch');
+    expect(rows[1]).not.toHaveTextContent('after');
+    expect(rows[2]).toHaveClass('cc-flow__box--branch');
+    expect(rows[2]).toHaveTextContent('after · Read');
+    expect(rows[3]).toHaveTextContent('after · Write kernel, Figures');
+  });
+
   it('counts a fork only while both of its steps are live', () => {
     mocks.todos.push(todo('figures', { title: 'Figures', parent_id: 'hw', sort_order: 15 }));
     mocks.relationships.push(edge('figures', 'read'));

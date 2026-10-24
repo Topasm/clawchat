@@ -29,8 +29,13 @@ export function formatMonthDay(dateString: string): string {
   return date.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 }
 
+/** "10월 25일" / "Oct 25" this year; the year is added only when it is another one. */
 export function formatDate(dateString: string): string {
   const date = parseDateString(dateString);
+  if (date.getFullYear() === new Date().getFullYear()) return formatMonthDay(dateString);
+  if (getAppLanguage() === 'ko') {
+    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+  }
   return date.toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',

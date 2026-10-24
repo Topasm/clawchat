@@ -211,6 +211,31 @@ Rules:
 - load_assessment: "light" (0-3 items), "moderate" (4-7), "heavy" (8+)
 - Always respond with valid JSON only"""
 
+_LANGUAGE_RULES = {
+    "en": "- Write summary, highlights, reason and load_message in English",
+    "ko": (
+        "- Write summary, highlights, reason and load_message in Korean "
+        "(한국어, 친근한 존댓말). Keep todo_id and action values as given"
+    ),
+}
+
+_CLEAR_DAY = {
+    "en": (
+        "Your schedule is clear today. No tasks, events, or pending items.",
+        "Nothing on the agenda today.",
+    ),
+    "ko": (
+        "오늘은 일정이 비어 있어요. 할 일도, 이벤트도, 기다리는 항목도 없습니다.",
+        "오늘 예정된 일이 없어요.",
+    ),
+}
+
+
+def briefing_system_prompt(language: str = "en") -> str:
+    """The briefing prompt, asking for prose in the reader's language."""
+    rule = _LANGUAGE_RULES.get(language, _LANGUAGE_RULES["en"])
+    return f"{_BRIEFING_SYSTEM_PROMPT}\n{rule}"
+
 
 async def generate_briefing(
     db: AsyncSession,
@@ -218,10 +243,12 @@ async def generate_briefing(
     *,
     today: date | None = None,
     zone: tzinfo | None = None,
+    language: str = "en",
 ) -> dict:
     """The briefing for ``today`` in ``zone`` (see ``gather_briefing_data``).
 
-    Every result carries ``date``, the calendar day it describes.
+    Every result carries ``date``, the calendar day it describes; its prose is
+    in ``language`` (``en`` or ``ko``).
     """
     data = await gather_briefing_data(db, today=today, zone=zone)
 
@@ -239,12 +266,13 @@ async def generate_briefing(
     # Nothing to brief
     has_items = any(v > 0 for v in stats.values())
     if not has_items:
+        summary, load_message = _CLEAR_DAY.get(language, _CLEAR_DAY["en"])
         return {
-            "summary": "Your schedule is clear today. No tasks, events, or pending items.",
+            "summary": summary,
             "stats": stats,
             "suggestions": [],
             "load_assessment": "light",
-            "load_message": "Nothing on the agenda today.",
+            "load_message": load_message,
             "date": data["date"].isoformat(),
         }
 
@@ -252,7 +280,7 @@ async def generate_briefing(
 
     try:
         raw = await ai_service.generate_completion(
-            system_prompt=_BRIEFING_SYSTEM_PROMPT,
+            system_prompt=briefing_system_prompt(language),
             user_message=prompt_text,
         )
         # Try parsing as JSON for structured response

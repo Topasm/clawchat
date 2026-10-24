@@ -149,7 +149,7 @@ export default function ActiveRunsLine() {
         <button
           type="button"
           className={`cc-connection-status cc-active-runs cc-active-runs--${state.tone}`}
-          title={state.detail ?? undefined}
+          title={[state.label, state.detail].filter(Boolean).join('\n')}
           disabled={state.tone === 'done'}
           onClick={open}
         >

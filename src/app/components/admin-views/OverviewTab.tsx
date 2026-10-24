@@ -6,6 +6,7 @@ import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
 import { PlugIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import { countLabel } from './adminCounts';
 export default function OverviewTab() {
   const { data, isLoading } = useAdminOverviewQuery();
   if (!useAuthStore.getState().serverUrl) {
@@ -63,7 +64,7 @@ export default function OverviewTab() {
         <div className="cc-admin-stats">
           {Object.entries(counts).map(([key, value]) => (
             <div key={key} className="cc-admin-stat">
-              <div className="cc-admin-stat__label">{key.replace(/_/g, ' ')}</div>
+              <div className="cc-admin-stat__label">{countLabel(key)}</div>
               <div className="cc-admin-stat__value">{value.toLocaleString()}</div>
             </div>
           ))}

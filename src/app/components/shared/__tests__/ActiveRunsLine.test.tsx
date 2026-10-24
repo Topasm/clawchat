@@ -60,7 +60,7 @@ describe('ActiveRunsLine', () => {
     mocks.active.mockReturnValue({ data: [run({})] });
     renderLine();
     const line = screen.getByRole('button', { name: '1 running' });
-    expect(line).toHaveAttribute('title', 'Profile the GPU kernel · Home · 3m ago');
+    expect(line).toHaveAttribute('title', '1 running\nProfile the GPU kernel · Home · 3m ago');
     fireEvent.click(line);
     expect(mocks.openRunThread).toHaveBeenCalledWith('run-1', 'Profile the GPU kernel');
   });
