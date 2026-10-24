@@ -7,8 +7,14 @@ import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRu
 import { translateUi } from '../../i18n';
 import { formatShortDateTime } from '../../utils/formatters';
 
-function riskLabel(level: string): string {
+/**
+ * The server's risk level in words. "Read-only tools" is not a degree of
+ * risk but what the run did: nothing it could have changed, yet it looked
+ * things up (web search, a read-only server), so it is named apart from low.
+ */
+export function riskLabel(level: string): string {
   if (level === 'low') return translateUi('Low risk');
+  if (level === 'read_only_tools') return translateUi('Read-only tools');
   if (level === 'high') return translateUi('High risk');
   return translateUi('Worth a close look');
 }

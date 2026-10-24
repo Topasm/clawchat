@@ -212,6 +212,10 @@
   background: color-mix(in srgb, var(--cc-success) 12%, transparent);
   color: var(--cc-success);
 }
+.cc-review-card__risk--read_only_tools {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+}
 .cc-review-card__risk--high {
   background: color-mix(in srgb, var(--cc-error) 12%, transparent);
   color: var(--cc-error);

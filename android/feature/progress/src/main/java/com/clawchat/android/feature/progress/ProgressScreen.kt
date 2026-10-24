@@ -540,7 +540,7 @@ private fun nowActionTone(item: NowItem): ClawTone = when (item.action) {
     NowAction.APPROVE -> when (item.riskLevel) {
         ReviewRiskLevel.HIGH -> ClawTone.Error
         ReviewRiskLevel.MEDIUM -> ClawTone.Warning
-        ReviewRiskLevel.LOW, null -> ClawTone.Primary
+        ReviewRiskLevel.LOW, ReviewRiskLevel.READ_ONLY_TOOLS, null -> ClawTone.Primary
     }
     NowAction.FILE -> ClawTone.Default
     NowAction.RETRY -> ClawTone.Error

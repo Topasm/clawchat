@@ -9306,6 +9306,7 @@
       "ReviewRiskLevel": {
         "enum": [
           "low",
+          "read_only_tools",
           "medium",
           "high"
         ],

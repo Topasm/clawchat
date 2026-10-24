@@ -59,6 +59,7 @@
     <string name="push_run_step">Step %1$d of %2$d</string>
     <string name="push_run_tap_to_answer">%1$s · Tap to answer</string>
     <string name="push_run_risk_low">Low risk · No file changes</string>
+    <string name="push_run_risk_read_only_tools">Read-only tools · Open to check</string>
     <string name="push_run_risk_medium">Medium risk · Open to check</string>
     <string name="push_run_risk_high">High risk · Open to check</string>
     <string name="push_run_risk_unknown">Open to check</string>
