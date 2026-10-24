@@ -17,6 +17,7 @@ fn main() {
         "app_open_canonical_document",
         "app_set_workspace_view_mode",
         "app_set_language",
+        "app_set_window_theme",
         "secure_storage_get",
         "secure_storage_set",
         "secure_storage_remove",

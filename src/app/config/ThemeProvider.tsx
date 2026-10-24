@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { ThemeContext, type ThemeMode } from './ThemeContext';
 import { lightColors, darkColors } from './theme';
+import { platformApi } from '../platform';
 
 const THEME_STORAGE_KEY = 'clawchat-theme-mode';
 
@@ -59,6 +60,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     applyDocumentTheme(isDark);
+    // The desktop's window frame follows the page, not the system. Test
+    // doubles of the platform may carry no window API at all.
+    void platformApi.appWindow?.setTheme(isDark ? 'dark' : 'light').catch(() => undefined);
   }, [isDark]);
 
   const value = useMemo(

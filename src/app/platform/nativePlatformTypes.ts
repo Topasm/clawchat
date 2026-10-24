@@ -196,6 +196,8 @@ export interface NativeAppWindowApi {
   setWorkspaceViewMode: (mode: WorkspaceViewMode) => Promise<void>;
   /** Put the native menu bar and tray in the renderer's language (`en` / `ko`). */
   setLanguage: (language: string) => Promise<void>;
+  /** Give the window frame the theme the page resolved to. */
+  setTheme: (theme: 'light' | 'dark') => Promise<void>;
 }
 
 export interface NativePlatformApi {

@@ -147,8 +147,9 @@ mod tests {
             Label::StopServer,
             Label::RestartServer,
         ] {
-            assert!(!text(Language::English, label).is_empty());
-            assert_ne!(text(Language::English, label), text(Language::Korean, label));
+            let english = text(Language::English, label);
+            assert!(!english.is_empty());
+            assert_ne!(english, text(Language::Korean, label));
         }
     }
 }

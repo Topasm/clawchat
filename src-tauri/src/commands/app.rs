@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, Runtime, State};
+use tauri::{window::Color, AppHandle, Emitter, LogicalSize, Manager, Runtime, State, Theme};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Notify;
@@ -138,6 +138,26 @@ pub fn app_set_badge_count<R: Runtime>(app: AppHandle<R>, count: u32) -> Result<
 #[tauri::command]
 pub fn app_set_language(app: AppHandle, language: String) -> Result<(), String> {
     crate::native::set_language(&app, &language)
+}
+
+/// The window frame follows the theme the renderer resolved, so a light app
+/// does not sit under a dark title bar when the system is dark (or the other
+/// way round). The window background between paints matches the page's.
+#[tauri::command]
+pub fn app_set_window_theme<R: Runtime>(app: AppHandle<R>, theme: String) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window is not available".to_owned())?;
+    let (theme, background) = match theme.as_str() {
+        "dark" => (Theme::Dark, Color(0x1E, 0x1E, 0x20, 0xFF)),
+        _ => (Theme::Light, Color(0xFF, 0xFF, 0xFF, 0xFF)),
+    };
+    window
+        .set_theme(Some(theme))
+        .map_err(|error| format!("failed to set the window theme: {error}"))?;
+    window
+        .set_background_color(Some(background))
+        .map_err(|error| format!("failed to paint the window: {error}"))
 }
 
 #[tauri::command]

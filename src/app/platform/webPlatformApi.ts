@@ -49,6 +49,7 @@ export const webPlatformApi: NativePlatformApi = {
   appWindow: {
     setWorkspaceViewMode: async () => {},
     setLanguage: async () => {},
+    setTheme: async () => {},
   },
   // A browser has no machine to run work on.
   worker: null,

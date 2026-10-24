@@ -21,4 +21,10 @@ describe('Tauri workspace window mode', () => {
       expect(invoke).toHaveBeenCalledWith(TAURI_COMMANDS.appSetWorkspaceViewMode, { mode });
     },
   );
+
+  it.each(['light', 'dark'] as const)('hands the %s theme to the window frame', async (theme) => {
+    await tauriPlatformApi.appWindow.setTheme(theme);
+
+    expect(invoke).toHaveBeenCalledWith(TAURI_COMMANDS.appSetWindowTheme, { theme });
+  });
 });
