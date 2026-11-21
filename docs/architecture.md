@@ -320,8 +320,10 @@ review history (`/review`) remain as the full record behind it.
 ### Orca execution provider
 
 Projects can select `orca` as their default execution provider and bind a
-repository path on the ClawChat server's machine, where the user runs
-`orca-ide serve`. For each run, ClawChat:
+repository path on the ClawChat server's machine. By default the server
+starts and supervises its own `orca-ide serve` there, in a private profile
+that keeps Orca's hooks and worktrees out of the user's home
+(`ORCA_MANAGE_RUNTIME=false` uses one the user runs). For each run, ClawChat:
 
 1. creates an Orca worktree, or uses the folder itself with local isolation;
 2. opens a chat with `ORCA_AGENT` and persists the chat id;
@@ -336,8 +338,11 @@ repository path on the ClawChat server's machine, where the user runs
 
 Orca owns agent credentials, the CLI and its sandbox, and the worktrees.
 ClawChat owns the AgentTask/AgentRun state machine, output Artifact,
-ReviewItem, adoption, and linked Todo completion. Active Orca runs survive a
-ClawChat restart: startup skips built-in interruption reconciliation for
-reattachable chat IDs and launches fresh monitors. See
+ReviewItem, adoption, and linked Todo completion. On startup, monitors are
+reattached to executing Orca runs, skipping built-in interruption
+reconciliation for their chat IDs. A run survives a ClawChat restart only
+when Orca kept running. That holds for an Orca the user runs. ClawChat's own
+Orca stops with the server and keeps no chats across a restart, so such a run
+fails and can be retried. See
 [ADR 020](./adr/020-orca-execution-provider.md); it replaced the earlier Paseo
 provider ([ADR 010](./adr/010-paseo-execution-provider.md)).

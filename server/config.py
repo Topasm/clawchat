@@ -217,17 +217,26 @@ class Settings(BaseSettings):
     opencode_startup_timeout_seconds: float = 30.0
     opencode_run_timeout_seconds: float = 3600.0
 
-    # Optional Orca execution backend: an `orca-ide serve` the user runs on
-    # this machine (ClawChat never starts it). Each run gets its own Orca
-    # worktree (or the project folder itself) and one Orca chat with
-    # `orca_agent`. Empty model picks the CLI's cheap tier (CODEX_CLI_MODEL,
-    # CLAUDE_CODE_MODEL). Permission mode "ask" runs the agent read-only and
-    # sends every escalation to the user; "auto" lets it write inside the
-    # workspace and has the agent's own reviewer judge escalations. Orca's
-    # "full-access" is never used. Empty user data path is Orca's default.
+    # Optional Orca execution backend. Each run gets its own Orca worktree (or
+    # the project folder itself) and one Orca chat with `orca_agent`. Empty
+    # model picks the CLI's cheap tier (CODEX_CLI_MODEL, CLAUDE_CODE_MODEL).
+    # Permission mode "ask" runs the agent read-only and sends every
+    # escalation to the user; "auto" lets it write inside the workspace and
+    # has the agent's own reviewer judge escalations. Orca's "full-access" is
+    # never used.
+    # With manage_runtime on, the server starts and watches its own
+    # `orca-ide serve` (127.0.0.1, pairing off) in a private profile: empty
+    # user data path means `orca` next to the uploads folder, Orca's agent
+    # hooks are turned off there before it first starts, and worktrees stay
+    # inside it. Off connects to an `orca-ide serve` you run yourself, and an
+    # empty user data path is then Orca's own default profile. Runtime port 0
+    # picks a free port on each start.
     orca_enabled: bool = False
+    orca_manage_runtime: bool = True
     orca_cli_command: str = "orca-ide"
     orca_user_data_path: str = ""
+    orca_runtime_port: int = 0
+    orca_startup_timeout_seconds: float = 60.0
     orca_agent: str = "codex"
     orca_model: str = ""
     orca_permission_mode: str = "auto"

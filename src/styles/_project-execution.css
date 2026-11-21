@@ -62,6 +62,16 @@
   white-space: nowrap;
 }
 
+.cc-project-execution-form__folder {
+  display: flex;
+  gap: 8px;
+}
+
+.cc-project-execution-form__folder input {
+  flex: 1;
+  min-width: 0;
+}
+
 .cc-project-execution-form__note,
 .cc-project-execution-form__advanced {
   grid-column: 1 / -1;

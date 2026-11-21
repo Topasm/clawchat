@@ -338,4 +338,54 @@ describe('ProjectWorkspacePage', () => {
     expect(screen.getByText('No repositories in Orca yet')).toBeInTheDocument();
     expect(screen.getByText(/orca-ide repo add --path/)).toBeInTheDocument();
   });
+
+  it("takes a folder for ClawChat's own Orca, which starts with no repositories", () => {
+    project.default_execution_provider = 'orca';
+    mocks.providers = [
+      {
+        id: 'orca',
+        label: 'Orca',
+        enabled: true,
+        available: true,
+        connected: true,
+        host: 'local',
+        providers: [],
+        managed: true,
+        runtime_state: 'running',
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+
+    expect(screen.getByText(/connected · started by ClawChat/)).toBeInTheDocument();
+    expect(screen.queryByText(/orca-ide repo add --path/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Or a folder on this machine'), {
+      target: { value: ' /home/me/clawchat ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Use folder' }));
+    expect(mocks.chooseRepo).toHaveBeenCalledWith('/home/me/clawchat');
+  });
+
+  it("says ClawChat's Orca is starting rather than offline", () => {
+    project.default_execution_provider = 'orca';
+    mocks.providers = [
+      {
+        id: 'orca',
+        label: 'Orca',
+        enabled: true,
+        available: true,
+        connected: false,
+        providers: [],
+        managed: true,
+        runtime_state: 'restarting',
+        error:
+          "ClawChat's Orca is not running: Orca exited with code 1: Orca serve exited via SIGKILL.",
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+
+    expect(screen.getByText(/starting…/)).toBeInTheDocument();
+    expect(screen.getByText(/Orca serve exited via SIGKILL/)).toBeInTheDocument();
+  });
 });

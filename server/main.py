@@ -100,7 +100,14 @@ async def lifespan(app: FastAPI):
 
     from services.agents import orca_execution_service
 
-    app.state.orca_adapter = orca_execution_service.adapter_from_settings()
+    # With ORCA_MANAGE_RUNTIME, ClawChat runs its own `orca-ide serve`. It
+    # starts in the background: the health endpoint must not wait for Orca,
+    # and monitors reattached below wait out its first seconds on the grace
+    # period.
+    app.state.orca_runtime = orca_execution_service.supervisor_from_settings()
+    if app.state.orca_runtime is not None:
+        app.state.orca_runtime.start()
+    app.state.orca_adapter = orca_execution_service.adapter_from_settings(app.state.orca_runtime)
 
     claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
@@ -249,6 +256,12 @@ async def lifespan(app: FastAPI):
 
     await ai_service.close()
     await codex_api.close()
+
+    # Orca stops last: it was started by this server and dies with it. Orca
+    # keeps no chats across a restart, so a run still executing fails once the
+    # server is back and can be retried (ADR 020).
+    if app.state.orca_runtime is not None:
+        await app.state.orca_runtime.stop()
 
 
 # The API description is a map of every endpoint. Development keeps it at

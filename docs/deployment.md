@@ -130,9 +130,12 @@ is not included in the Docker image.
 | `CODEX_REASONING_EFFORT` | `medium` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh` |
 | `CODEX_CLI_MODEL` | `gpt-6-luna` | Codex CLI model; empty uses the CLI config default |
 | `CLAUDE_CODE_MODEL` | `sonnet` | Model alias passed to `claude --model`; empty uses the CLI default |
-| `ORCA_ENABLED` | `false` | Enable the optional Orca execution adapter (an `orca-ide serve` you run on this machine) |
+| `ORCA_ENABLED` | `false` | Enable the optional Orca execution adapter |
+| `ORCA_MANAGE_RUNTIME` | `true` | ClawChat starts, restarts and stops its own `orca-ide serve` (127.0.0.1, pairing off) in a private profile, with Orca's agent hooks off and worktrees kept inside the profile; `false` connects to an `orca-ide serve` you run yourself |
 | `ORCA_CLI_COMMAND` | `orca-ide` | Orca CLI command available to the server process (never bare `orca` on Linux: that is the screen reader) |
-| `ORCA_USER_DATA_PATH` | *(empty)* | Orca profile directory; empty uses Orca's default |
+| `ORCA_USER_DATA_PATH` | *(empty)* | Orca profile directory; empty is `orca` next to `UPLOAD_DIR` when managed, Orca's own default when not |
+| `ORCA_RUNTIME_PORT` | `0` | Port for ClawChat's Orca (bound to 127.0.0.1); `0` picks a free port on each start |
+| `ORCA_STARTUP_TIMEOUT_SECONDS` | `60` | How long ClawChat's Orca may take to become ready before it is restarted |
 | `ORCA_AGENT` | `codex` | Orca agent id each run's chat uses (`orca-ide agent installed` lists them) |
 | `ORCA_MODEL` | *(empty)* | Model for that agent; empty picks the CLI's cheap tier |
 | `ORCA_PERMISSION_MODE` | `auto` | `auto` (workspace writes, agent's reviewer judges escalations) or `ask` (read-only, every escalation waits for you) |
@@ -162,7 +165,9 @@ AI_MODEL=llama3.2
 ENABLE_SCHEDULER=true
 BRIEFING_TIME=08:00
 
-# Optional coding-agent execution through Orca running on this machine
+# Optional coding-agent execution through Orca on this machine. ClawChat starts
+# and supervises its own `orca-ide serve`; set ORCA_MANAGE_RUNTIME=false to use
+# one you run yourself.
 # ORCA_ENABLED=true
 # ORCA_CLI_COMMAND=/opt/orca-server/bin/orca-ide
 

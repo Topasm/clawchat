@@ -12,6 +12,11 @@ the canonical payload, which Orca checks before acting.
 
 That socket is Orca's internal protocol, not a published API, so everything
 that touches it lives here and fails as ``OrcaError`` with a code.
+
+When ClawChat runs Orca itself (``execution/orca_runtime.py``), the profile is
+private to ClawChat, and every repository registered in it is told to keep its
+worktrees inside the profile and to leave agent trust to the agent, so Orca
+writes neither ``~/orca/workspaces`` nor ``~/.codex/config.toml``.
 """
 
 from __future__ import annotations
@@ -27,7 +32,12 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from execution.orca_runtime import orca_environment
+
+if TYPE_CHECKING:
+    from execution.orca_runtime import OrcaRuntimeSupervisor
 
 #: The modes ClawChat may ask for. Orca's "full-access" (no sandbox, no
 #: approvals) and "own" (whatever the CLI's config says) are refused.
@@ -35,6 +45,8 @@ ALLOWED_PERMISSION_MODES = ("ask", "auto")
 #: Terminal states Orca reports for a chat's latest turn.
 WORKING_STATES = frozenset({"working", "waiting"})
 SETTLED_STATES = frozenset({"done", "idle"})
+#: Inside a private profile: where each repository's worktrees go.
+PROFILE_WORKSPACES = "workspaces"
 
 
 class OrcaError(RuntimeError):
@@ -157,6 +169,8 @@ class OrcaAdapter:
         user_data_path: str = "",
         enabled: bool = False,
         command_timeout_seconds: float = 30,
+        supervisor: OrcaRuntimeSupervisor | None = None,
+        private_profile: bool = False,
     ) -> None:
         argv = shlex.split(command)
         if not argv:
@@ -165,6 +179,10 @@ class OrcaAdapter:
         self.user_data_path = user_data_path.strip()
         self.enabled = enabled
         self.command_timeout_seconds = command_timeout_seconds
+        #: Set when ClawChat starts and watches this Orca itself.
+        self.supervisor = supervisor
+        #: The profile is ClawChat's alone, so its repositories may be changed.
+        self.private_profile = private_profile
 
     # -- plumbing ---------------------------------------------------------
 
@@ -180,14 +198,25 @@ class OrcaAdapter:
     def _profile(self) -> Path:
         return Path(self.user_data_path).expanduser() if self.user_data_path else default_user_data_path()
 
+    @property
+    def managed(self) -> bool:
+        return self.supervisor is not None
+
+    @property
+    def workspaces_root(self) -> Path:
+        """Where a private profile keeps every repository's worktrees."""
+        return self._profile() / PROFILE_WORKSPACES
+
     def _env(self) -> dict[str, str]:
-        env = os.environ.copy()
-        if self.user_data_path:
-            env["ORCA_USER_DATA_PATH"] = str(self._profile())
-        # Orca's own opt-outs; ClawChat sends nothing anywhere on its behalf.
-        env["ORCA_TELEMETRY_DISABLED"] = "1"
-        env["DO_NOT_TRACK"] = "1"
-        return env
+        return orca_environment(self._profile() if self.user_data_path else None)
+
+    def _not_running_message(self) -> str:
+        if self.supervisor is None:
+            return f"Orca is not running for {self._profile()} (start `orca-ide serve`)"
+        reason = self.supervisor.error
+        if self.supervisor.state in ("starting", "restarting") and not reason:
+            return "ClawChat is starting Orca"
+        return f"ClawChat's Orca is not running: {reason or self.supervisor.state}"
 
     def _require_enabled(self) -> None:
         if not self.enabled:
@@ -243,10 +272,7 @@ class OrcaAdapter:
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise OrcaError(
-                "ORCA_NOT_RUNNING",
-                f"Orca is not running for {self._profile()} (start `orca-ide serve`)",
-            ) from exc
+            raise OrcaError("ORCA_NOT_RUNNING", self._not_running_message()) from exc
         socket_path = next(
             (
                 str(transport.get("endpoint"))
@@ -330,6 +356,8 @@ class OrcaAdapter:
             "host": self.host_label,
             "error": None,
             "providers": [],
+            "managed": self.managed,
+            "runtime_state": self.supervisor.state if self.supervisor is not None else None,
         }
         if not self.enabled:
             status["error"] = "Orca execution is disabled"
@@ -337,11 +365,14 @@ class OrcaAdapter:
         if not status["available"]:
             status["error"] = f"Orca CLI executable was not found: {self.command[0]}"
             return status
+        if self.supervisor is not None and not self.supervisor.ready:
+            status["error"] = self._not_running_message()
+            return status
         try:
             result = await self._cli("status", timeout=10)
             runtime = (result or {}).get("runtime") or {}
             if not runtime.get("reachable"):
-                status["error"] = "Orca is not running (start `orca-ide serve`)"
+                status["error"] = self._not_running_message()
                 return status
             status["connected"] = True
             status["providers"] = await self.list_agents()
@@ -374,14 +405,40 @@ class OrcaAdapter:
         return listed
 
     async def ensure_repo(self, path: str) -> None:
-        """Register the project folder with Orca unless it already is."""
+        """Register the project folder with Orca unless it already is.
+
+        In ClawChat's private profile the repository is also told to keep its
+        worktrees inside the profile and to let the agent ask about trust
+        rather than have Orca pre-trust each worktree in the agent's global
+        config. Without both, a run would write ``~/orca/workspaces`` and
+        ``~/.codex/config.toml``, so a refusal fails the run.
+        """
         try:
             await self._cli("repo", "show", "--repo", f"path:{path}")
-            return
         except OrcaError as exc:
             if exc.code in ("ORCA_DISABLED", "ORCA_CLI_NOT_FOUND", "ORCA_START_FAILED", "ORCA_TIMEOUT"):
                 raise
-        await self._cli("repo", "add", "--path", path)
+            await self._cli("repo", "add", "--path", path)
+        if self.private_profile:
+            await self.keep_repo_in_profile(path)
+
+    async def keep_repo_in_profile(self, path: str) -> None:
+        """Point the repository's worktrees into the profile; no pre-trust."""
+        updates = {"worktreeBasePath": str(self.workspaces_root), "agentWorkspaceTrust": "agent-asks"}
+        try:
+            result = await self._rpc("repo.update", {"repo": f"path:{path}", "updates": updates})
+        except OrcaError as exc:
+            raise OrcaError(
+                "ORCA_REPO_NOT_PRIVATE",
+                f"Orca would not keep {path}'s worktrees inside ClawChat's profile: {exc.message}",
+                exc.details,
+            ) from exc
+        repo = (result or {}).get("repo") if isinstance(result, dict) else None
+        if isinstance(repo, dict) and repo.get("worktreeBasePath") not in (None, updates["worktreeBasePath"]):
+            raise OrcaError(
+                "ORCA_REPO_NOT_PRIVATE",
+                f"Orca kept {path}'s worktrees at {repo.get('worktreeBasePath')}",
+            )
 
     async def create_worktree(
         self,

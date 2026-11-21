@@ -486,6 +486,14 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
   const chooseRepo = useChooseOrcaRepository(project.id);
   const repoPath = project.execution_workspace_path ?? '';
   const repoListed = orcaRepos.some((repo) => repo.path === repoPath);
+  // ClawChat's own Orca starts with no repositories: a folder joins it on its first run.
+  const [folder, setFolder] = useState('');
+  const chooseFolder = () => {
+    if (folder.trim()) chooseRepo.mutate(folder.trim());
+  };
+  const externalStarting =
+    !!external?.managed &&
+    (external.runtime_state === 'starting' || external.runtime_state === 'restarting');
   const save = (event: React.FormEvent) => {
     event.preventDefault();
     updateProject.mutate({
@@ -516,8 +524,12 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
               {isLoading
                 ? translateUi('checking\u2026')
                 : external?.connected
-                  ? translateUi('connected · {{host}}', { host: external.host ?? '' })
-                  : translateUi('offline')}
+                  ? external.managed
+                    ? translateUi('connected · started by ClawChat')
+                    : translateUi('connected · {{host}}', { host: external.host ?? '' })
+                  : externalStarting
+                    ? translateUi('starting…')
+                    : translateUi('offline')}
             </span>
             <button
               type="button"
@@ -582,12 +594,39 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
                   {repoPath}
                 </small>
               )}
-              {orca?.connected && orcaRepos.length === 0 && (
+              {orca?.connected && orcaRepos.length === 0 && !orca.managed && (
                 <small className="cc-project-execution-form__hint">
                   {translateUi('Add one in Orca first (orca-ide repo add --path <folder>).')}
                 </small>
               )}
             </label>
+            {orca?.managed && (
+              <label>
+                <span>{translateUi('Or a folder on this machine')}</span>
+                <span className="cc-project-execution-form__folder">
+                  <input
+                    value={folder}
+                    onChange={(event) => setFolder(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        chooseFolder();
+                      }
+                    }}
+                    placeholder={translateUi('Folder path')}
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--ghost"
+                    disabled={!folder.trim() || chooseRepo.isPending}
+                    onClick={chooseFolder}
+                  >
+                    {translateUi('Use folder')}
+                  </button>
+                </span>
+              </label>
+            )}
             <label>
               <span>{translateUi('Each task works in')}</span>
               <select
