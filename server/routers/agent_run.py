@@ -285,22 +285,9 @@ async def cancel_run(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    persisted = await agent_run_service.require_run(db, run_id)
     run = await agent_run_service.cancel_run(db, run_id)
-    external_cancel_error = None
-    if persisted.provider == "orca":
-        external_cancel_error = await orca_execution_service.cancel_external_run(
-            persisted, adapter=_orca_adapter(request)
-        )
-    if external_cancel_error:
-        await agent_run_service.record_event(
-            db,
-            run,
-            "external_cancel_unconfirmed",
-            external_cancel_error,
-            progress=run.progress,
-        )
-        await db.commit()
+    if run.provider == "orca":
+        await orca_execution_service.stop_cancelled_run(db, run, adapter=_orca_adapter(request))
     await notify_module_data_changed("runs")
     return await agent_run_service.build_run_response(db, run)
 

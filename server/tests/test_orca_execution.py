@@ -60,6 +60,7 @@ class FakeOrcaAdapter:
         self.launch_chat = AsyncMock(return_value=SESSION)
         self.cancel = AsyncMock()
         self.respond = AsyncMock()
+        self.remove_worktree = AsyncMock()
 
     async def set_permission_mode(self, session_id, mode):
         self.calls.append(f"mode:{mode}")
@@ -751,6 +752,150 @@ async def test_the_project_folder_itself_is_never_committed_or_removed(db_sessio
 
     remover.remove_worktree.assert_not_awaited()
     assert (folder / "calc.py").read_text() == "changed\n"
+
+
+# -- runs that end without review ------------------------------------------
+
+
+async def _run_in_worktree(db_session, tmp_path, *, status="running"):
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    _project, _todo, task, run = await _project_run(db_session, tmp_path, status=status, session=SESSION)
+    metadata = json.loads(run.usage_json)
+    metadata.update(cwd=str(worktree), worktree_id="repo-1::wt", branch="refs/heads/clawchat/fix-add-1")
+    run.workspace_id = str(worktree)
+    run.usage_json = json.dumps(metadata)
+    await db_session.commit()
+    return task, run.id, worktree
+
+
+async def _metadata_of(db_session, run_id):
+    db_session.expire_all()
+    return json.loads((await db_session.get(AgentRun, run_id)).usage_json)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_run_drops_its_worktree_and_keeps_what_it_changed(db_session, tmp_path):
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    _project, _todo, _task, run = await _project_run(db_session, tmp_path)
+    run_id = run.id
+    adapter = FakeOrcaAdapter(states=("error",))
+    adapter.create_worktree = AsyncMock(
+        return_value=OrcaWorktree(id="repo-1::wt", path=str(worktree), branch="refs/heads/clawchat/fix-add-1")
+    )
+
+    await orca_execution_service.execute_run(_factory(db_session), run_id, adapter=adapter, poll_interval=0.001)
+
+    metadata = await _metadata_of(db_session, run_id)
+    assert (await db_session.get(AgentRun, run_id)).status == "failed"
+    adapter.remove_worktree.assert_awaited_once_with(str(worktree), delete_branch=True)
+    assert metadata["workspace_removed"] is True
+    # A retry starts a new worktree, so the record is all that is left of this one.
+    assert "+    return a + b" in metadata["patch"]
+    removed = next(e for e in await _events(db_session, run_id) if e.event_type == "workspace_removed")
+    assert removed.message == "Removed the failed run's worktree and branch clawchat/fix-add-1"
+
+
+@pytest.mark.asyncio
+async def test_cancelling_a_run_stops_orca_and_drops_its_worktree(client, auth_headers, db_session, tmp_path):
+    _task, run_id, worktree = await _run_in_worktree(db_session, tmp_path)
+    adapter = FakeOrcaAdapter()
+    with _AppState(orca_adapter=adapter):
+        response = await client.post(f"/api/runs/{run_id}/cancel", headers=auth_headers)
+    assert response.status_code == 200, response.text
+    adapter.cancel.assert_awaited_once_with(SESSION)
+    adapter.remove_worktree.assert_awaited_once_with(str(worktree), delete_branch=True)
+    assert (await _metadata_of(db_session, run_id))["workspace_removed"] is True
+
+
+@pytest.mark.asyncio
+async def test_cancelling_the_task_drops_the_run_worktree_too(client, auth_headers, db_session, tmp_path):
+    task, run_id, worktree = await _run_in_worktree(db_session, tmp_path)
+    adapter = FakeOrcaAdapter()
+    with _AppState(orca_adapter=adapter):
+        response = await client.post(f"/api/tasks/{task.id}/cancel", headers=auth_headers)
+    assert response.status_code == 200, response.text
+    adapter.cancel.assert_awaited_once_with(SESSION)
+    adapter.remove_worktree.assert_awaited_once_with(str(worktree), delete_branch=True)
+
+
+@pytest.mark.asyncio
+async def test_a_worktree_orca_could_not_remove_is_retried_later(client, auth_headers, db_session, tmp_path):
+    _task, run_id, worktree = await _run_in_worktree(db_session, tmp_path)
+    down = FakeOrcaAdapter()
+    down.cancel = AsyncMock(side_effect=OrcaError("ORCA_NOT_RUNNING", "Orca is not running"))
+    down.remove_worktree = AsyncMock(side_effect=OrcaError("ORCA_NOT_RUNNING", "Orca is not running"))
+    with _AppState(orca_adapter=down):
+        response = await client.post(f"/api/runs/{run_id}/cancel", headers=auth_headers)
+    assert response.status_code == 200, response.text
+    metadata = await _metadata_of(db_session, run_id)
+    assert metadata["cleanup_pending"] is True
+    kinds = {e.event_type for e in await _events(db_session, run_id)}
+    assert {"external_cancel_unconfirmed", "workspace_cleanup_failed"} <= kinds
+
+    up = FakeOrcaAdapter()
+    assert await orca_execution_service.sweep_pending_cleanups(_factory(db_session), adapter=up) == 1
+    up.remove_worktree.assert_awaited_once_with(str(worktree), delete_branch=True)
+    metadata = await _metadata_of(db_session, run_id)
+    assert metadata["workspace_removed"] is True
+    assert "cleanup_pending" not in metadata
+    # Nothing is left for the next sweep.
+    assert await orca_execution_service.sweep_pending_cleanups(_factory(db_session), adapter=up) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_run_the_watchdog_failed_is_cleaned_up_by_the_sweep(db_session, tmp_path):
+    # The watchdog fails a run whose monitor is gone without talking to Orca.
+    _task, run_id, worktree = await _run_in_worktree(db_session, tmp_path, status="failed")
+    up = FakeOrcaAdapter()
+    assert await orca_execution_service.sweep_pending_cleanups(_factory(db_session), adapter=up) == 1
+    up.remove_worktree.assert_awaited_once_with(str(worktree), delete_branch=True)
+    assert (await _metadata_of(db_session, run_id))["workspace_removed"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_leaves_live_and_local_runs_alone(db_session, tmp_path):
+    _task, run_id, _worktree = await _run_in_worktree(db_session, tmp_path, status="running")
+    up = FakeOrcaAdapter()
+    assert await orca_execution_service.sweep_pending_cleanups(_factory(db_session), adapter=up) == 0
+    run = await db_session.get(AgentRun, run_id)
+    metadata = json.loads(run.usage_json)
+    metadata["worktree_id"] = None
+    run.usage_json = json.dumps(metadata)
+    run.status = "failed"
+    await db_session.commit()
+    assert await orca_execution_service.sweep_pending_cleanups(_factory(db_session), adapter=up) == 0
+    up.remove_worktree.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_folder_already_gone_is_not_retried(db_session, tmp_path):
+    _task, run_id, worktree = await _run_in_worktree(db_session, tmp_path, status="failed")
+    worktree.rmdir()
+    gone = FakeOrcaAdapter()
+    gone.remove_worktree = AsyncMock(side_effect=OrcaError("worktree_not_found", "no such worktree"))
+    run = await db_session.get(AgentRun, run_id)
+    assert await orca_execution_service.discard_workspace(db_session, run=run, adapter=gone, reason="failed")
+    await db_session.commit()
+    metadata = await _metadata_of(db_session, run_id)
+    assert metadata["workspace_removed"] is True
+    assert "cleanup_pending" not in metadata
+
+
+@pytest.mark.asyncio
+async def test_a_new_worktree_run_first_retries_leftover_cleanups(db_session, tmp_path, monkeypatch):
+    _project, _todo, _task, run = await _project_run(db_session, tmp_path)
+    swept = []
+
+    async def sweep(_factory, *, adapter):
+        swept.append(adapter)
+        return 0
+
+    monkeypatch.setattr(orca_execution_service, "sweep_pending_cleanups", sweep)
+    adapter = FakeOrcaAdapter()
+    await orca_execution_service.execute_run(_factory(db_session), run.id, adapter=adapter, poll_interval=0.001)
+    assert swept == [adapter]
 
 
 # -- picking a repository ----------------------------------------------------

@@ -329,7 +329,10 @@ repository path on the ClawChat server's machine, where the user runs
    `full-access`) and sends the instruction;
 4. polls the chat into heartbeats. An approval the agent stops for becomes
    `waiting_input`, answered from the run card;
-5. turns the working-tree diff into the patch under review.
+5. turns the working-tree diff into the patch under review;
+6. commits an approved worktree on its branch. A rejected, failed or
+   cancelled run's worktree and branch are removed, and the patch stays on
+   the run.
 
 Orca owns agent credentials, the CLI and its sandbox, and the worktrees.
 ClawChat owns the AgentTask/AgentRun state machine, output Artifact,

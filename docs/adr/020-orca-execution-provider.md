@@ -90,8 +90,16 @@ confinement and is the cost of using Orca's presets.
 - Orca writes into global config: hooks in `~/.claude/settings.json` and
   `~/.codex/hooks.json`, plus per-worktree trust in `~/.codex/config.toml`.
   `orca-ide agent hooks off` removes the hooks. Chats work without them.
-- Worktrees and their branches stay after review, for the person to merge or
-  delete, as with Paseo.
+- An approved worktree is committed on its `clawchat/...` branch, which stays
+  for the person to merge. A worktree whose work will never be adopted is
+  removed together with its branch: the review rejected it, or the run failed
+  or was cancelled. Those runs cannot be resumed, and a retry starts a new run
+  in a new worktree. What it changed is kept on the run as its patch first.
+  When Orca cannot remove a worktree at that moment, the run is marked
+  `cleanup_pending`, and the next run that creates a worktree retries it.
+  The same sweep removes the worktree of a run the watchdog failed after its
+  monitor was gone. A project folder used with local isolation is never
+  committed or removed.
 - Events are polled. Orca's push subscriptions need its streaming transport,
   which the local socket refuses.
 - Paseo covered the same ground and was removed. Its settings, adapter and

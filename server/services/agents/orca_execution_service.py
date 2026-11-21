@@ -44,7 +44,7 @@ from models.todo import Todo
 from services.agents import agent_run_service, agent_task_service, execution_host_service
 from services.agents.execution_host_service import WorkspaceResolution
 from services.review import artifact_service
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ws.notifications import notify_module_data_changed
 
@@ -299,6 +299,8 @@ async def _monitor(
                 )
                 await db.commit()
                 await _notify_run_state(user_id)
+                await discard_workspace(db, run=run, adapter=adapter, reason="failed")
+                await db.commit()
                 return
             await db.commit()
             await asyncio.sleep(poll_interval)
@@ -446,6 +448,10 @@ async def execute_run(
                 repo_path = os.path.expanduser(workspace.path or "")
                 await adapter.ensure_repo(repo_path)
                 if project.execution_workspace_isolation == "worktree":
+                    try:
+                        await sweep_pending_cleanups(session_factory, adapter=adapter)
+                    except Exception:
+                        logger.exception("Could not retry leftover Orca worktree cleanups")
                     worktree = await adapter.create_worktree(
                         repo_path=repo_path,
                         name=f"clawchat-{run.id[-8:]}",
@@ -521,6 +527,9 @@ async def execute_run(
                     )
                     await db.commit()
                     await _notify_run_state(user_id)
+                if run.status == AgentRunStatus.FAILED:
+                    await discard_workspace(db, run=run, adapter=adapter, reason="failed")
+                    await db.commit()
             except Exception:
                 logger.exception("Could not persist Orca AgentRun failure for %s", run_id)
 
@@ -603,6 +612,8 @@ async def resume_external_run(
             )
             await db.commit()
             await _notify_run_state(user_id)
+            await discard_workspace(db, run=run, adapter=adapter, reason="failed")
+            await db.commit()
             return
         run.status = AgentRunStatus.RUNNING
         run.progress = max(10, min(run.progress, 90))
@@ -699,48 +710,160 @@ async def settle_workspace(
     worked in the person's own folder, which is theirs to commit or revert.
     A failure is recorded on the run and never undoes the decision.
     """
+    if not adopted:
+        await discard_workspace(db, run=run, adapter=adapter, reason="rejected")
+        return
     metadata = _metadata(run)
     cwd = metadata.get("cwd") or run.workspace_id
     if not metadata.get("worktree_id") or not cwd:
         return
-    branch = str(metadata.get("branch") or "").removeprefix("refs/heads/") or None
-    if adopted:
-        todo = await db.get(Todo, task.todo_id) if task.todo_id else None
-        title = todo.title if todo else task.task_type
-        try:
-            sha = await commit_all(cwd, f"{title}\n\nApproved in ClawChat (run {run.id})")
-        except (OSError, RuntimeError) as exc:
-            await agent_run_service.record_event(
-                db, run, "commit_failed", f"Could not commit the approved changes: {exc}"[:500]
-            )
-            return
-        if sha is None:
-            return
-        metadata["commit"] = sha
-        _save_metadata(run, metadata)
+    branch = _branch_name(metadata)
+    todo = await db.get(Todo, task.todo_id) if task.todo_id else None
+    title = todo.title if todo else task.task_type
+    try:
+        sha = await commit_all(cwd, f"{title}\n\nApproved in ClawChat (run {run.id})")
+    except (OSError, RuntimeError) as exc:
         await agent_run_service.record_event(
-            db,
-            run,
-            "changes_committed",
-            f"Committed to {branch or cwd} ({sha[:7]})",
-            payload={"branch": branch, "commit": sha, "cwd": cwd},
+            db, run, "commit_failed", f"Could not commit the approved changes: {exc}"[:500]
         )
         return
+    if sha is None:
+        return
+    metadata["commit"] = sha
+    _save_metadata(run, metadata)
+    await agent_run_service.record_event(
+        db,
+        run,
+        "changes_committed",
+        f"Committed to {branch or cwd} ({sha[:7]})",
+        payload={"branch": branch, "commit": sha, "cwd": cwd},
+    )
+
+
+_ENDED_REASONS = {AgentRunStatus.CANCELLED: "cancelled", AgentRunStatus.FAILED: "failed"}
+
+
+def _branch_name(metadata: dict[str, Any]) -> str | None:
+    return str(metadata.get("branch") or "").removeprefix("refs/heads/") or None
+
+
+async def discard_workspace(
+    db: AsyncSession,
+    *,
+    run: AgentRun,
+    reason: str,
+    adapter: OrcaAdapter | None = None,
+    record_failure: bool = True,
+) -> bool:
+    """Remove the worktree ClawChat made for ``run``, and its branch.
+
+    For work that will never be adopted: the review rejected it, or the run
+    failed or was cancelled. Neither of those can be resumed, and a retry
+    starts a new run in a new worktree, so nothing reaches the old one again.
+    Changes the run has not recorded yet are kept as its patch first. A
+    project folder (local isolation) is never touched.
+
+    When Orca cannot remove it now, the run is marked ``cleanup_pending`` and
+    the next Orca run retries it. True when nothing is left to remove.
+    """
+    metadata = _metadata(run)
+    cwd = metadata.get("cwd") or run.workspace_id
+    if not metadata.get("worktree_id") or not cwd or metadata.get("workspace_removed"):
+        return True
     adapter = adapter or adapter_from_settings()
+    branch = _branch_name(metadata)
+    if "patch" not in metadata and os.path.isdir(cwd):
+        try:
+            files, patch = await collect_changes(adapter, cwd)
+            metadata.update(files=files, patch=patch)
+        except OrcaError:
+            pass
     try:
         await adapter.remove_worktree(cwd, delete_branch=True)
     except OrcaError as exc:
-        await agent_run_service.record_event(
-            db, run, "workspace_cleanup_failed", f"Could not remove the Orca worktree: {exc.message}"[:500]
-        )
-        return
+        if os.path.isdir(cwd):
+            metadata["cleanup_pending"] = True
+            _save_metadata(run, metadata)
+            if record_failure:
+                await agent_run_service.record_event(
+                    db,
+                    run,
+                    "workspace_cleanup_failed",
+                    (
+                        f"Could not remove the Orca worktree yet ({exc.message}); "
+                        "the next Orca run retries it"
+                    )[:500],
+                    payload={"branch": branch, "cwd": cwd},
+                )
+            return False
+        # Someone already removed the folder; there is nothing left to retry.
+    metadata["workspace_removed"] = True
+    metadata.pop("cleanup_pending", None)
+    _save_metadata(run, metadata)
     await agent_run_service.record_event(
         db,
         run,
         "workspace_removed",
-        f"Removed the rejected worktree{f' and branch {branch}' if branch else ''}",
-        payload={"branch": branch, "cwd": cwd},
+        f"Removed the {reason} run's worktree{f' and branch {branch}' if branch else ''}",
+        payload={"branch": branch, "cwd": cwd, "reason": reason},
     )
+    return True
+
+
+async def stop_cancelled_run(
+    db: AsyncSession,
+    run: AgentRun,
+    *,
+    adapter: OrcaAdapter | None = None,
+) -> None:
+    """After a person cancels a run: stop its turn in Orca and drop its worktree."""
+    if run.provider != PROVIDER:
+        return
+    adapter = adapter or adapter_from_settings()
+    error = await cancel_external_run(run, adapter=adapter)
+    if error:
+        await agent_run_service.record_event(
+            db, run, "external_cancel_unconfirmed", error, progress=run.progress
+        )
+    await discard_workspace(db, run=run, adapter=adapter, reason="cancelled")
+    await db.commit()
+
+
+async def sweep_pending_cleanups(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    adapter: OrcaAdapter,
+) -> int:
+    """Remove worktrees still left by runs that ended; how many were removed.
+
+    Covers a removal Orca could not do when the run ended
+    (``cleanup_pending``), and a run the watchdog failed after its monitor
+    was gone, which never got to remove anything.
+    """
+    removed = 0
+    async with session_factory() as db:
+        runs = (
+            await db.execute(
+                select(AgentRun).where(
+                    AgentRun.provider == PROVIDER,
+                    # Serialized by _save_metadata; a null worktree_id is local isolation.
+                    AgentRun.usage_json.like('%"worktree_id": "%'),
+                    AgentRun.usage_json.not_like('%"workspace_removed": true%'),
+                    or_(
+                        AgentRun.status.in_(tuple(_ENDED_REASONS)),
+                        AgentRun.usage_json.like('%"cleanup_pending": true%'),
+                    ),
+                )
+            )
+        ).scalars()
+        for run in runs:
+            reason = _ENDED_REASONS.get(run.status, "rejected")
+            if await discard_workspace(
+                db, run=run, adapter=adapter, reason=reason, record_failure=False
+            ):
+                removed += 1
+        await db.commit()
+    return removed
 
 
 async def publish_adopted_output(
