@@ -73,4 +73,9 @@
     <string name="runs_event_task_plan_reverted">작업 계획 되돌림</string>
     <string name="runs_event_waiting_review">검토 대기 중</string>
     <string name="runs_event_workspace_created">워크스페이스 생성됨</string>
+    <string name="runs_event_branch_merged">합침</string>
+    <string name="runs_event_merge_conflict">합치면 충돌</string>
+    <string name="runs_event_merge_failed">합치기 실패</string>
+    <string name="runs_event_pr_opened">PR 열림</string>
+    <string name="runs_event_pr_failed">PR 열기 실패</string>
 </resources>

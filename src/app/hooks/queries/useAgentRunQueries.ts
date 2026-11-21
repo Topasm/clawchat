@@ -219,3 +219,53 @@ export function useResolveRunPermission() {
       useToastStore.getState().addToast('error', translateUi('Could not resolve permission')),
   });
 }
+
+export type LandMethod = 'merge' | 'pull_request';
+
+/**
+ * Land an approved Orca run: merge its branch into the base, or open a PR.
+ *
+ * A refusal (a conflict, gh failing) is kept on the run, so the card
+ * refetches either way and shows what happened under the buttons.
+ */
+export function useLandAgentRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ runId, method }: { runId: string; method: LandMethod }) => {
+      requireHome();
+      const response = await apiClient.post(`/runs/${runId}/land`, { method });
+      return AgentRunResponseSchema.parse(response.data);
+    },
+    onSuccess: (run, { method }) => {
+      const base = run.landing?.base_branch;
+      useToastStore
+        .getState()
+        .addToast(
+          'success',
+          method === 'pull_request'
+            ? translateUi('Pull request opened')
+            : base
+              ? translateUi('Merged into {{branch}}', { branch: base })
+              : translateUi('Merged'),
+        );
+    },
+    onError: (error, { method }) => {
+      if (error instanceof HomeUnreachableError) {
+        useToastStore.getState().addToast('info', homeUnreachableMessage());
+        return;
+      }
+      const message = (error as { response?: { data?: { error?: { message?: string } } } }).response
+        ?.data?.error?.message;
+      useToastStore
+        .getState()
+        .addToast(
+          'error',
+          message ??
+            translateUi(
+              method === 'pull_request' ? 'Could not open the pull request' : 'Could not merge',
+            ),
+        );
+    },
+    onSettled: () => invalidateRuns(queryClient),
+  });
+}

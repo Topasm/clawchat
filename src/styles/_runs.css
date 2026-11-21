@@ -221,6 +221,25 @@
   background: color-mix(in srgb, var(--cc-error) 8%, transparent);
   color: var(--cc-error);
 }
+/* Where an approved branch went: merged, a pull request, or why it could not. */
+.cc-run-card__landing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cc-run-card__landing--quiet {
+  color: var(--cc-text-tertiary);
+}
+.cc-run-card__landing--problem {
+  color: var(--cc-warning);
+}
+.cc-run-card__landing a {
+  color: var(--cc-primary);
+}
 /* The run's own words, kept under Details for whoever needs them. */
 .cc-run-card__raw-error {
   margin: 6px 0 0;

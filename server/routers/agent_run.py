@@ -14,6 +14,7 @@ from schemas.agent_run import (
     AgentRunDetailResponse,
     AgentRunEventResponse,
     AgentRunHeartbeatRequest,
+    AgentRunLandRequest,
     AgentRunPermissionRequest,
     AgentRunRecoveryResponse,
     AgentRunResponse,
@@ -28,6 +29,7 @@ from services.agents import (
     execution_host_service,
     opencode_execution_service,
     orca_execution_service,
+    orca_landing_service,
     run_resume_service,
     task_execution_recovery_service,
 )
@@ -275,6 +277,25 @@ async def resolve_run_permission(
         ),
     )
     await notify_module_data_changed("runs")
+    return await agent_run_service.build_run_response(db, run)
+
+
+@router.post("/{run_id}/land", response_model=AgentRunResponse)
+async def land_run(
+    run_id: str,
+    body: AgentRunLandRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Merge an approved Orca run's branch into its base, or open a pull request.
+
+    A merge that would conflict is refused with 409, names the files, and
+    leaves both branches untouched; the refusal is kept on the run either way.
+    """
+    run = await orca_landing_service.land_run(
+        db, run_id, body.method, adapter=_orca_adapter(request)
+    )
     return await agent_run_service.build_run_response(db, run)
 
 

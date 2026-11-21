@@ -19,6 +19,20 @@ export const koreanUiTranslations: Record<string, string> = {
   'Reconnect to {{workspace}} to hand this to AI':
     '{{workspace}}에 다시 연결되면 AI에게 맡길 수 있어요',
   'Changed files': '바뀐 파일',
+  'Open PR': 'PR 열기',
+  'Open pull request': 'PR 보기',
+  'Pull request opened': 'PR을 열었어요',
+  Merge: '합치기',
+  'Merge into {{branch}}': '{{branch}}에 합치기',
+  Merged: '합침',
+  'Merged into {{branch}}': '{{branch}}에 합침',
+  'Could not merge': '합치지 못했어요',
+  'Could not open the pull request': 'PR을 열지 못했어요',
+  'Merging would conflict in {{files}}. Nothing was changed.':
+    '합치면 {{files}}에서 충돌이 나요. 아무것도 바꾸지 않았어요.',
+  'some files': '일부 파일',
+  'Approved changes are on {{branch}}, not merged yet':
+    '승인한 변경은 {{branch}}에 있고 아직 합치지 않았어요',
   'Waiting to start': '시작 대기',
   'Just started': '방금 시작',
   '{{minutes}} min in': '{{minutes}}분째',

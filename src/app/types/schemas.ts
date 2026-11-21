@@ -1144,6 +1144,18 @@ export const PendingToolCallSchema = z.object({
   arguments: z.record(z.string(), z.unknown()),
 });
 
+/** Where an approved Orca worktree run's branch stands: merge it or open a PR. */
+export const RunLandingSchema = z.object({
+  state: z.enum(['ready', 'merged', 'pr_opened', 'conflict', 'failed']),
+  branch: z.string(),
+  base_branch: z.string().nullable().optional(),
+  can_open_pr: z.boolean().optional(),
+  commit: z.string().nullable().optional(),
+  pr_url: z.string().nullable().optional(),
+  conflicts: z.array(z.string()).optional(),
+  message: z.string().nullable().optional(),
+});
+
 export const AgentRunResponseSchema = z.object({
   id: z.string(),
   agent_task_id: z.string(),
@@ -1172,6 +1184,7 @@ export const AgentRunResponseSchema = z.object({
   usage: z.record(z.string(), z.unknown()).nullable(),
   is_adopted: z.boolean(),
   pending_tool_call: PendingToolCallSchema.nullable().optional(),
+  landing: RunLandingSchema.nullable().optional(),
   created_at: z.string(),
   started_at: z.string().nullable(),
   heartbeat_at: z.string().nullable(),
@@ -1481,6 +1494,7 @@ export type InboxState = z.infer<typeof InboxStateSchema>;
 export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
 export type AgentRunResponse = z.infer<typeof AgentRunResponseSchema>;
+export type RunLanding = z.infer<typeof RunLandingSchema>;
 export type AgentRunEventResponse = z.infer<typeof AgentRunEventResponseSchema>;
 export type AgentRunRecoveryResponse = z.infer<typeof AgentRunRecoveryResponseSchema>;
 export type TaskExecutionTelemetryResponse = z.infer<typeof TaskExecutionTelemetryResponseSchema>;

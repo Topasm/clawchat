@@ -332,9 +332,11 @@ that keeps Orca's hooks and worktrees out of the user's home
 4. polls the chat into heartbeats. An approval the agent stops for becomes
    `waiting_input`, answered from the run card;
 5. turns the working-tree diff into the patch under review;
-6. commits an approved worktree on its branch. A rejected, failed or
-   cancelled run's worktree and branch are removed, and the patch stays on
-   the run.
+6. commits an approved worktree on its branch, which the run card then merges
+   into the base branch (fast-forward or merge commit; a conflict is refused
+   and leaves both branches untouched) or pushes as a GitHub pull request
+   through `gh`. A rejected, failed or cancelled run's worktree and branch are
+   removed, and the patch stays on the run.
 
 Orca owns agent credentials, the CLI and its sandbox, and the worktrees.
 ClawChat owns the AgentTask/AgentRun state machine, output Artifact,
