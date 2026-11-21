@@ -1053,6 +1053,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Current version {{version}}': '현재 버전 {{version}}',
   '{{count}} items': '항목 {{count}}개',
   'connected · {{host}}': '연결됨 · {{host}}',
+  'connected · started by ClawChat': '연결됨 · ClawChat이 시작함',
+  'starting…': '시작 중…',
   offline: '오프라인',
   'Review note for {{title}}': '{{title}}의 검토 메모',
   '· workspace {{id}}': ' · 워크스페이스 {{id}}',
@@ -1088,6 +1090,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'No repositories in Orca yet': 'Orca에 등록된 저장소가 없습니다',
   'Add one in Orca first (orca-ide repo add --path <folder>).':
     '먼저 Orca에 저장소를 추가하세요 (orca-ide repo add --path <폴더>).',
+  'Or a folder on this machine': '또는 이 컴퓨터의 폴더',
+  'Use folder': '폴더 사용',
   'Each task works in': '각 작업의 작업 위치',
   'Its own worktree (recommended)': '작업마다 새 worktree (권장)',
   'The repository folder itself': '저장소 폴더에서 직접',

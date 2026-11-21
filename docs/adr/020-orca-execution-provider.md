@@ -36,9 +36,11 @@ A spike against `orca-ide` 1.4.267 established two surfaces:
 
 Add `orca` as an AgentRun provider. It sits behind `execution/orca_cli.py`,
 which is the only code that knows either surface, and
-`services/agents/orca_execution_service.py`. ClawChat never starts Orca. It
-connects to the `orca-ide serve` the user runs on the same machine, so the
-project's workspace host must be local, as for OpenCode.
+`services/agents/orca_execution_service.py`. Orca runs on the server's own
+machine, so the project's workspace host must be local, as for OpenCode. By
+default ClawChat starts and supervises that Orca itself (see "ClawChat's own
+runtime" below). With `ORCA_MANAGE_RUNTIME=false` it connects to an
+`orca-ide serve` the user runs and changes nothing in that profile.
 
 A run:
 
@@ -47,8 +49,11 @@ A run:
    project's base branch. With local isolation, it works in the folder itself.
 2. Opens an idle chat with `ORCA_AGENT` (default `codex`). The model defaults
    to the CLI's cheap tier, `CODEX_CLI_MODEL` or `CLAUDE_CODE_MODEL`.
-3. Persists the chat id before anything else. Orca outlives a ClawChat
-   restart, so an executing run is reattached on startup, as Paseo runs are.
+3. Persists the chat id before anything else. An executing run is
+   reattached on startup. That only helps when Orca outlived the restart,
+   which is the case for an Orca the user runs. Orca keeps no chats across a
+   restart of its own, so with ClawChat's runtime a run that was executing
+   fails with "Orca no longer has chat …" (see below).
 4. Sets the chat's permission mode, then sends the frozen instruction, which
    carries the skill text as for the other CLI backends.
    - A new Orca chat otherwise inherits `full-access` (no sandbox, no
@@ -69,6 +74,91 @@ A run:
 Cancel stops the turn with `agentSession.cancel`, which also ends the command
 the agent was running.
 
+## ClawChat's own runtime
+
+With `ORCA_MANAGE_RUNTIME` (default on), `execution/orca_runtime.py`
+supervises one `orca-ide serve --port <free> --bind 127.0.0.1 --no-pairing`.
+It runs in a profile private to ClawChat: `ORCA_USER_DATA_PATH`, by default
+`orca` next to the server's uploads folder. `ORCA_TELEMETRY_DISABLED=1` and
+`DO_NOT_TRACK=1` are set.
+
+- **Ready** means Orca wrote a new `orca-runtime.json` (new `runtimeId`) and
+  its unix socket accepts connections. Orca leaves the file behind when it
+  stops, so its presence proves nothing.
+- **Restart.** A runtime that exits is started again after 1 s, 2 s, 4 s and
+  so on, up to 60 s. A runtime that stayed up for a minute resets the delay.
+  The status carries the reason, read from what Orca printed. One example is
+  `Orca serve exited via SIGKILL.`.
+- **Shutdown** stops the `serve` process group. It also stops its `orcad`
+  child if that still answers on its socket. A pid from a stale file is never
+  signalled.
+- **Reuse.** If a runtime already answers for the profile, no second one is
+  started. In 1.4.267, `serve` refuses a taken profile with exit code 78 and
+  `OrcadInstanceLockError`, although its help names code 3.
+  - A runtime ClawChat started is recorded in `clawchat-runtime.json` with
+    its `runtimeId`. If the server was killed before it could stop Orca, the
+    next start takes that runtime back and stops it on shutdown as usual.
+  - Anyone else's runtime is used and left running. When it goes away,
+    ClawChat starts its own.
+- **Status.** The provider status reports `managed: true` and
+  `runtime_state`: `starting`, `running`, `reused`, `restarting`, `failed` or
+  `stopped`. Its `error` says why Orca is down, for example "ClawChat's Orca
+  is not running: Orca exited with code 1: Orca serve exited via SIGKILL.".
+
+### What it keeps out of the user's home
+
+The spike found Orca writing global config. Against `orca-ide` 1.4.267 and
+`codex` 0.171, with a scratch `HOME` and then the real one:
+
+| Write | Kept out? | How |
+| --- | --- | --- |
+| Agent status hooks: `~/.claude/settings.json`, `~/.claude/keybindings.json`, `~/.claude/orca-agent-view.json`, `~/.codex/hooks.json`, hook trust in `~/.codex/config.toml`, `~/.orca/agent-hooks/*.sh` | Yes | `orca-ide agent hooks off --json` before Orca first serves the profile |
+| Worktrees in `~/orca/workspaces/<repo>/<name>` | Yes | Each repository gets `worktreeBasePath = <profile>/workspaces` |
+| Orca's per-worktree trust in `~/.codex/config.toml` (and Claude's in `~/.claude.json`) | Yes | Each repository gets `agentWorkspaceTrust = agent-asks` |
+| Codex's own trust for the repository root in `~/.codex/config.toml` | No | Written by Codex, see below |
+| Daemon sockets in `/tmp/.orca-daemon-<uid>` | No | Shared by every Orca on the machine |
+
+- **Hooks.** A first `serve` with hooks on writes them all within two
+  seconds. `agent hooks off` on a profile that already served removes the
+  entries but leaves `"hooks": {}` stubs. It also creates
+  `~/.cursor/hooks.json`, `~/.gemini/settings.json`,
+  `~/.gemini/config/hooks.json`, `~/.factory/settings.json` and
+  `~/.commandcode/settings.json` for agents that may not even be installed.
+  So the supervisor asks `agent hooks status` and runs `off` before Orca has
+  ever served the profile. Both work without a runtime. Both run with `HOME`
+  pointed at `<profile>/clawchat-scratch-home`: the setting lands in the
+  profile, and the stubs land in the scratch folder. Orca is not started
+  until it confirms the hooks are off.
+- **Worktrees and Orca's trust.** The worktree root is Orca's
+  `workspaceDir` setting. It is stored in the profile's SQLite state and has
+  no CLI flag or environment variable, and `settings.update` does not accept
+  it. A repository's own `worktreeBasePath` overrides it, and so does its
+  `agentWorkspaceTrust` decision. The socket's `repo.update` sets both. So
+  `ensure_repo` sends `repo.update` for every repository in ClawChat's
+  profile. If Orca refuses, the run fails with `ORCA_REPO_NOT_PRIVATE`
+  rather than writing into the home folder. With `agent-asks`, Codex still
+  ran and edited files in an `auto` chat.
+- **What cannot be kept out.** Codex's app-server itself records the
+  repository root as trusted when a thread starts with the `workspace-write`
+  sandbox, which is Orca's `auto`. The entry is
+  `[projects."<repo root>"] trust_level = "trusted"`. This was reproduced
+  with `codex app-server` alone, without Orca. The key is the main checkout,
+  not the worktree, so there is one entry per project. It stays after the
+  run, as it does when the person runs Codex there. `ask` (`read-only`)
+  writes none. Avoiding it would need a separate `CODEX_HOME` for runs,
+  which would also separate the person's Codex login, settings and history,
+  so it is not done. Codex likewise keeps its session history and memory
+  under `~/.codex`, as for any Codex use.
+- **Restarts lose chats.** Orca does not restore a chat after its runtime
+  restarts. A run that was executing when ClawChat's Orca crashed, or when
+  the server restarted, therefore fails with "Orca no longer has chat …".
+  Its worktree is removed and its patch kept, like any failed run. Retrying
+  starts it fresh.
+
+`ORCA_MANAGE_RUNTIME=false` restores the earlier arrangement. ClawChat then
+runs neither `agent hooks off` nor `repo.update`, so that profile's own
+settings, including hooks and worktree location, are the user's.
+
 ## Permission modes
 
 | Mode | Codex sandbox | Escalations |
@@ -87,9 +177,11 @@ confinement and is the cost of using Orca's presets.
 - Orca's socket protocol can change with any release, because Orca ships
   daily. All of it is isolated in one adapter, and its contract tests pin the
   fingerprints Orca accepted. Pin the Orca version you run.
-- Orca writes into global config: hooks in `~/.claude/settings.json` and
-  `~/.codex/hooks.json`, plus per-worktree trust in `~/.codex/config.toml`.
-  `orca-ide agent hooks off` removes the hooks. Chats work without them.
+- An Orca the user runs (`ORCA_MANAGE_RUNTIME=false`) writes into global
+  config: hooks in `~/.claude/settings.json` and `~/.codex/hooks.json`, plus
+  per-worktree trust in `~/.codex/config.toml`. ClawChat's own runtime keeps
+  all of that out, except the Codex trust entry described above. Chats work
+  without the hooks.
 - An approved worktree is committed on its `clawchat/...` branch, which stays
   for the person to merge. A worktree whose work will never be adopted is
   removed together with its branch: the review rejected it, or the run failed

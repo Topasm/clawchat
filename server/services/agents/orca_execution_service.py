@@ -24,6 +24,7 @@ import re
 import time
 from contextlib import suppress
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from config import settings
@@ -36,6 +37,7 @@ from execution.orca_cli import (
     OrcaAdapter,
     OrcaError,
 )
+from execution.orca_runtime import OrcaRuntimeSupervisor
 from models.agent_run import AgentRun
 from models.agent_task import AgentTask
 from models.artifact import Artifact
@@ -65,12 +67,36 @@ _UNREACHABLE_CODES = frozenset(
 )
 
 
-def adapter_from_settings() -> OrcaAdapter:
+def managed_profile_path() -> Path:
+    """ClawChat's own Orca profile: the setting, or ``orca`` beside the uploads."""
+    if settings.orca_user_data_path.strip():
+        return Path(settings.orca_user_data_path.strip()).expanduser().absolute()
+    return Path(settings.upload_dir).expanduser().absolute().parent / "orca"
+
+
+def adapter_from_settings(supervisor: OrcaRuntimeSupervisor | None = None) -> OrcaAdapter:
+    """The adapter for the configured Orca; ``supervisor`` when ClawChat runs it."""
+    managed = supervisor is not None
     return OrcaAdapter(
         command=settings.orca_cli_command,
-        user_data_path=settings.orca_user_data_path,
+        user_data_path=str(supervisor.profile) if managed else settings.orca_user_data_path,
         enabled=settings.orca_enabled,
         command_timeout_seconds=settings.orca_command_timeout_seconds,
+        supervisor=supervisor,
+        private_profile=managed,
+    )
+
+
+def supervisor_from_settings() -> OrcaRuntimeSupervisor | None:
+    """ClawChat's own ``orca-ide serve`` when Orca is on and managed, else None."""
+    if not (settings.orca_enabled and settings.orca_manage_runtime):
+        return None
+    return OrcaRuntimeSupervisor(
+        command=settings.orca_cli_command,
+        profile=managed_profile_path(),
+        port=settings.orca_runtime_port,
+        startup_timeout=settings.orca_startup_timeout_seconds,
+        command_timeout=settings.orca_command_timeout_seconds,
     )
 
 

@@ -1230,6 +1230,8 @@ export const ExecutionProviderStatusSchema = z.object({
   error: z.string().nullable().optional(),
   providers: z.array(z.record(z.string(), z.unknown())).default([]),
   permission_mode: z.string().nullable().optional(),
+  managed: z.boolean().default(false),
+  runtime_state: z.string().nullable().optional(),
 });
 
 export const OrcaRepositorySchema = z.object({

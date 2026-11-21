@@ -4947,6 +4947,11 @@
             "title": "Label",
             "type": "string"
           },
+          "managed": {
+            "default": false,
+            "title": "Managed",
+            "type": "boolean"
+          },
           "permission_mode": {
             "anyOf": [
               {
@@ -4965,6 +4970,17 @@
             },
             "title": "Providers",
             "type": "array"
+          },
+          "runtime_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime State"
           }
         },
         "required": [
