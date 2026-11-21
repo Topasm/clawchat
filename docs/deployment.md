@@ -303,6 +303,14 @@ The server's output goes to `~/.local/share/com.clawchat.desktop/server.log`, as
 
 **Living with the app.** Only one server ever runs per database. The server locks `server-data/data/clawchat.db.lock`, and a second one refuses to start. With the service running, the app uses the service's server instead of starting its own, and leaves it running when you quit. If the app was serving first, the service waits and takes over a few seconds after the app quits. A PIN, port or LAN change in the app restarts the server. Whichever starts next, the service or the app, uses the new settings.
 
+**Leftover mount points.** The AppImage runs from a temporary mount, `/tmp/.mount_ClawCh…`. If the server stops on its own, because a settings change in the app restarted it or because it crashed, systemd ends the AppImage's mount helper before it can unmount. The dead mount point then stays until the next reboot. It is harmless, and the next start uses a new one. `systemctl --user stop` does not leave one. To clear the dead ones by hand (a live mount still lists its files, so it is skipped):
+
+```bash
+for m in /tmp/.mount_ClawCh*; do ls "$m" >/dev/null 2>&1 || { fusermount -uz "$m" && rmdir "$m"; }; done
+```
+
+Avoid `APPIMAGE_EXTRACT_AND_RUN` for the service, except as the FUSE fallback above. It extracts into `/tmp`, which this system cleans after 30 days, possibly while the server is still running from it.
+
 **Upgrading.** Point the link at the new AppImage and restart the service. An in-app update replaces the AppImage file, but the running server stays on the old version until it restarts.
 
 ```bash

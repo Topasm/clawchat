@@ -135,6 +135,14 @@ from before this lock.
   that file, but the running server keeps the old version until
   `systemctl --user restart clawchat`. The window does not restart a service
   server whose version differs.
+- An AppImage runs from a FUSE mount whose helper lives in the service's
+  cgroup. When the server exits on its own (a settings restart from the
+  window, or a crash), systemd ends the helper before it unmounts, and a dead
+  `/tmp/.mount_ClawCh…` stays until reboot. `systemctl stop` does not leave
+  one, and neither `KillMode=mixed` nor `control-group` avoids it.
+  `APPIMAGE_EXTRACT_AND_RUN` avoids it but extracts into `/tmp`, which is
+  cleaned after 30 days under a running server, and forks instead of
+  `exec`ing. The leftover mount is the smaller cost.
 - The shell's lock probe holds the lock for an instant. A server that starts
   at that moment exits as "in use", and its launcher retries: the window
   connects, systemd restarts.
