@@ -143,6 +143,8 @@ const AGENT_NAMES: Record<string, string> = {
   codex_cli: 'Codex',
   opencode: 'OpenCode',
   openclaw: 'OpenClaw',
+  orca: 'Orca',
+  // Runs from before Paseo support was removed still name their agent.
   paseo: 'Paseo',
 };
 

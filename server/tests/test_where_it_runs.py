@@ -75,15 +75,15 @@ async def test_server_run_has_no_machine_label(db_session, pushed):
 
 
 @pytest.mark.asyncio
-async def test_paseo_run_reports_the_daemon_label(db_session, pushed):
+async def test_a_bridged_run_reports_the_label_it_carries(db_session, pushed):
     _project, task = await make_task(db_session)
     run = await agent_run_service.create_run(
-        db_session, task, provider="paseo", host_id="paseo@lab"
+        db_session, task, provider="orca", host_id="Home"
     )
     await db_session.commit()
 
     response = await agent_run_service.build_run_response(db_session, run)
-    assert response.host_label == "paseo@lab"
+    assert response.host_label == "Home"
 
 
 @pytest.mark.asyncio

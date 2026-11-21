@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   setConversationId: vi.fn(),
   isMobile: false,
   planTodos: [] as Array<Record<string, unknown>>,
+  providers: [] as Array<Record<string, unknown>>,
+  orcaRepos: [] as Array<{ path: string; name: string }>,
+  chooseRepo: vi.fn(),
 }));
 vi.mock('../../services/apiClient', () => ({ default: { get: mocks.get } }));
 
@@ -31,8 +34,8 @@ const project = {
   graph_revision: 3,
   default_execution_provider: 'builtin' as string | null,
   default_execution_model: null,
-  execution_workspace_path: null,
-  execution_workspace_isolation: 'local',
+  execution_workspace_path: null as string | null,
+  execution_workspace_isolation: 'local' as 'local' | 'worktree',
   execution_base_branch: null,
   created_at: '2026-09-04T00:00:00Z',
   updated_at: '2026-09-04T00:00:00Z',
@@ -61,8 +64,10 @@ vi.mock('../../hooks/queries', () => ({
   }),
   useDeleteProject: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateProject: () => ({ mutate: mocks.updateProject, isPending: false }),
-  useExecutionProvidersQuery: () => ({ data: [], isLoading: false }),
+  useExecutionProvidersQuery: () => ({ data: mocks.providers, isLoading: false }),
   useTestExecutionProvider: () => ({ mutate: vi.fn(), isPending: false }),
+  useOrcaRepositoriesQuery: () => ({ data: mocks.orcaRepos }),
+  useChooseOrcaRepository: () => ({ mutate: mocks.chooseRepo, isPending: false }),
   useTaskExecutionTelemetryQuery: () => ({ data: [] }),
 }));
 
@@ -121,7 +126,12 @@ describe('ProjectWorkspacePage', () => {
     mocks.planTodos = [];
     project.description = null;
     project.default_execution_provider = 'builtin';
+    project.execution_workspace_path = null;
+    project.execution_workspace_isolation = 'local';
     project.running_agent_count = 0;
+    mocks.providers = [];
+    mocks.orcaRepos = [];
+    mocks.chooseRepo.mockReset();
   });
 
   it('opens Project Agent only when asked (⌘K) and keeps the root out of the plan', async () => {
@@ -286,5 +296,46 @@ describe('ProjectWorkspacePage', () => {
     expect(mocks.updateProject).toHaveBeenCalledWith(
       expect.objectContaining({ execution_instructions: 'Never use --force.' }),
     );
+  });
+
+  it('sets up Orca by picking one of its repositories', () => {
+    project.default_execution_provider = 'orca';
+    project.execution_workspace_isolation = 'worktree';
+    mocks.providers = [
+      {
+        id: 'orca',
+        label: 'Orca',
+        enabled: true,
+        available: true,
+        connected: true,
+        host: 'local',
+        providers: [],
+        permission_mode: 'auto',
+      },
+    ];
+    mocks.orcaRepos = [{ path: '/repos/clawchat', name: 'clawchat' }];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+
+    expect(screen.getByText(/Auto: edits inside the task's worktree/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Repository'), {
+      target: { value: '/repos/clawchat' },
+    });
+    expect(mocks.chooseRepo).toHaveBeenCalledWith('/repos/clawchat');
+    // Model and base branch wait behind Advanced.
+    expect(screen.getByText('Advanced')).toBeInTheDocument();
+    expect(screen.getByLabelText('Each task works in')).toHaveValue('worktree');
+  });
+
+  it('tells the person to add a repository to Orca when it has none', () => {
+    project.default_execution_provider = 'orca';
+    mocks.providers = [
+      { id: 'orca', label: 'Orca', enabled: true, available: true, connected: true, providers: [] },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
+
+    expect(screen.getByText('No repositories in Orca yet')).toBeInTheDocument();
+    expect(screen.getByText(/orca-ide repo add --path/)).toBeInTheDocument();
   });
 });

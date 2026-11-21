@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from config import settings
 from database import Base
 from exceptions import ValidationError
 from models.execution_host import ExecutionHost, ProjectHostPath
@@ -55,15 +54,9 @@ def test_a_disabled_host_takes_no_work(tmp_path):
     assert execution_host_service.host_is_available(host, str(tmp_path)) is False
 
 
-def test_a_remote_host_goes_quiet_after_the_heartbeat_grace(monkeypatch):
-    monkeypatch.setattr(settings, "paseo_enabled", True)
+def test_a_remote_host_goes_quiet_after_the_heartbeat_grace():
     now = datetime(2026, 9, 3, 12, 0, tzinfo=UTC)
-    host = ExecutionHost(
-        label="Laptop",
-        kind="paseo",
-        target="laptop.local:6767",
-        is_enabled=True,
-    )
+    host = ExecutionHost(label="Laptop", kind="worker", is_enabled=True)
 
     host.last_seen_at = now - timedelta(minutes=1)
     assert execution_host_service.host_is_available(host, "/x", now=now) is True
@@ -72,16 +65,15 @@ def test_a_remote_host_goes_quiet_after_the_heartbeat_grace(monkeypatch):
     assert execution_host_service.host_is_available(host, "/x", now=now) is False
 
 
-def test_a_remote_host_is_tried_before_it_has_ever_been_probed(monkeypatch):
-    monkeypatch.setattr(settings, "paseo_enabled", True)
-    host = ExecutionHost(
-        label="Laptop",
-        kind="paseo",
-        target="laptop.local:6767",
-        is_enabled=True,
-    )
+def test_a_worker_that_never_checked_in_takes_no_work():
+    host = ExecutionHost(label="Laptop", kind="worker", is_enabled=True)
 
-    assert execution_host_service.host_is_available(host, "/x") is True
+    assert execution_host_service.host_is_available(host, "/x") is False
+
+
+def test_paseo_is_no_longer_a_host_kind():
+    with pytest.raises(ValueError):
+        ExecutionHost(label="Laptop", kind="paseo", target="laptop.local:6767")
 
 
 # --- resolution -----------------------------------------------------------
@@ -102,15 +94,9 @@ async def test_work_resolves_to_the_named_host_and_its_path(db_session, tmp_path
 
 # An offline machine is not a misconfiguration: the work is well defined and
 # runs when that machine comes back, so it waits rather than failing.
-async def test_an_unreachable_host_leaves_the_work_waiting(db_session, monkeypatch):
-    monkeypatch.setattr(settings, "paseo_enabled", True)
+async def test_an_unreachable_host_leaves_the_work_waiting(db_session):
     project = await _project(db_session)
-    host = await _host(
-        db_session,
-        label="Laptop",
-        kind="paseo",
-        target="laptop.local:6767",
-    )
+    host = await _host(db_session, label="Laptop", kind="worker")
     host.last_seen_at = datetime.now(UTC) - timedelta(hours=3)
     await _bind(db_session, project, host, "/Users/someone/papers")
 
@@ -124,16 +110,9 @@ async def test_an_unreachable_host_leaves_the_work_waiting(db_session, monkeypat
 async def test_an_unreachable_host_is_not_swapped_for_a_reachable_one(
     db_session,
     tmp_path,
-    monkeypatch,
 ):
-    monkeypatch.setattr(settings, "paseo_enabled", True)
     project = await _project(db_session)
-    laptop = await _host(
-        db_session,
-        label="Laptop",
-        kind="paseo",
-        target="laptop.local:6767",
-    )
+    laptop = await _host(db_session, label="Laptop", kind="worker")
     laptop.last_seen_at = datetime.now(UTC) - timedelta(hours=3)
     workstation = await _host(db_session, label="Workstation", kind="local")
     db_session.add(

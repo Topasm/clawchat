@@ -53,7 +53,7 @@ Project is context and policy; a Todo is a completable execution unit.
 | `deadline` | TIMESTAMP | NULLABLE | Project completion deadline |
 | `root_task_id` | TEXT | UNIQUE, FOREIGN KEY -> todos.id ON DELETE SET NULL | Compatibility graph container |
 | `graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Monotonic project-scoped task graph revision |
-| `default_execution_provider` | TEXT | NULLABLE | Default provider for future AgentRuns (`builtin` or `paseo`) |
+| `default_execution_provider` | TEXT | NULLABLE | Default provider for future AgentRuns (`builtin`, `opencode` or `orca`; a leftover `paseo` is refused) |
 | `default_execution_model` | TEXT | NULLABLE | Provider/model identifier, for example `codex/gpt-5.5` |
 | `execution_workspace_path` | TEXT | NULLABLE | Repository path as seen by the execution host |
 | `execution_workspace_isolation` | TEXT | NOT NULL, CHECK | `local` or `worktree` |
@@ -376,7 +376,7 @@ Stores durable execution attempts separately from the requested AgentTask.
 | `agent_runs.project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Project scope |
 | `agent_runs.attempt` | INTEGER | UNIQUE per AgentTask, CHECK >= 1 | Monotonic attempt number |
 | `agent_runs.instruction_snapshot` | TEXT | NOT NULL | Exact instructions used by this attempt |
-| `provider`, `model`, `host_id`, `workspace_id`, `external_run_id` | TEXT | External values nullable | Execution identity and Paseo agent linkage |
+| `provider`, `model`, `host_id`, `workspace_id`, `external_run_id` | TEXT | External values nullable | Execution identity and external agent linkage (Orca worktree path and chat id) |
 | `agent_runs.status` | TEXT | NOT NULL, CHECK | Queued, active, waiting, or terminal run lifecycle |
 | `progress`, `progress_message`, `heartbeat_at` | Mixed | Progress CHECK 0..100 | Liveness and progress |
 | `result`, `result_summary`, `error`, `usage_json` | TEXT/JSON | NULLABLE | Attempt outcome and usage |
@@ -459,7 +459,7 @@ Alembic is the versioned migration source for new schema changes. The current
 chain normalizes task status, migrates JSON dependencies into relationships,
 then adds graph revisions, versioned plan proposals, first-class projects, the
 unified review queue, versioned artifacts, durable AgentRun attempts and event
-logs, Paseo external execution metadata, change sets, and the Vault outbox.
+logs, external execution metadata, change sets, and the Vault outbox.
 Completed legacy `plan_todo` agent tasks are retained as non-actionable
 proposal history rather than silently discarded; existing proposal states are
 backfilled into review history.

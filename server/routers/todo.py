@@ -1219,8 +1219,8 @@ async def delegate_todo(
         session_factory=getattr(state, "session_factory", None),
         active_ai=resolve_active_ai(state),
         active_ai_provider=getattr(state, "active_ai_provider", "openclaw"),
-        paseo_adapter=getattr(state, "paseo_adapter", None),
         opencode_adapter=getattr(state, "opencode_adapter", None),
+        orca_adapter=getattr(state, "orca_adapter", None),
     )
     return await task_delegation_service.delegate_todo_to_skill(
         db, todo_id, body, runtime, _user

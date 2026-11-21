@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 020](./020-orca-execution-provider.md). The Paseo provider
+was removed in favour of Orca. Rows that still say `paseo` are kept as
+history; a project still set to it is asked to choose again.
 
 ## Context
 

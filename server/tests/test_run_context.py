@@ -222,7 +222,7 @@ def _chain_task(task_id: str, chain: list[str]) -> AgentTask:
     )
 
 
-@pytest.mark.parametrize("provider", ["worker", "paseo"])
+@pytest.mark.parametrize("provider", ["worker", "orca"])
 async def test_cli_handoff_runs_carry_the_skill_instructions(db_session, provider):
     task = _chain_task(f"task_skill_{provider}", ["code_review"])
     db_session.add(task)

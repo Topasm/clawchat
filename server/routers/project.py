@@ -1,5 +1,7 @@
 """First-class Project endpoints."""
 
+import os
+
 from auth.dependencies import get_current_user
 from database import get_db
 from exceptions import NotFoundError, ValidationError
@@ -8,6 +10,7 @@ from models.execution_host import ExecutionHost, ProjectHostPath
 from models.project import Project
 from schemas.execution_host import (
     ProjectExecutionHostSelect,
+    ProjectOrcaRepositorySelect,
     ProjectHostPathResponse,
     ProjectHostPathUpsert,
     ProjectWorkspaceContextUpsert,
@@ -207,6 +210,49 @@ async def delete_project_host_path(
         project.execution_host_id = None
         project.execution_workspace_path = None
     await db.commit()
+
+
+@router.put("/{project_id}/workspace/orca", response_model=ProjectWorkspaceResponse)
+async def use_orca_repository(
+    project_id: str,
+    body: ProjectOrcaRepositorySelect,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Run this project's work with Orca, in one of Orca's repositories.
+
+    Orca runs beside the server, so the folder is recorded on the server's own
+    machine, which becomes where the work runs; the project's provider becomes
+    Orca. One step instead of registering a host, typing a path and choosing a
+    provider separately.
+    """
+    project = await _require_project(db, project_id)
+    path = body.path.strip()
+    if not os.path.isdir(os.path.expanduser(path)):
+        raise ValidationError(
+            f"{path} does not exist on the ClawChat server",
+            details={"reason": "path_not_found"},
+        )
+    host = await execution_host_service.ensure_local_host(db)
+    existing = (
+        await db.execute(
+            select(ProjectHostPath).where(
+                ProjectHostPath.project_id == project.id,
+                ProjectHostPath.host_id == host.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(ProjectHostPath(project_id=project.id, host_id=host.id, path=path))
+    else:
+        existing.path = path
+    project.execution_host_id = host.id
+    project.execution_workspace_path = path
+    project.default_execution_provider = "orca"
+    await db.commit()
+    await db.refresh(project)
+    await notify_module_data_changed("projects")
+    return await _workspace_response(db, project)
 
 
 @router.put("/{project_id}/workspace/host", response_model=ProjectWorkspaceResponse)

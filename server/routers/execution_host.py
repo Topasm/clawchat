@@ -47,12 +47,6 @@ async def create_execution_host(
             "This server is already registered as a host.",
             details={"reason": "local_host_exists"},
         )
-    if body.kind == "paseo" and not (body.target or "").strip():
-        raise ValidationError(
-            "A remote host needs a target to reach it.",
-            details={"reason": "target_required"},
-        )
-
     host = ExecutionHost(
         label=body.label.strip(),
         kind=body.kind,
@@ -95,12 +89,6 @@ async def update_execution_host(
         host.platform = updates["platform"]
     if "is_enabled" in updates and updates["is_enabled"] is not None:
         host.is_enabled = updates["is_enabled"]
-
-    if host.kind == "paseo" and not host.target:
-        raise ValidationError(
-            "A remote host needs a target to reach it.",
-            details={"reason": "target_required"},
-        )
 
     try:
         await db.commit()

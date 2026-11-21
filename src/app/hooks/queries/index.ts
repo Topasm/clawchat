@@ -89,13 +89,14 @@ export type { ReviewDecisionResult } from './useReviewQueries';
 export {
   useAgentRunsQuery,
   useAgentRunEventsQuery,
+  useAgentRunPatchQuery,
   useActiveRunsQuery,
   useRunsAwaitingInputQuery,
   useCancelAgentRun,
   useRetryAgentRun,
   useReturnAgentRunToReady,
   useResumeAgentRun,
-  useResolvePaseoPermission,
+  useResolveRunPermission,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
 export {
@@ -108,6 +109,8 @@ export type { StartReadyTaskExecutionVariables } from './useTaskExecutionQueries
 export {
   useExecutionProvidersQuery,
   useTestExecutionProvider,
+  useOrcaRepositoriesQuery,
+  useChooseOrcaRepository,
 } from './useExecutionProviderQueries';
 export {
   useAdminOverviewQuery,

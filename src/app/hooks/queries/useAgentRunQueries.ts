@@ -35,6 +35,27 @@ export function useAgentRunsQuery(projectId?: string | null) {
   });
 }
 /**
+ * The patch a run recorded (Orca and OpenCode diff their workspace), or null.
+ *
+ * Fetched only when someone opens the changes: a patch can run to hundreds of
+ * kilobytes, so it never rides on the review list itself.
+ */
+export function useAgentRunPatchQuery(runId: string | null, enabled: boolean) {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  return useQuery({
+    queryKey: queryKeys.runPatch(runId ?? ''),
+    queryFn: async () => {
+      const response = await apiClient.get(`/runs/${runId}`);
+      const run = AgentRunResponseSchema.parse(response.data);
+      const patch = run.usage?.patch;
+      return typeof patch === 'string' && patch.trim() ? patch : null;
+    },
+    enabled: !!serverUrl && !!runId && enabled,
+    staleTime: 60_000,
+  });
+}
+
+/**
  * Runs stopped on a question or a permission, i.e. the agent is waiting on you.
  *
  * No polling: the server pushes `module_data_changed("runs")` on every
@@ -182,7 +203,8 @@ export function useResumeAgentRun() {
   });
 }
 
-export function useResolvePaseoPermission() {
+/** Allow or deny what an Orca agent stopped to ask permission for. */
+export function useResolveRunPermission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ runId, decision }: { runId: string; decision: 'allow' | 'deny' }) => {

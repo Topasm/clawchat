@@ -91,6 +91,7 @@ describe('labels', () => {
     );
     expect(agentName('claude_code')).toBe('Claude');
     expect(agentName('codex_cli')).toBe('Codex');
+    expect(agentName('orca')).toBe('Orca');
   });
 });
 

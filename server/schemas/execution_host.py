@@ -55,6 +55,12 @@ class ProjectHostPathUpsert(BaseModel):
     path: str = Field(min_length=1)
 
 
+class ProjectOrcaRepositorySelect(BaseModel):
+    """An Orca repository, by its path on the ClawChat server's machine."""
+
+    path: str = Field(min_length=1)
+
+
 class ProjectExecutionHostSelect(BaseModel):
     host_id: str = Field(min_length=1)
 

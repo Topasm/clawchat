@@ -335,7 +335,7 @@ async def test_ready_execution_claims_the_task(
 # --- provider selection ---------------------------------------------------
 
 
-async def test_paseo_requires_it_to_be_enabled(
+async def test_orca_requires_it_to_be_enabled(
     client: AsyncClient, auth_headers, db_session
 ):
     project = Project(id=make_id("proj_"), title="Workspace project")
@@ -346,11 +346,31 @@ async def test_paseo_requires_it_to_be_enabled(
     resp = await client.post(
         f"/api/todos/{todo.id}/delegate",
         headers=auth_headers,
-        json={"skill_id": "research", "execution_provider": "paseo"},
+        json={"skill_id": "research", "execution_provider": "orca"},
     )
 
     assert resp.status_code == 503
-    assert resp.json()["error"]["code"] == "PASEO_DISABLED"
+    assert resp.json()["error"]["code"] == "ORCA_DISABLED"
+
+
+async def test_a_project_still_set_to_paseo_is_told_to_choose_again(
+    client: AsyncClient, auth_headers, db_session
+):
+    project = Project(
+        id=make_id("proj_"), title="Old project", default_execution_provider="paseo"
+    )
+    db_session.add(project)
+    await db_session.commit()
+    todo = await _todo(db_session, project_id=project.id)
+
+    resp = await client.post(
+        f"/api/todos/{todo.id}/delegate",
+        headers=auth_headers,
+        json={"skill_id": "research"},
+    )
+
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "EXECUTION_PROVIDER_REMOVED"
 
 
 async def test_delegation_fails_when_no_provider_is_available(

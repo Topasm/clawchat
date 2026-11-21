@@ -20,7 +20,7 @@ MAX_CONTEXT_CHARS = 10_000
 #: project's folder. The skill chain never runs on the server for them, so the
 #: skills travel in the instruction. A chain run here sends each skill as its
 #: system prompt instead, and OpenCode loads the skill files itself.
-SKILL_TEXT_PROVIDERS = frozenset({"worker", "paseo"})
+SKILL_TEXT_PROVIDERS = frozenset({"worker", "orca"})
 
 
 def skill_chain_block(task: AgentTask) -> str:

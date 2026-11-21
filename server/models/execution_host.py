@@ -26,10 +26,11 @@ from sqlalchemy.orm import Mapped, mapped_column, validates
 from database import Base
 from utils import make_id
 
-#: "local" is the machine the server itself runs on. "paseo" is reached
-#: through the Paseo CLI. "worker" is a ClawChat desktop app that checks in and
-#: runs work on the machine it is installed on.
-EXECUTION_HOST_KINDS = ("local", "paseo", "worker")
+#: "local" is the machine the server itself runs on. "worker" is a ClawChat
+#: desktop app that checks in and runs work on the machine it is installed on.
+#: The database still accepts "paseo" for hosts saved before Paseo support was
+#: removed (ADR 020); such a host never takes work.
+EXECUTION_HOST_KINDS = ("local", "worker")
 
 
 class ExecutionHost(Base):
@@ -84,6 +85,7 @@ class ExecutionHost(Base):
 
     __table_args__ = (
         CheckConstraint(
+            # "paseo" stays legal for rows saved before Paseo was removed.
             "kind IN ('local', 'paseo', 'worker')",
             name="ck_execution_hosts_kind_valid",
         ),

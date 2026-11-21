@@ -570,14 +570,15 @@ async def decide_run(
             todo.completed_at = datetime.now(timezone.utc)
             await review_item_service.close_task_plan_reviews(db, [todo.id])
         await _publish_approved_report(db, run=run, task=task, todo=todo)
-        if run.provider == "paseo":
-            from services.agents.paseo_execution_service import publish_adopted_output
-
-            await publish_adopted_output(db, run=run, task=task)
-        elif run.provider == "opencode":
+        if run.provider == "opencode":
             from services.agents import opencode_execution_service
 
             await opencode_execution_service.publish_adopted_output(db, run=run, task=task)
+        elif run.provider == "orca":
+            from services.agents import orca_execution_service
+
+            await orca_execution_service.publish_adopted_output(db, run=run, task=task)
+            await orca_execution_service.settle_workspace(db, run=run, task=task, adopted=True)
         await record_event(db, run, "approved", "Run result approved", progress=100)
         await db.flush()
         if todo is not None and before_insights is not None:
@@ -647,6 +648,10 @@ async def decide_run(
         task.status = "failed"
         task.error = "Run result rejected"
         await record_event(db, run, "rejected", task.error, progress=100)
+        if run.provider == "orca":
+            from services.agents import orca_execution_service
+
+            await orca_execution_service.settle_workspace(db, run=run, task=task, adopted=False)
         await notify_run_state(db, run, task)
     else:
         raise ConflictError("Unsupported agent run review decision")
@@ -831,9 +836,9 @@ async def reconcile_interrupted_runs(db: AsyncSession) -> int:
     now = datetime.now(timezone.utc)
     reconciled = 0
     for run in runs:
-        # Paseo owns the external process. A later startup hook reattaches a
-        # monitor instead of falsely declaring the still-running agent dead.
-        if run.provider == "paseo" and run.external_run_id:
+        # Orca owns the external process. A later startup hook reattaches a
+        # monitor instead of declaring the live agent dead.
+        if run.provider == "orca" and run.external_run_id:
             continue
         reconciled += 1
         run.status = AgentRunStatus.FAILED

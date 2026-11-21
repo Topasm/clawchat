@@ -84,7 +84,7 @@ server/
 │   ├── planning/                # Plan capture/validation/versioned apply, inbox triage
 │   ├── notifications/           # Daily briefing, weekly review, reminders, nudges, push
 │   ├── agents/                  # Agent task pipeline, run lifecycle, delegation,
-│   │                            # Paseo provider, interrupted-run recovery
+│   │                            # OpenCode and Orca providers, interrupted-run recovery
 │   ├── relay/                   # Host identity, relay connector + crypto
 │   ├── chat/                    # orchestrator (routes intents, streams over WebSocket),
 │   │                            # intent_classifier, conversation_context,
