@@ -4712,7 +4712,7 @@
           },
           "kind": {
             "default": "local",
-            "pattern": "^(local|paseo|worker)$",
+            "pattern": "^(local|worker)$",
             "title": "Kind",
             "type": "string"
           },
@@ -4854,7 +4854,7 @@
           "kind": {
             "anyOf": [
               {
-                "pattern": "^(local|paseo|worker)$",
+                "pattern": "^(local|worker)$",
                 "type": "string"
               },
               {
@@ -4946,6 +4946,17 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "permission_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permission Mode"
           },
           "providers": {
             "items": {
@@ -6805,6 +6816,25 @@
         "title": "OpenPrerequisite",
         "type": "object"
       },
+      "OrcaRepository": {
+        "description": "A repository registered with the Orca on this machine.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name"
+        ],
+        "title": "OrcaRepository",
+        "type": "object"
+      },
       "PaginatedResponse_AgentTaskResponse_": {
         "properties": {
           "items": {
@@ -7999,6 +8029,21 @@
           "path"
         ],
         "title": "ProjectHostPathUpsert",
+        "type": "object"
+      },
+      "ProjectOrcaRepositorySelect": {
+        "description": "An Orca repository, by its path on the ClawChat server's machine.",
+        "properties": {
+          "path": {
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ProjectOrcaRepositorySelect",
         "type": "object"
       },
       "ProjectOverviewResponse": {
@@ -17114,6 +17159,37 @@
         ]
       }
     },
+    "/api/execution-providers/orca/repositories": {
+      "get": {
+        "description": "The repositories Orca knows on this machine, to pick a project's folder from.",
+        "operationId": "list_orca_repositories_api_execution_providers_orca_repositories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrcaRepository"
+                  },
+                  "title": "Response List Orca Repositories Api Execution Providers Orca Repositories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Orca Repositories",
+        "tags": [
+          "execution-providers"
+        ]
+      }
+    },
     "/api/execution-providers/{provider_id}/test": {
       "post": {
         "operationId": "test_execution_provider_api_execution_providers__provider_id__test_post",
@@ -18728,6 +18804,64 @@
         ]
       }
     },
+    "/api/projects/{project_id}/workspace/orca": {
+      "put": {
+        "description": "Run this project's work with Orca, in one of Orca's repositories.\n\nOrca runs beside the server, so the folder is recorded on the server's own\nmachine, which becomes where the work runs; the project's provider becomes\nOrca. One step instead of registering a host, typing a path and choosing a\nprovider separately.",
+        "operationId": "use_orca_repository_api_projects__project_id__workspace_orca_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOrcaRepositorySelect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Use Orca Repository",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/projects/{project_id}/workspace/paths": {
       "put": {
         "description": "Record where this project lives on one machine.",
@@ -19277,7 +19411,7 @@
     },
     "/api/runs/{run_id}/permission": {
       "post": {
-        "description": "Allow or deny the permissions blocking a Paseo-backed run.",
+        "description": "Allow or deny the approval an Orca-backed run stopped for.",
         "operationId": "resolve_run_permission_api_runs__run_id__permission_post",
         "parameters": [
           {

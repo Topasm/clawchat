@@ -230,7 +230,7 @@ Agent is actively executing.
 
 `ReadyTaskExecutionPanel` keeps execution approval separate from Task Skill
 assignment. It filters out the planning Skill, selects from the server Skill
-registry and discovered providers, checks the Paseo workspace prerequisite,
+registry and discovered providers, checks the bridged provider's workspace prerequisite,
 and reveals the Start action only after a review step. The owning mutation
 sends the Ready guard and explicit approval, then invalidates Todos, Runs,
 Projects, graph insights, and Task execution telemetry together.

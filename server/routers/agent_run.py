@@ -27,7 +27,7 @@ from services.agents import (
     agent_task_service,
     execution_host_service,
     opencode_execution_service,
-    paseo_execution_service,
+    orca_execution_service,
     run_resume_service,
     task_execution_recovery_service,
 )
@@ -85,17 +85,20 @@ def _active_provider(request: Request) -> tuple[str, object, str | None]:
 def _external_backend(request: Request, provider: str):
     """``(label, adapter, execute_run)`` for a provider ClawChat bridges to."""
     state = request.app.state
-    if provider == "paseo":
-        adapter = getattr(state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        return "Paseo", adapter, paseo_execution_service.execute_run
     if provider == "opencode":
         adapter = getattr(state, "opencode_adapter", None) or (
             opencode_execution_service.adapter_from_settings()
         )
         return "OpenCode", adapter, opencode_execution_service.execute_run
+    if provider == "orca":
+        return "Orca", _orca_adapter(request), orca_execution_service.execute_run
     return None
+
+
+def _orca_adapter(request: Request):
+    return getattr(request.app.state, "orca_adapter", None) or (
+        orca_execution_service.adapter_from_settings()
+    )
 
 
 @router.post("/{run_id}/retry", response_model=AgentRunResponse, status_code=201)
@@ -138,7 +141,7 @@ async def retry_run(
             task,
             provider=provider,
             model=body.model or previous.model,
-            host_id=adapter.host_label if provider == "paseo" else previous.host_id,
+            host_id=previous.host_id,
             instruction_snapshot=instruction,
         )
         await db.commit()
@@ -233,26 +236,23 @@ async def resolve_run_permission(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
-    """Allow or deny the permissions blocking a Paseo-backed run."""
+    """Allow or deny the approval an Orca-backed run stopped for."""
     run = await agent_run_service.require_run_for_update(db, run_id)
     if (
-        run.provider != "paseo"
+        run.provider != "orca"
         or run.status != AgentRunStatus.WAITING_INPUT
         or not run.external_run_id
     ):
-        raise ConflictError("This run has no pending Paseo permission")
-    adapter = getattr(request.app.state, "paseo_adapter", None) or (
-        paseo_execution_service.adapter_from_settings()
-    )
-    await adapter.resolve_permissions(
-        run.external_run_id, allow=body.decision == "allow"
-    )
+        raise ConflictError("This run has no pending permission")
+    allow = body.decision == "allow"
+    adapter = _orca_adapter(request)
+    await orca_execution_service.answer_pending_requests(run, allow=allow, adapter=adapter)
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
-    decision_past = "allowed" if body.decision == "allow" else "denied"
+    decision_past = "allowed" if allow else "denied"
     run.status = AgentRunStatus.RUNNING
-    run.progress_message = f"Paseo permission {decision_past}"
+    run.progress_message = f"Orca permission {decision_past}"
     run.heartbeat_at = datetime.now(timezone.utc)
     task.status = "running"
     task.progress_message = run.progress_message
@@ -267,7 +267,7 @@ async def resolve_run_permission(
     await db.commit()
     agent_run_service.launch_execution(
         run.id,
-        paseo_execution_service.execute_run(
+        orca_execution_service.execute_run(
             request.app.state.session_factory,
             run.id,
             user_id=user_id,
@@ -288,12 +288,9 @@ async def cancel_run(
     persisted = await agent_run_service.require_run(db, run_id)
     run = await agent_run_service.cancel_run(db, run_id)
     external_cancel_error = None
-    if persisted.provider == "paseo":
-        adapter = getattr(request.app.state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        external_cancel_error = await paseo_execution_service.cancel_external_run(
-            persisted, adapter=adapter
+    if persisted.provider == "orca":
+        external_cancel_error = await orca_execution_service.cancel_external_run(
+            persisted, adapter=_orca_adapter(request)
         )
     if external_cancel_error:
         await agent_run_service.record_event(

@@ -317,19 +317,24 @@ the queue, each acted on in place through the shared `RunCard` and
 `ReviewItemCard` and linked to its thread. The Runs log (`/runs`) and the
 review history (`/review`) remain as the full record behind it.
 
-### Paseo execution provider
+### Orca execution provider
 
-Projects can select `paseo` as their default execution provider and bind a
-repository path visible to the configured daemon. ClawChat invokes Paseo's
-official JSON CLI contract without a shell: it creates a local or worktree
-workspace, starts a background agent, persists the external workspace/agent
-IDs, polls provider state into heartbeats, and forwards follow-up or stop
-commands. The provider/model value remains a Paseo identifier such as
-`codex/gpt-5.5`.
+Projects can select `orca` as their default execution provider and bind a
+repository path on the ClawChat server's machine, where the user runs
+`orca-ide serve`. For each run, ClawChat:
 
-Paseo continues to own agent credentials, process supervision, worktrees, and
-remote transport. ClawChat owns the AgentTask/AgentRun state machine, output
-Artifact, ReviewItem, adoption, and linked Todo completion. Active Paseo runs
-survive a ClawChat restart: startup skips built-in interruption reconciliation
-for reattachable external IDs and launches fresh monitors. See
-[ADR 010](./adr/010-paseo-execution-provider.md).
+1. creates an Orca worktree, or uses the folder itself with local isolation;
+2. opens a chat with `ORCA_AGENT` and persists the chat id;
+3. sets the chat's permission mode (`ask` or `auto`, never Orca's
+   `full-access`) and sends the instruction;
+4. polls the chat into heartbeats. An approval the agent stops for becomes
+   `waiting_input`, answered from the run card;
+5. turns the working-tree diff into the patch under review.
+
+Orca owns agent credentials, the CLI and its sandbox, and the worktrees.
+ClawChat owns the AgentTask/AgentRun state machine, output Artifact,
+ReviewItem, adoption, and linked Todo completion. Active Orca runs survive a
+ClawChat restart: startup skips built-in interruption reconciliation for
+reattachable chat IDs and launches fresh monitors. See
+[ADR 020](./adr/020-orca-execution-provider.md); it replaced the earlier Paseo
+provider ([ADR 010](./adr/010-paseo-execution-provider.md)).

@@ -57,8 +57,8 @@ async def fail_silent_runs(
 ) -> list[str]:
     """Fail started runs nothing is executing whose heartbeat has lapsed.
 
-    A run this process is executing is alive whatever its heartbeat says; a
-    Paseo monitor and a desktop worker both refresh the heartbeat while they
+    A run this process is executing is alive whatever its heartbeat says; an
+    Orca monitor and a desktop worker both refresh the heartbeat while they
     live, so a lapse with no local coroutine means the process behind the run
     is gone. Queued runs are not started yet and are left for their host.
     """

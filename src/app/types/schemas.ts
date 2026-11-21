@@ -1229,6 +1229,12 @@ export const ExecutionProviderStatusSchema = z.object({
   host: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   providers: z.array(z.record(z.string(), z.unknown())).default([]),
+  permission_mode: z.string().nullable().optional(),
+});
+
+export const OrcaRepositorySchema = z.object({
+  path: z.string(),
+  name: z.string(),
 });
 
 export const ActivityResponseSchema = z.object({

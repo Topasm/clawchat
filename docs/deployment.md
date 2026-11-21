@@ -130,13 +130,16 @@ is not included in the Docker image.
 | `CODEX_REASONING_EFFORT` | `medium` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh` |
 | `CODEX_CLI_MODEL` | `gpt-6-luna` | Codex CLI model; empty uses the CLI config default |
 | `CLAUDE_CODE_MODEL` | `sonnet` | Model alias passed to `claude --model`; empty uses the CLI default |
-| `PASEO_ENABLED` | `false` | Enable the optional Paseo execution adapter |
-| `PASEO_CLI_COMMAND` | `paseo` | Official Paseo CLI command available to the server process |
-| `PASEO_HOST` | *(empty)* | Optional daemon target; supports host:port or an E2EE offer URL |
-| `PASEO_DEFAULT_PROVIDER` | `codex` | Default Paseo provider/model identifier |
-| `PASEO_POLL_INTERVAL_SECONDS` | `3` | External agent status polling interval |
-| `PASEO_COMMAND_TIMEOUT_SECONDS` | `30` | Per-command timeout, except transcript collection |
-| `PASEO_RECONNECT_GRACE_SECONDS` | `120` | Daemon outage tolerated before a run fails |
+| `ORCA_ENABLED` | `false` | Enable the optional Orca execution adapter (an `orca-ide serve` you run on this machine) |
+| `ORCA_CLI_COMMAND` | `orca-ide` | Orca CLI command available to the server process (never bare `orca` on Linux: that is the screen reader) |
+| `ORCA_USER_DATA_PATH` | *(empty)* | Orca profile directory; empty uses Orca's default |
+| `ORCA_AGENT` | `codex` | Orca agent id each run's chat uses (`orca-ide agent installed` lists them) |
+| `ORCA_MODEL` | *(empty)* | Model for that agent; empty picks the CLI's cheap tier |
+| `ORCA_PERMISSION_MODE` | `auto` | `auto` (workspace writes, agent's reviewer judges escalations) or `ask` (read-only, every escalation waits for you) |
+| `ORCA_POLL_INTERVAL_SECONDS` | `3` | Chat status polling interval |
+| `ORCA_COMMAND_TIMEOUT_SECONDS` | `30` | Per-command timeout |
+| `ORCA_RECONNECT_GRACE_SECONDS` | `120` | Orca outage tolerated before a run fails |
+| `ORCA_RUN_TIMEOUT_SECONDS` | `3600` | Longest a run may work before its turn is stopped |
 | `UPLOAD_DIR` | `data/uploads` | Directory for uploaded attachment files |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum file upload size in MB |
 | `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
@@ -159,10 +162,9 @@ AI_MODEL=llama3.2
 ENABLE_SCHEDULER=true
 BRIEFING_TIME=08:00
 
-# Optional coding-agent execution through a local Paseo daemon
-# PASEO_ENABLED=true
-# PASEO_CLI_COMMAND=paseo
-# PASEO_DEFAULT_PROVIDER=codex/gpt-5.5
+# Optional coding-agent execution through Orca running on this machine
+# ORCA_ENABLED=true
+# ORCA_CLI_COMMAND=/opt/orca-server/bin/orca-ide
 
 # Remote access (set when using Cloudflare Tunnel or reverse proxy)
 # PUBLIC_URL=https://clawchat.example.com

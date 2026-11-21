@@ -24,7 +24,6 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import settings
 from domain.agent_run import AgentRunStatus
 from exceptions import ValidationError
 from models.execution_host import ExecutionHost, ProjectHostPath
@@ -75,14 +74,6 @@ def host_is_available(
         # machine is simply not here. Reporting that as "the wrong machine"
         # beats failing obscurely somewhere deeper in the run.
         return os.path.isdir(os.path.expanduser(path))
-    if host.kind == "paseo":
-        if not settings.paseo_enabled:
-            return False
-        if host.last_seen_at is None:
-            # Never probed. The adapter reports a real failure on first use,
-            # which is more informative than refusing to try.
-            return True
-        return host_checked_in_recently(host, now=now)
     if host.kind == "worker":
         # A worker only exists while its app is running, so silence means the
         # machine is asleep or the app is closed. Never having checked in is
@@ -94,8 +85,8 @@ def host_is_available(
 async def run_host_label(db: AsyncSession, run) -> str | None:
     """The machine a run executes on, as the user named it.
 
-    Worker runs carry the host id; Paseo runs carry the daemon's label in
-    ``host_id``; built-in runs execute on the server itself.
+    Worker runs carry the host id; OpenCode and Orca runs carry the host's
+    label in ``host_id``; built-in runs execute on the server itself.
     """
     if run.execution_host_id:
         host = await db.get(ExecutionHost, run.execution_host_id)
@@ -301,8 +292,8 @@ async def resolve_workspace(
     if local is None:
         # No host has been registered at all: the historical shape, where the
         # path was handed straight to the provider. That is deliberately not
-        # checked against this filesystem -- a Paseo workspace path lives on
-        # the Paseo machine and was never expected to exist here.
+        # checked here; a provider that needs it on this machine (OpenCode,
+        # Orca) checks it itself before anything starts.
         return WorkspaceResolution(host=None, path=legacy_path, is_available=True)
 
     return WorkspaceResolution(

@@ -92,8 +92,8 @@ class AgentRunResponse(BaseModel):
     provider: str
     model: str | None = None
     host_id: str | None = None
-    #: The machine this run executes on, as the user named it (worker label,
-    #: Paseo daemon label); None for runs the server executes itself.
+    #: The machine this run executes on, as the user named it (worker or host
+    #: label); None for runs the server executes itself.
     host_label: str | None = None
     workspace_id: str | None = None
     external_run_id: str | None = None

@@ -26,7 +26,7 @@ from services.agents import (
     agent_task_service,
     execution_host_service,
     opencode_execution_service,
-    paseo_execution_service,
+    orca_execution_service,
 )
 from services.planning import (
     inbox_pipeline_service,
@@ -57,8 +57,8 @@ class DelegationRuntime:
     session_factory: async_sessionmaker[AsyncSession] | None
     active_ai: Any | None
     active_ai_provider: str
-    paseo_adapter: Any | None = None
     opencode_adapter: Any | None = None
+    orca_adapter: Any | None = None
 
 
 SkillSource = Literal["requested", "assigned", "auto"]
@@ -153,6 +153,14 @@ async def delegate_todo_to_skill(
     configured_provider = body.execution_provider or (
         project.default_execution_provider if project else None
     )
+    if configured_provider == "paseo":
+        # Refused rather than quietly run by the built-in AI: a project that
+        # sent its code work to an agent should not get a chat reply instead.
+        raise AppError(
+            code="EXECUTION_PROVIDER_REMOVED",
+            message="Paseo is no longer supported. Choose Orca or OpenCode in the project's execution settings.",
+            status_code=409,
+        )
     workspace = (
         await execution_host_service.resolve_workspace(db, project)
         if project is not None
@@ -182,48 +190,13 @@ async def delegate_todo_to_skill(
         if worker_host is not None
         else (
             configured_provider
-            if configured_provider in ("paseo", "opencode") and skill_id != "plan"
+            if configured_provider in ("opencode", "orca") and skill_id != "plan"
             else active_provider
         )
     )
-    paseo_adapter = None
     opencode_adapter = None
-    if provider == "paseo":
-        paseo_adapter = runtime.paseo_adapter or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        if not paseo_adapter.enabled:
-            raise AppError(
-                code="PASEO_DISABLED",
-                message="Paseo execution is disabled on this ClawChat server",
-                status_code=503,
-            )
-        if project is None:
-            raise AppError(
-                code="PASEO_WORKSPACE_REQUIRED",
-                message="Configure the project's execution workspace path before using Paseo",
-                status_code=409,
-            )
-        if workspace is None or workspace.is_unconfigured:
-            raise AppError(
-                code="PASEO_WORKSPACE_REQUIRED",
-                message="Configure the project's execution workspace path before using Paseo",
-                status_code=409,
-            )
-        if workspace.is_offline:
-            # Refused rather than queued: this work belongs on that machine
-            # alone, and holding it until the machine returns would run it much
-            # later against files that have moved on in the meantime.
-            host_label = workspace.host.label if workspace.host else "The host"
-            raise AppError(
-                code="EXECUTION_HOST_UNAVAILABLE",
-                message=(
-                    f"{host_label} is offline. Open ClawChat there, or move this "
-                    "project to a machine that is running."
-                ),
-                status_code=409,
-            )
-    elif provider == "opencode":
+    orca_adapter = None
+    if provider == "opencode":
         opencode_adapter = runtime.opencode_adapter or (
             opencode_execution_service.adapter_from_settings()
         )
@@ -237,6 +210,18 @@ async def delegate_todo_to_skill(
         if problem is not None:
             code, message = problem
             raise AppError(code=code, message=message, status_code=409)
+    elif provider == "orca":
+        orca_adapter = runtime.orca_adapter or orca_execution_service.adapter_from_settings()
+        if not orca_adapter.enabled:
+            raise AppError(
+                code="ORCA_DISABLED",
+                message="Orca execution is disabled on this ClawChat server",
+                status_code=503,
+            )
+        problem = orca_execution_service.workspace_problem(workspace)
+        if problem is not None:
+            code, message = problem
+            raise AppError(code=code, message=message, status_code=409)
     elif worker_host is None and active_ai is None:
         raise AppError(
             code="AI_UNAVAILABLE",
@@ -247,10 +232,10 @@ async def delegate_todo_to_skill(
         body.model
         or (project.default_execution_model if project else None)
         or (
-            settings.paseo_default_provider
-            if provider == "paseo"
-            else settings.opencode_model or None
+            settings.opencode_model or None
             if provider == "opencode"
+            else orca_execution_service.default_model(settings.orca_agent)
+            if provider == "orca"
             else getattr(active_ai, "model", None)
         )
     )
@@ -263,12 +248,10 @@ async def delegate_todo_to_skill(
         provider=provider,
         model=run_model,
         host_id=(
-            paseo_adapter.host_label
-            if paseo_adapter
-            else worker_host.label
+            worker_host.label
             if worker_host
             else workspace.host.label
-            if opencode_adapter and workspace and workspace.host
+            if (opencode_adapter or orca_adapter) and workspace and workspace.host
             else None
         ),
         update_todo_status=skill_id != "plan" and not body.require_ready,
@@ -353,16 +336,6 @@ async def delegate_todo_to_skill(
         # it, which it only does while it is running and asking for work.
         run.execution_host_id = worker_host.id
         await db.commit()
-    elif provider == "paseo":
-        agent_run_service.launch_execution(
-            run.id,
-            paseo_execution_service.execute_run(
-                session_factory,
-                run.id,
-                user_id=user_id,
-                adapter=paseo_adapter,
-            ),
-        )
     elif provider == "opencode":
         agent_run_service.launch_execution(
             run.id,
@@ -371,6 +344,16 @@ async def delegate_todo_to_skill(
                 run.id,
                 user_id=user_id,
                 adapter=opencode_adapter,
+            ),
+        )
+    elif provider == "orca":
+        agent_run_service.launch_execution(
+            run.id,
+            orca_execution_service.execute_run(
+                session_factory,
+                run.id,
+                user_id=user_id,
+                adapter=orca_adapter,
             ),
         )
     else:

@@ -10,7 +10,11 @@ from exceptions import NotFoundError
 from models.agent_task import AgentTask
 from schemas.common import PaginatedResponse
 from schemas.task import AgentTaskResponse
-from services.agents import agent_run_service, agent_task_service, paseo_execution_service
+from services.agents import (
+    agent_run_service,
+    agent_task_service,
+    orca_execution_service,
+)
 
 router = APIRouter()
 
@@ -80,11 +84,11 @@ async def cancel_task(
     if run is not None and run.status in ("queued", "starting", "running", "waiting_input"):
         await agent_run_service.cancel_run(db, run.id)
         external_cancel_error = None
-        if run.provider == "paseo":
-            adapter = getattr(request.app.state, "paseo_adapter", None) or (
-                paseo_execution_service.adapter_from_settings()
+        if run.provider == "orca":
+            adapter = getattr(request.app.state, "orca_adapter", None) or (
+                orca_execution_service.adapter_from_settings()
             )
-            external_cancel_error = await paseo_execution_service.cancel_external_run(
+            external_cancel_error = await orca_execution_service.cancel_external_run(
                 run, adapter=adapter
             )
         if external_cancel_error:

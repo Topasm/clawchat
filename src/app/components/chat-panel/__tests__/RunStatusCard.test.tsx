@@ -19,7 +19,7 @@ vi.mock('../../../hooks/queries', () => ({
   useReviewsQuery: queryMocks.reviews,
   useResumeAgentRun: () => ({ mutate: queryMocks.resume, isPending: false }),
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
-  useResolvePaseoPermission: () => ({ mutate: queryMocks.permission, isPending: false }),
+  useResolveRunPermission: () => ({ mutate: queryMocks.permission, isPending: false }),
   useDecideToolCall: () => ({ mutate: queryMocks.decideTool, isPending: false }),
   useRunReadyTaskWithProjectDefaults: () => ({
     runTask: queryMocks.runNext,
@@ -71,7 +71,7 @@ describe('RunStatusCard', () => {
     queryMocks.runNext.mockReset();
   });
 
-  it('renders structured choices and Paseo permission actions inline', () => {
+  it('renders structured choices and Orca permission actions inline', () => {
     queryMocks.awaitingInput.mockReturnValue({ data: [waitingRun] });
     renderCard({
       action_type: 'run_update',

@@ -94,13 +94,13 @@ async def lifespan(app: FastAPI):
 
     app.state.session_factory = async_session_factory
 
-    from services.agents import paseo_execution_service
-
-    app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
-
     from services.agents import opencode_execution_service
 
     app.state.opencode_adapter = opencode_execution_service.adapter_from_settings()
+
+    from services.agents import orca_execution_service
+
+    app.state.orca_adapter = orca_execution_service.adapter_from_settings()
 
     claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
@@ -146,12 +146,12 @@ async def lifespan(app: FastAPI):
 
     run_push.configure(push_service, async_session_factory)
 
-    recovered_paseo_runs = await paseo_execution_service.recover_active_runs(
+    recovered_orca_runs = await orca_execution_service.recover_active_runs(
         async_session_factory,
-        adapter=app.state.paseo_adapter,
+        adapter=app.state.orca_adapter,
     )
-    if recovered_paseo_runs:
-        logger.info("Reattached %d Paseo AgentRun monitor(s)", recovered_paseo_runs)
+    if recovered_orca_runs:
+        logger.info("Reattached %d Orca AgentRun monitor(s)", recovered_orca_runs)
 
     # Start background scheduler if enabled
     if settings.enable_scheduler:

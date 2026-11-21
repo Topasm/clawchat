@@ -1,5 +1,5 @@
 """Execution-provider adapters used by durable AgentRuns."""
 
-from execution.paseo_cli import PaseoCLIAdapter, PaseoCLIError
+from execution.orca_cli import OrcaAdapter, OrcaError
 
-__all__ = ["PaseoCLIAdapter", "PaseoCLIError"]
+__all__ = ["OrcaAdapter", "OrcaError"]

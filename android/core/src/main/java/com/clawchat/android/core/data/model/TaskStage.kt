@@ -91,6 +91,7 @@ private val AGENT_NAMES = mapOf(
     "codex_cli" to "Codex",
     "opencode" to "OpenCode",
     "openclaw" to "OpenClaw",
+    "orca" to "Orca",
     "paseo" to "Paseo",
 )
 

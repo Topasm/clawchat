@@ -204,16 +204,6 @@ class Settings(BaseSettings):
     cli_sessions_enabled: bool = True
     cli_sessions_codex_socket: str = ""
 
-    # Optional Paseo execution daemon. The CLI owns daemon authentication and
-    # supports local, TCP, unix-socket, and E2EE offer URL targets.
-    paseo_enabled: bool = False
-    paseo_cli_command: str = "paseo"
-    paseo_host: str = ""
-    paseo_default_provider: str = "codex"
-    paseo_poll_interval_seconds: float = 3.0
-    paseo_command_timeout_seconds: float = 30.0
-    paseo_reconnect_grace_seconds: float = 120.0
-
     # Optional OpenCode execution backend. ClawChat starts one sandboxed
     # `opencode serve` per run on this machine; skills, the tool loop and model
     # routing stay OpenCode's. The model is "provider/model" as OpenCode names
@@ -226,6 +216,25 @@ class Settings(BaseSettings):
     opencode_sandbox: str = "bwrap"
     opencode_startup_timeout_seconds: float = 30.0
     opencode_run_timeout_seconds: float = 3600.0
+
+    # Optional Orca execution backend: an `orca-ide serve` the user runs on
+    # this machine (ClawChat never starts it). Each run gets its own Orca
+    # worktree (or the project folder itself) and one Orca chat with
+    # `orca_agent`. Empty model picks the CLI's cheap tier (CODEX_CLI_MODEL,
+    # CLAUDE_CODE_MODEL). Permission mode "ask" runs the agent read-only and
+    # sends every escalation to the user; "auto" lets it write inside the
+    # workspace and has the agent's own reviewer judge escalations. Orca's
+    # "full-access" is never used. Empty user data path is Orca's default.
+    orca_enabled: bool = False
+    orca_cli_command: str = "orca-ide"
+    orca_user_data_path: str = ""
+    orca_agent: str = "codex"
+    orca_model: str = ""
+    orca_permission_mode: str = "auto"
+    orca_poll_interval_seconds: float = 3.0
+    orca_command_timeout_seconds: float = 30.0
+    orca_reconnect_grace_seconds: float = 120.0
+    orca_run_timeout_seconds: float = 3600.0
 
     # The user's own Agent Skills: one `<name>/SKILL.md` per directory, loaded
     # after the built-ins (a matching name replaces the built-in). Empty

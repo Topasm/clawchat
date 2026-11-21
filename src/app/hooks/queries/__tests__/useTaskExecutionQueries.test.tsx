@@ -155,8 +155,8 @@ describe('Ready task execution queries', () => {
               status: 'active',
               root_task_id: 'root-1',
               graph_revision: 8,
-              default_execution_provider: 'paseo',
-              default_execution_model: 'codex/gpt-5.6',
+              default_execution_provider: 'orca',
+              default_execution_model: 'gpt-6-luna',
               execution_workspace_isolation: 'local',
               created_at: '2026-09-04T00:00:00Z',
               updated_at: '2026-09-04T00:00:00Z',
@@ -202,8 +202,8 @@ describe('Ready task execution queries', () => {
 
     expect(apiMocks.post).toHaveBeenCalledWith('/todos/todo-next/delegate', {
       skill_id: 'publish',
-      execution_provider: 'paseo',
-      model: 'codex/gpt-5.6',
+      execution_provider: 'orca',
+      model: 'gpt-6-luna',
       require_ready: true,
       approved: true,
     });

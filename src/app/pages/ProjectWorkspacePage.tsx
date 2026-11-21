@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  useChooseOrcaRepository,
   useDeleteProject,
   useGetOrCreateProjectConversation,
   useExecutionProvidersQuery,
+  useOrcaRepositoriesQuery,
   useProjectQuery,
   useTaskExecutionTelemetryQuery,
   useTestExecutionProvider,
@@ -449,11 +451,16 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
   );
 }
 
+/** The project's provider as the form offers it; a removed one (Paseo) reads as built-in. */
+function offeredProvider(provider: string | null | undefined): string {
+  return provider && provider !== 'paseo' ? provider : 'builtin';
+}
+
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();
   const testProvider = useTestExecutionProvider();
   const updateProject = useUpdateProject(project.id, 'Execution settings saved');
-  const [provider, setProvider] = useState(project.default_execution_provider || 'builtin');
+  const [provider, setProvider] = useState(offeredProvider(project.default_execution_provider));
   const [model, setModel] = useState(project.default_execution_model || '');
   const [isolation, setIsolation] = useState<'local' | 'worktree'>(
     project.execution_workspace_isolation || 'local',
@@ -463,29 +470,27 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
     project.execution_instructions || '',
   );
   useEffect(() => {
-    setProvider(project.default_execution_provider || 'builtin');
+    setProvider(offeredProvider(project.default_execution_provider));
     setModel(project.default_execution_model || '');
     setIsolation(project.execution_workspace_isolation || 'local');
     setBaseBranch(project.execution_base_branch || '');
     setExecutionInstructions(project.execution_instructions || '');
   }, [project]);
-  const paseo = providers.find((item) => item.id === 'paseo');
   const opencode = providers.find((item) => item.id === 'opencode');
+  const orca = providers.find((item) => item.id === 'orca');
   // Only a provider ClawChat bridges to has a connection worth showing.
-  const external = provider === 'paseo' ? paseo : provider === 'opencode' ? opencode : undefined;
-  const paseoModels = (paseo?.providers ?? [])
-    .map((item) => (typeof item.provider === 'string' ? item.provider : null))
-    .filter((item): item is string => !!item);
+  const external = provider === 'opencode' ? opencode : provider === 'orca' ? orca : undefined;
+  const externalLabel = provider === 'opencode' ? translateUi('OpenCode') : translateUi('Orca');
+  const isBridged = provider === 'opencode' || provider === 'orca';
+  const { data: orcaRepos = [] } = useOrcaRepositoriesQuery(provider === 'orca' && !!orca?.enabled);
+  const chooseRepo = useChooseOrcaRepository(project.id);
+  const repoPath = project.execution_workspace_path ?? '';
+  const repoListed = orcaRepos.some((repo) => repo.path === repoPath);
   const save = (event: React.FormEvent) => {
     event.preventDefault();
     updateProject.mutate({
       default_execution_provider: provider,
-      default_execution_model:
-        provider === 'paseo'
-          ? model.trim() || 'codex'
-          : provider === 'opencode'
-            ? model.trim() || null
-            : null,
+      default_execution_model: isBridged ? model.trim() || null : null,
       execution_workspace_isolation: isolation,
       execution_base_branch: isolation === 'worktree' ? baseBranch.trim() || null : null,
       execution_instructions: executionInstructions.trim() || null,
@@ -502,12 +507,12 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
             )}
           </p>
         </div>
-        {(provider === 'paseo' || provider === 'opencode') && (
+        {isBridged && (
           <div className="cc-project-execution-settings__health">
             <span
               className={`cc-settings-status cc-settings-status--${external?.connected ? 'success' : 'muted'}`}
             >
-              {provider === 'paseo' ? translateUi('Paseo') : translateUi('OpenCode')}{' '}
+              {externalLabel}{' '}
               {isLoading
                 ? translateUi('checking\u2026')
                 : external?.connected
@@ -541,52 +546,94 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
           <span>{translateUi('Provider')}</span>
           <select value={provider} onChange={(event) => setProvider(event.target.value)}>
             <option value="builtin">{translateUi('Built-in AI and skills')}</option>
-            <option value="paseo" disabled={!paseo?.enabled}>
-              {translateUi('\n              Paseo daemon')}
-              {paseo?.enabled ? '' : translateUi(' (disabled on server)')}
-            </option>
             <option value="opencode" disabled={!opencode?.enabled}>
               {translateUi('OpenCode')}
               {opencode?.enabled ? '' : translateUi(' (disabled on server)')}
             </option>
+            <option value="orca" disabled={!orca?.enabled}>
+              {translateUi('Orca')}
+              {orca?.enabled ? '' : translateUi(' (disabled on server)')}
+            </option>
           </select>
         </label>
-        {provider === 'paseo' && (
+        {provider === 'orca' && (
           <>
             <label>
-              <span>{translateUi('Paseo provider / model')}</span>
-              <input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                placeholder={translateUi('codex/gpt-5.5')}
-                list="cc-paseo-provider-list"
-              />
-              <datalist id="cc-paseo-provider-list">
-                {paseoModels.map((item) => (
-                  <option key={item} value={item} />
+              <span>{translateUi('Repository')}</span>
+              <select
+                value={repoPath}
+                disabled={chooseRepo.isPending || !orca?.connected}
+                onChange={(event) => chooseRepo.mutate(event.target.value)}
+              >
+                <option value="" disabled>
+                  {orcaRepos.length > 0
+                    ? translateUi('Choose a repository')
+                    : translateUi('No repositories in Orca yet')}
+                </option>
+                {repoPath && !repoListed && <option value={repoPath}>{repoPath}</option>}
+                {orcaRepos.map((repo) => (
+                  <option key={repo.path} value={repo.path}>
+                    {repo.name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
+              {repoPath && (
+                <small className="cc-project-execution-form__hint" title={repoPath}>
+                  {repoPath}
+                </small>
+              )}
+              {orca?.connected && orcaRepos.length === 0 && (
+                <small className="cc-project-execution-form__hint">
+                  {translateUi('Add one in Orca first (orca-ide repo add --path <folder>).')}
+                </small>
+              )}
             </label>
             <label>
-              <span>{translateUi('Isolation')}</span>
+              <span>{translateUi('Each task works in')}</span>
               <select
                 value={isolation}
                 onChange={(event) => setIsolation(event.target.value as 'local' | 'worktree')}
               >
-                <option value="worktree">{translateUi('New worktree')}</option>
-                <option value="local">{translateUi('Local workspace')}</option>
+                <option value="worktree">{translateUi('Its own worktree (recommended)')}</option>
+                <option value="local">{translateUi('The repository folder itself')}</option>
               </select>
             </label>
-            {isolation === 'worktree' && (
-              <label>
-                <span>{translateUi('Base branch')}</span>
-                <input
-                  value={baseBranch}
-                  onChange={(event) => setBaseBranch(event.target.value)}
-                  placeholder={translateUi('origin/main')}
-                />
-              </label>
+            {orca?.permission_mode && (
+              <p className="cc-project-execution-form__note">
+                <strong>{translateUi('Agent permissions')}</strong>{' '}
+                {orca.permission_mode === 'ask'
+                  ? translateUi(
+                      'Ask: read-only, and anything more waits for your approval here. Code cannot be edited in this mode.',
+                    )
+                  : translateUi(
+                      "Auto: edits inside the task's worktree; the agent's own reviewer decides anything beyond it.",
+                    )}{' '}
+                {translateUi('Set on the server with ORCA_PERMISSION_MODE.')}
+              </p>
             )}
+            <details className="cc-project-execution-form__advanced">
+              <summary>{translateUi('Advanced')}</summary>
+              <div className="cc-project-execution-form__advanced-fields">
+                <label>
+                  <span>{translateUi('Orca model')}</span>
+                  <input
+                    value={model}
+                    onChange={(event) => setModel(event.target.value)}
+                    placeholder={translateUi("empty uses the agent's cheaper tier")}
+                  />
+                </label>
+                {isolation === 'worktree' && (
+                  <label>
+                    <span>{translateUi('Base branch')}</span>
+                    <input
+                      value={baseBranch}
+                      onChange={(event) => setBaseBranch(event.target.value)}
+                      placeholder={translateUi("empty uses the repository's default")}
+                    />
+                  </label>
+                )}
+              </div>
+            </details>
           </>
         )}
         {provider === 'opencode' && (

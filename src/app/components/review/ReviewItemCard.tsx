@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AgentRunReviewHandoff from './AgentRunReviewHandoff';
+import RunChangesView from './RunChangesView';
 import { useUpdateScheduledJob } from '../../hooks/queries';
 import type { ReviewItemResponse } from '../../types/api';
 import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRunReview';
@@ -43,6 +44,8 @@ export function reviewAutomation(item: ReviewItemResponse): ReviewAutomation | n
 export interface ChangedFile {
   path: string;
   status: string;
+  additions?: number;
+  deletions?: number;
 }
 
 /**
@@ -56,7 +59,12 @@ export function reviewChangedFiles(
   if (!Array.isArray(raw)) return null;
   const files = raw
     .filter((file): file is ChangedFile => typeof file?.path === 'string')
-    .map((file) => ({ path: file.path, status: String(file.status ?? 'modified') }));
+    .map((file) => ({
+      path: file.path,
+      status: String(file.status ?? 'modified'),
+      additions: typeof file.additions === 'number' ? file.additions : undefined,
+      deletions: typeof file.deletions === 'number' ? file.deletions : undefined,
+    }));
   const count =
     typeof item.metadata.changed_files_count === 'number'
       ? item.metadata.changed_files_count
@@ -119,6 +127,11 @@ export default function ReviewItemCard({
     });
   // The note says what to change, so it opens only once changes are asked for.
   const [requesting, setRequesting] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
+  const runId =
+    item.subject_type === 'agent_run' && typeof item.metadata.run_id === 'string'
+      ? item.metadata.run_id
+      : null;
   const title = item.subject_title || item.summary;
   const summary =
     item.summary && item.summary !== title
@@ -154,6 +167,12 @@ export default function ReviewItemCard({
                   {mark}
                 </span>
                 <span className="cc-review-card__file-path">{file.path}</span>
+                {(file.additions !== undefined || file.deletions !== undefined) && (
+                  <span className="cc-review-card__file-counts">
+                    <span className="cc-review-card__file-count--add">+{file.additions ?? 0}</span>{' '}
+                    <span className="cc-review-card__file-count--del">−{file.deletions ?? 0}</span>
+                  </span>
+                )}
               </li>
             );
           })}
@@ -164,6 +183,17 @@ export default function ReviewItemCard({
           )}
         </ul>
       )}
+      {runId && changed && changed.count > 0 && (
+        <button
+          className="cc-review-card__link"
+          type="button"
+          aria-expanded={showChanges}
+          onClick={() => setShowChanges((value) => !value)}
+        >
+          {showChanges ? translateUi('Hide changes') : translateUi('Show changes')}
+        </button>
+      )}
+      {runId && showChanges && <RunChangesView runId={runId} />}
       {item.subject_description && (
         <pre className="cc-review-card__preview">{item.subject_description}</pre>
       )}

@@ -19,7 +19,7 @@ from models.message import Message
 from services.agents import (
     agent_run_service,
     agent_task_service,
-    paseo_execution_service,
+    orca_execution_service,
 )
 from services.review import review_item_service
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,13 +62,13 @@ async def resume_with_follow_up(
     if not follow_up:
         raise ConflictError("A follow-up instruction is required to resume")
 
-    paseo_adapter = None
+    orca_adapter = None
     provider = None
     ai_service = None
     model = None
-    if run.provider == "paseo":
-        paseo_adapter = getattr(app_state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
+    if run.provider == "orca":
+        orca_adapter = getattr(app_state, "orca_adapter", None) or (
+            orca_execution_service.adapter_from_settings()
         )
     else:
         provider, ai_service, model = active_provider(app_state)
@@ -120,15 +120,15 @@ async def resume_with_follow_up(
     await db.commit()
 
     session_factory = app_state.session_factory
-    if run.provider == "paseo":
+    if run.provider == "orca":
         agent_run_service.launch_execution(
             run.id,
-            paseo_execution_service.resume_external_run(
+            orca_execution_service.resume_external_run(
                 session_factory,
                 run.id,
                 follow_up,
                 user_id=user_id,
-                adapter=paseo_adapter,
+                adapter=orca_adapter,
             ),
         )
         return run

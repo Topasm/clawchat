@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useResumeAgentRun,
-  useResolvePaseoPermission,
+  useResolveRunPermission,
   useReviewsQuery,
   useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
@@ -64,7 +64,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
       )
     : undefined;
   const resume = useResumeAgentRun();
-  const resolvePermission = useResolvePaseoPermission();
+  const resolvePermission = useResolveRunPermission();
   const {
     approvedAgentRun: approvedRun,
     decide,
