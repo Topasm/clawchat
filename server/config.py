@@ -139,6 +139,10 @@ class Settings(BaseSettings):
     # Server
     host: str = "127.0.0.1"
     port: int = 8000
+    # Who started this process, recorded beside the database (ADR 021). The
+    # desktop app stops a server it started ("desktop") when it quits, and
+    # leaves one run by the server-only service ("service") running.
+    server_owner: str = "standalone"
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/clawchat.db"

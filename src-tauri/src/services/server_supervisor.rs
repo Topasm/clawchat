@@ -10,6 +10,9 @@ use std::{
 
 use crate::{
     models::{NativePaths, ServerConfig, ServerState, ServerStatus},
+    services::database_lock::{
+        self, DatabaseHolder, DatabaseOwner, DATABASE_IN_USE_MARKER, OWNER_DESKTOP, OWNER_SERVICE,
+    },
     startup_log,
 };
 
@@ -17,6 +20,10 @@ const STARTUP_HEALTH_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const SERVER_LOG_DIAGNOSTIC_BYTES: usize = 4_000;
 const PORT_BIND_RETRY_LIMIT: usize = 3;
+/// How long a server run by someone else gets to let go of the database after
+/// it was asked to stop, before the start path takes over the waiting.
+const EXTERNAL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+const DATABASE_FILE: &str = "clawchat.db";
 
 enum HealthWaitOutcome {
     Ready,
@@ -27,7 +34,13 @@ enum HealthWaitOutcome {
 pub struct ServerSupervisor {
     paths: NativePaths,
     child: Option<Child>,
+    /// A server an earlier launch of this app started, still running after
+    /// that launch crashed or was killed. Stopped like `child`.
     reused_pid: Option<u32>,
+    /// A server someone else runs for this workspace: the `--server-only`
+    /// service, or one started by hand. The app uses it and never stops it on
+    /// quit; a restart asks it to stop so the new settings apply (ADR 021).
+    external_pid: Option<u32>,
     status: ServerStatus,
 }
 
@@ -37,6 +50,7 @@ impl ServerSupervisor {
             paths,
             child: None,
             reused_pid: None,
+            external_pid: None,
             status: ServerStatus {
                 state: ServerState::Stopped,
                 port,
@@ -91,6 +105,13 @@ impl ServerSupervisor {
                 return current;
             }
             self.stop();
+        }
+
+        // Another process already serves this workspace's database. Use it:
+        // a second server would put two writers on one SQLite file, and the
+        // server would refuse to start anyway (ADR 021).
+        if let Some(status) = self.attach_to_database_owner() {
+            return status;
         }
 
         if health_check(requested_port) {
@@ -170,6 +191,13 @@ impl ServerSupervisor {
                             let _ = fs::remove_file(&self.paths.pid_path);
                             let attempt_output =
                                 read_log_since(&log_path, log_offset, SERVER_LOG_DIAGNOSTIC_BYTES);
+                            // Someone claimed the database between the check
+                            // above and this server's own claim.
+                            if attempt_output.as_deref().is_some_and(is_database_in_use) {
+                                if let Some(status) = self.attach_to_database_owner() {
+                                    return status;
+                                }
+                            }
                             if bind_attempt < PORT_BIND_RETRY_LIMIT
                                 && attempt_output.as_deref().is_some_and(is_bind_conflict)
                             {
@@ -248,6 +276,11 @@ impl ServerSupervisor {
         if let Some(pid) = self.reused_pid.take() {
             terminate_pid(pid);
         }
+        if let Some(pid) = self.external_pid.take() {
+            startup_log::report(&format!(
+                "[clawchat] left the workspace server (pid {pid}) running; this app did not start it"
+            ));
+        }
         let _ = fs::remove_file(&self.paths.pid_path);
         self.status = ServerStatus {
             state: ServerState::Stopped,
@@ -259,8 +292,106 @@ impl ServerSupervisor {
     }
 
     pub fn restart(&mut self, config: &ServerConfig) -> ServerStatus {
+        if let Some(pid) = self.external_pid.take() {
+            // A new PIN, port or LAN setting only takes effect when a server
+            // starts. Ask the service's server to stop; whoever claims the
+            // database next -- this app, or the service once systemd starts
+            // it again -- reads the settings just saved.
+            startup_log::report(&format!(
+                "[clawchat] asking the workspace server (pid {pid}) to restart with the new settings"
+            ));
+            terminate_process(pid);
+            self.wait_for_database_release(EXTERNAL_STOP_TIMEOUT);
+        }
         self.stop();
         self.start(config)
+    }
+
+    fn database_path(&self) -> PathBuf {
+        self.paths.server_data_dir.join(DATABASE_FILE)
+    }
+
+    /// Connect to the server that holds this workspace's database, if any.
+    ///
+    /// `None` means nobody holds it and the caller may start a server. A
+    /// holder that is still migrating has not bound its port yet, so wait for
+    /// it like for a server of our own.
+    fn attach_to_database_owner(&mut self) -> Option<ServerStatus> {
+        let database = self.database_path();
+        match database_lock::probe(&database) {
+            Ok(DatabaseHolder::Held) => {}
+            Ok(DatabaseHolder::Free) => return None,
+            Err(error) => {
+                startup_log::report(&format!("[clawchat] {error}"));
+                return None;
+            }
+        }
+        let deadline = Instant::now() + STARTUP_HEALTH_TIMEOUT;
+        let mut last_owner = None;
+        loop {
+            if let Some(owner) = database_lock::read_owner(&database) {
+                if health_check(owner.port) {
+                    return Some(self.attach(owner));
+                }
+                last_owner = Some(owner);
+            }
+            if matches!(database_lock::probe(&database), Ok(DatabaseHolder::Free)) {
+                // The holder stopped while we waited.
+                return None;
+            }
+            if Instant::now() >= deadline {
+                let holder = last_owner
+                    .as_ref()
+                    .map(DatabaseOwner::describe)
+                    .unwrap_or_else(|| "unknown process".to_owned());
+                self.status = ServerStatus {
+                    state: ServerState::Error,
+                    port: last_owner
+                        .as_ref()
+                        .map_or(self.status.port, |owner| owner.port),
+                    pid: None,
+                    error: Some(format!(
+                        "another ClawChat server ({holder}) holds this workspace's database but did not answer within {} seconds",
+                        STARTUP_HEALTH_TIMEOUT.as_secs()
+                    )),
+                };
+                return Some(self.status.clone());
+            }
+            thread::sleep(HEALTH_POLL_INTERVAL);
+        }
+    }
+
+    fn attach(&mut self, owner: DatabaseOwner) -> ServerStatus {
+        if owner.started_by_desktop() {
+            // An earlier launch of this app started it and then crashed or was
+            // killed. Adopt it: quitting stops it, as it would have then.
+            self.reused_pid = Some(owner.pid);
+            self.external_pid = None;
+        } else {
+            self.external_pid = Some(owner.pid);
+            self.reused_pid = None;
+            startup_log::report(&format!(
+                "[clawchat] using the workspace server that is already running ({}); it keeps running when the app quits",
+                owner.describe()
+            ));
+        }
+        self.status = ServerStatus {
+            state: ServerState::Running,
+            port: owner.port,
+            pid: Some(owner.pid),
+            error: None,
+        };
+        self.status.clone()
+    }
+
+    fn wait_for_database_release(&self, timeout: Duration) {
+        let database = self.database_path();
+        let deadline = Instant::now() + timeout;
+        while matches!(database_lock::probe(&database), Ok(DatabaseHolder::Held))
+            && Instant::now() < deadline
+        {
+            thread::sleep(HEALTH_POLL_INTERVAL);
+        }
     }
 
     fn stop_child(&mut self) {
@@ -282,6 +413,40 @@ impl ServerSupervisor {
     }
 
     fn spawn(&self, config: &ServerConfig) -> Result<Child, String> {
+        let mut command = self.server_process(config, OWNER_DESKTOP)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        self.redirect_output(&mut command, config.port, "bundled server");
+        command.spawn().map_err(|error| {
+            format!(
+                "failed to start server executable {}: {error}",
+                command.get_program().to_string_lossy()
+            )
+        })
+    }
+
+    /// The server as the `--server-only` service runs it: the same program
+    /// and environment the app uses, output appended to the same
+    /// `server.log`, and left in the service's own process group so systemd
+    /// signals it directly.
+    pub fn service_command(&self, config: &ServerConfig) -> Result<Command, String> {
+        let mut command = self.server_process(config, OWNER_SERVICE)?;
+        self.redirect_output(&mut command, config.port, "server-only service");
+        Ok(command)
+    }
+
+    pub fn server_log_path(&self) -> PathBuf {
+        self.paths.app_data_dir.join("server.log")
+    }
+
+    pub fn database_file(&self) -> PathBuf {
+        self.database_path()
+    }
+
+    fn server_process(&self, config: &ServerConfig, owner: &str) -> Result<Command, String> {
         fs::create_dir_all(self.paths.server_data_dir.join("uploads")).map_err(|error| {
             format!(
                 "failed to create server data directory {}: {error}",
@@ -289,12 +454,15 @@ impl ServerSupervisor {
             )
         })?;
         let (program, arguments, working_directory) = self.server_command(config)?;
-        let database = self.paths.server_data_dir.join("clawchat.db");
+        let database = self.database_path();
         let uploads = self.paths.server_data_dir.join("uploads");
         let mut command = Command::new(&program);
         command
             .args(arguments)
             .current_dir(working_directory)
+            // Recorded beside the database, so a later app launch knows
+            // whether this server is its own to stop (ADR 021).
+            .env("SERVER_OWNER", owner)
             .env("HOST", config.bind_host())
             .env("PORT", config.port.to_string())
             .env("PIN", &config.pin)
@@ -323,20 +491,18 @@ impl ServerSupervisor {
         if let Some(obsidian) = find_obsidian_cli() {
             command.env("OBSIDIAN_CLI_COMMAND", obsidian);
         }
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            command.process_group(0);
-        }
+        command.stdin(Stdio::null());
+        Ok(command)
+    }
 
-        let log_path = self.paths.app_data_dir.join("server.log");
+    fn redirect_output(&self, command: &mut Command, port: u16, label: &str) {
+        let log_path = self.server_log_path();
         match OpenOptions::new().create(true).append(true).open(&log_path) {
             Ok(mut stdout) => match stdout.try_clone() {
                 Ok(stderr) => {
                     let _ = writeln!(
                         stdout,
-                        "\n[clawchat] --- starting bundled server on port {} ---",
-                        config.port
+                        "\n[clawchat] --- starting {label} on port {port} ---"
                     );
                     command
                         .stdout(Stdio::from(stdout))
@@ -350,13 +516,6 @@ impl ServerSupervisor {
                 command.stdout(Stdio::null()).stderr(Stdio::null());
             }
         }
-        command.stdin(Stdio::null());
-        command.spawn().map_err(|error| {
-            format!(
-                "failed to start server executable {}: {error}",
-                program.display()
-            )
-        })
     }
 
     fn server_command(
@@ -538,6 +697,10 @@ fn read_log_since(path: &Path, offset: usize, maximum_bytes: usize) -> Option<St
     (!diagnostic.is_empty()).then_some(diagnostic)
 }
 
+fn is_database_in_use(output: &str) -> bool {
+    output.contains(DATABASE_IN_USE_MARKER)
+}
+
 fn is_bind_conflict(output: &str) -> bool {
     let output = output.to_ascii_lowercase();
     output.contains("address already in use")
@@ -570,6 +733,25 @@ fn write_pid(path: &Path, pid: u32) -> Result<(), String> {
 
 fn terminate_pid(pid: u32) {
     signal_pid(pid, false);
+}
+
+/// SIGTERM one process, not its group: a server someone else started may
+/// share a process group with its launcher (a shell, or nothing we know).
+fn terminate_process(pid: u32) {
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("taskkill");
+        command.args(["/PID", &pid.to_string()]);
+        command
+    };
+    #[cfg(not(windows))]
+    let mut command = {
+        let mut command = Command::new("kill");
+        command.args(["-TERM", &pid.to_string()]);
+        command
+    };
+    command.stdout(Stdio::null()).stderr(Stdio::null());
+    let _ = command.status();
 }
 
 fn signal_pid(pid: u32, force: bool) {
@@ -766,6 +948,266 @@ while True:
             "first\nsecond\n"
         );
         supervisor.stop();
+    }
+
+    /// Stands in for a server that claimed the database: takes the lock,
+    /// writes the owner record and answers health checks, like
+    /// `server/services/database_lock.py` and `/api/health`.
+    #[cfg(unix)]
+    const FAKE_DATABASE_HOLDER: &str = r#"
+import fcntl, json, os, socket, sys
+
+database = sys.argv[1] if len(sys.argv) > 1 else os.environ["DATABASE_URL"].split("///", 1)[1]
+owner = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("SERVER_OWNER", "standalone")
+lock = open(database + ".lock", "a+b")
+try:
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    print("ClawChat database in use: another server already serves " + database, file=sys.stderr)
+    sys.exit(75)
+listener = socket.socket()
+listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+listener.bind((os.environ.get("HOST", "127.0.0.1"), int(os.environ.get("PORT", "0"))))
+listener.listen()
+record = {"pid": os.getpid(), "host": "127.0.0.1", "port": listener.getsockname()[1],
+          "owner": owner, "version": "test"}
+with open(database + ".owner.json.tmp", "w") as handle:
+    json.dump(record, handle)
+os.replace(database + ".owner.json.tmp", database + ".owner.json")
+while True:
+    connection, _ = listener.accept()
+    connection.recv(8192)
+    body = b'{"service":"clawchat"}'
+    connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: " + str(len(body)).encode()
+                       + b"\r\nConnection: close\r\n\r\n" + body)
+    connection.close()
+"#;
+
+    #[cfg(unix)]
+    fn write_executable(path: &Path, contents: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::create_dir_all(path.parent().expect("parent")).expect("parent dir");
+        fs::write(path, contents).expect("script");
+        let mut permissions = fs::metadata(path).expect("metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("executable permissions");
+    }
+
+    #[cfg(unix)]
+    fn holder_script(root: &Path) -> PathBuf {
+        let script = root.join("holder.py");
+        fs::write(&script, FAKE_DATABASE_HOLDER).expect("holder script");
+        script
+    }
+
+    #[cfg(unix)]
+    fn wait_for_owner(database: &Path, pid: Option<u32>) -> DatabaseOwner {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Some(owner) = database_lock::read_owner(database) {
+                if pid.is_none_or(|pid| owner.pid == pid) {
+                    return owner;
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the holder never claimed the database"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    /// A server some other launcher started, holding the workspace database.
+    #[cfg(unix)]
+    fn start_database_holder(root: &Path, database: &Path, owner: &str) -> (Child, DatabaseOwner) {
+        use std::os::unix::process::CommandExt;
+
+        fs::create_dir_all(database.parent().expect("database dir")).expect("database dir");
+        let child = Command::new("python3")
+            .arg(holder_script(root))
+            .arg(database)
+            .arg(owner)
+            .env_remove("PORT")
+            .env_remove("HOST")
+            .process_group(0)
+            .spawn()
+            .expect("holder process");
+        let record = wait_for_owner(database, Some(child.id()));
+        (child, record)
+    }
+
+    #[cfg(unix)]
+    fn wait_for_exit(child: &mut Child) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            if let Ok(Some(_)) = child.try_wait() {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        false
+    }
+
+    #[cfg(unix)]
+    fn free_port() -> u16 {
+        let probe = TcpListener::bind(("127.0.0.1", 0)).expect("port probe");
+        probe.local_addr().expect("address").port()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn uses_the_server_that_already_serves_the_workspace_and_leaves_it_running() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let database = native_paths.server_data_dir.join(DATABASE_FILE);
+        let (mut holder, record) = start_database_holder(root.path(), &database, OWNER_SERVICE);
+        let config = ServerConfig {
+            port: free_port(),
+            ..ServerConfig::default()
+        };
+        let mut supervisor = ServerSupervisor::new(native_paths, config.port);
+
+        let status = supervisor.start(&config);
+
+        assert!(
+            matches!(status.state, ServerState::Running),
+            "attach failed: {:?}",
+            status.error
+        );
+        assert_eq!(status.port, record.port);
+        assert_eq!(status.pid, Some(holder.id()));
+
+        supervisor.stop();
+
+        assert!(holder.try_wait().expect("holder state").is_none());
+        assert!(health_check(record.port));
+        let _ = holder.kill();
+        let _ = holder.wait();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn adopts_a_server_an_earlier_launch_left_running_and_stops_it_on_quit() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let database = native_paths.server_data_dir.join(DATABASE_FILE);
+        let (mut holder, record) = start_database_holder(root.path(), &database, OWNER_DESKTOP);
+        let config = ServerConfig {
+            port: free_port(),
+            ..ServerConfig::default()
+        };
+        let mut supervisor = ServerSupervisor::new(native_paths, config.port);
+
+        let status = supervisor.start(&config);
+        assert!(matches!(status.state, ServerState::Running));
+        assert_eq!(status.port, record.port);
+
+        supervisor.stop();
+
+        assert!(
+            wait_for_exit(&mut holder),
+            "the adopted server kept running"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restart_asks_the_service_server_to_stop_and_takes_over_the_database() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let database = native_paths.server_data_dir.join(DATABASE_FILE);
+        let script = holder_script(root.path());
+        write_executable(
+            &native_paths
+                .resource_dir
+                .join("server-bin")
+                .join("clawchat-server"),
+            &format!("#!/bin/sh\nexec python3 '{}'\n", script.display()),
+        );
+        let (mut service, service_record) =
+            start_database_holder(root.path(), &database, OWNER_SERVICE);
+        let config = ServerConfig {
+            port: free_port(),
+            ..ServerConfig::default()
+        };
+        let mut supervisor = ServerSupervisor::new(native_paths, config.port);
+        assert_eq!(supervisor.start(&config).pid, Some(service.id()));
+
+        let status = supervisor.restart(&config);
+
+        assert!(
+            matches!(status.state, ServerState::Running),
+            "takeover failed: {:?}",
+            status.error
+        );
+        assert!(
+            wait_for_exit(&mut service),
+            "the service's server ignored SIGTERM"
+        );
+        assert_ne!(status.pid, Some(service_record.pid));
+        let record = wait_for_owner(&database, status.pid);
+        assert_eq!(record.owner, OWNER_DESKTOP);
+        assert_eq!(record.port, status.port);
+        supervisor.stop();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn connects_to_whoever_claimed_the_database_during_startup() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let database = native_paths.server_data_dir.join(DATABASE_FILE);
+        let script = holder_script(root.path());
+        // The service starts a moment after the app checked the database and
+        // wins the claim; the app's own server then exits as the real one does.
+        write_executable(
+            &native_paths
+                .resource_dir
+                .join("server-bin")
+                .join("clawchat-server"),
+            &format!(
+                r#"#!/bin/sh
+db="${{DATABASE_URL#*///}}"
+env -u PORT -u HOST python3 '{script}' "$db" service </dev/null >/dev/null 2>&1 &
+i=0
+while [ ! -f "$db.owner.json" ] && [ $i -lt 300 ]; do sleep 0.05; i=$((i+1)); done
+echo "ClawChat database in use: another server already serves $db" >&2
+exit 75
+"#,
+                script = script.display()
+            ),
+        );
+        let config = ServerConfig {
+            port: free_port(),
+            ..ServerConfig::default()
+        };
+        let mut supervisor = ServerSupervisor::new(native_paths, config.port);
+
+        let status = supervisor.start(&config);
+
+        let record = wait_for_owner(&database, None);
+        assert!(
+            matches!(status.state, ServerState::Running),
+            "startup race not handled: {:?}",
+            status.error
+        );
+        assert_eq!(status.pid, Some(record.pid));
+        assert_eq!(status.port, record.port);
+        supervisor.stop();
+        assert!(
+            health_check(record.port),
+            "quitting stopped the service's server"
+        );
+        terminate_process(record.pid);
+    }
+
+    #[test]
+    fn recognises_the_servers_database_in_use_message() {
+        assert!(is_database_in_use(
+            "INFO: x ClawChat database in use: another server (pid 7, port 8000) already serves /d/clawchat.db."
+        ));
+        assert!(!is_database_in_use("database is locked"));
     }
 
     #[test]

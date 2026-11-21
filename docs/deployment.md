@@ -1,6 +1,6 @@
 # Deployment
 
-ClawChat server is deployed as a Docker Compose stack on the user's own infrastructure.
+ClawChat server is deployed as a Docker Compose stack on the user's own infrastructure, or served by the desktop app in host mode. A Linux desktop host can keep serving after logout; see [Desktop Host Without a Login](#desktop-host-without-a-login-linux).
 
 ## Dockerfile
 
@@ -235,6 +235,102 @@ volumes:
 your-domain.com {
     reverse_proxy server:8000
 }
+```
+
+## Desktop Host Without a Login (Linux)
+
+A desktop app in host mode serves phones and workers only while its window runs. Logging out stops the server, and the app cannot start again until someone logs in. On a Linux machine that other devices depend on, run the same server from a systemd user service. It starts at boot and keeps serving whether or not anyone is logged in ([ADR 021](./adr/021-headless-desktop-host.md)).
+
+`ClawChat.AppImage --server-only` runs the bundled server without a window. It uses the app's own data folder and the settings chosen in the app: port, PIN and LAN access. Open the app once and set those first. Without them, the server answers only on this machine, with the default PIN.
+
+1. Give the AppImage a path that survives upgrades, and point the app-menu launcher (`Exec=` in `~/.local/share/applications/clawchat.desktop`) at the same path:
+
+   ```bash
+   ln -sfn ~/Applications/ClawChat-<version>.AppImage ~/Applications/ClawChat.AppImage
+   ```
+
+2. Keep your user's services running without a login:
+
+   ```bash
+   loginctl enable-linger "$USER"
+   ```
+
+3. Create `~/.config/systemd/user/clawchat.service`:
+
+   ```ini
+   [Unit]
+   Description=ClawChat server
+
+   [Service]
+   ExecStart=%h/Applications/ClawChat.AppImage --server-only
+   # Whatever the app-menu launcher sets, such as the AI provider.
+   Environment=AI_PROVIDER=codex_cli
+   # Where the server finds the CLIs it runs (codex, claude). A service does
+   # not read your shell profile, so list the folders here.
+   Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+   # Always, not on-failure: changing the PIN, port or LAN access in the app
+   # stops this server so it comes back with the new settings.
+   Restart=always
+   RestartSec=5
+
+   [Install]
+   WantedBy=default.target
+   ```
+
+   With the `.deb` package, use `ExecStart=/usr/bin/clawchat-tauri --server-only`. If the AppImage cannot mount because FUSE is missing, add `Environment=APPIMAGE_EXTRACT_AND_RUN=1`.
+
+4. Start it, now and at every boot:
+
+   ```bash
+   systemctl --user daemon-reload
+   ```
+
+   ```bash
+   systemctl --user enable --now clawchat
+   ```
+
+5. Check it:
+
+   ```bash
+   systemctl --user status clawchat
+   ```
+
+   ```bash
+   curl -s http://127.0.0.1:8000/api/health
+   ```
+
+The server's output goes to `~/.local/share/com.clawchat.desktop/server.log`, as it does under the app. The launcher's own messages, such as a refused setting or "waiting for it to stop", are in `journalctl --user -u clawchat`.
+
+**Living with the app.** Only one server ever runs per database. The server locks `server-data/data/clawchat.db.lock`, and a second one refuses to start. With the service running, the app uses the service's server instead of starting its own, and leaves it running when you quit. If the app was serving first, the service waits and takes over a few seconds after the app quits. A PIN, port or LAN change in the app restarts the server. Whichever starts next, the service or the app, uses the new settings.
+
+**Upgrading.** Point the link at the new AppImage and restart the service. An in-app update replaces the AppImage file, but the running server stays on the old version until it restarts.
+
+```bash
+ln -sfn ~/Applications/ClawChat-<new-version>.AppImage ~/Applications/ClawChat.AppImage
+```
+
+```bash
+systemctl --user restart clawchat
+```
+
+**Trying it on a copy first.** `--data-dir` points the server at another data folder. Copy `server-config.json` into a new folder. In the copy, set a spare `port`, `"lanAccess": false` and an empty `"obsidianVaultPath"`, so the rehearsal cannot reach your phone or write to your vault. Then copy the database with SQLite's backup API, never as a plain file while a server runs:
+
+```bash
+mkdir -p /path/to/copy/server-data/data
+```
+
+```bash
+python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).backup(sqlite3.connect(sys.argv[2]))' ~/.local/share/com.clawchat.desktop/server-data/data/clawchat.db /path/to/copy/server-data/data/clawchat.db
+```
+
+```bash
+~/Applications/ClawChat.AppImage --server-only --data-dir /path/to/copy
+```
+
+**Removing it.** The app goes back to starting its own server.
+
+```bash
+systemctl --user disable --now clawchat
 ```
 
 ## Calendar Subscription URLs in Logs

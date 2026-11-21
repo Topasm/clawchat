@@ -255,6 +255,25 @@ pub struct NativePaths {
     pub development_server_dir: PathBuf,
 }
 
+impl NativePaths {
+    /// The layout of one workspace's data folder. The window and the
+    /// `--server-only` service must agree on it to share one database.
+    pub fn in_app_data_dir(
+        app_data_dir: PathBuf,
+        resource_dir: PathBuf,
+        development_server_dir: PathBuf,
+    ) -> Self {
+        Self {
+            config_path: app_data_dir.join("server-config.json"),
+            server_data_dir: app_data_dir.join("server-data").join("data"),
+            pid_path: app_data_dir.join("server.pid"),
+            app_data_dir,
+            resource_dir,
+            development_server_dir,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

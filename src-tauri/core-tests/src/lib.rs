@@ -13,6 +13,14 @@ mod services {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/config.rs"));
     }
 
+    pub mod database_lock {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/database_lock.rs"));
+    }
+
+    pub mod headless {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/headless.rs"));
+    }
+
     pub mod migration {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/migration.rs"));
     }

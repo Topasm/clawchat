@@ -58,6 +58,18 @@ fn install_termination_signal_handler<R: tauri::Runtime>(_app_handle: tauri::App
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `--server-only` runs the bundled server in this process's place before
+    // Tauri initializes anything, so it works without a desktop session
+    // (ADR 021).
+    match services::headless::parse_arguments(std::env::args_os()) {
+        Ok(Some(options)) => std::process::exit(services::headless::run(options)),
+        Ok(None) => {}
+        Err(error) => {
+            eprintln!("[clawchat] {error}");
+            std::process::exit(services::headless::EXIT_USAGE);
+        }
+    }
+
     let application = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(
             |app, _arguments, _cwd| {
