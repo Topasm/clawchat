@@ -24,6 +24,12 @@ class AgentRunPermissionRequest(BaseModel):
     decision: Literal["allow", "deny"]
 
 
+class AgentRunLandRequest(BaseModel):
+    """How an approved Orca run's branch reaches the project."""
+
+    method: Literal["merge", "pull_request"]
+
+
 class AgentRunResultRequest(BaseModel):
     """What a worker reports back when its run finishes."""
 
@@ -73,6 +79,28 @@ class PendingToolCall(BaseModel):
     arguments: dict[str, Any]
 
 
+class RunLanding(BaseModel):
+    """Where an approved Orca worktree run's branch stands.
+
+    ``ready`` until it is merged into the base branch or a pull request is
+    opened; ``conflict`` and ``failed`` keep the last refusal so the run card
+    can say why, and both branches are then untouched.
+    """
+
+    state: Literal["ready", "merged", "pr_opened", "conflict", "failed"]
+    branch: str
+    base_branch: str | None = None
+    #: The project has a GitHub remote and ``gh`` is installed on the server.
+    can_open_pr: bool = False
+    #: The base branch's commit after the merge.
+    commit: str | None = None
+    pr_url: str | None = None
+    #: Files a merge would have conflicted in.
+    conflicts: list[str] = Field(default_factory=list)
+    #: Why the last attempt was refused.
+    message: str | None = None
+
+
 class AgentRunResponse(BaseModel):
     id: str
     agent_task_id: str
@@ -106,6 +134,8 @@ class AgentRunResponse(BaseModel):
     is_adopted: bool = False
     # A tool call the run is paused on until the user allows or denies it.
     pending_tool_call: PendingToolCall | None = None
+    #: An approved Orca worktree run's branch: merge it or open a PR.
+    landing: RunLanding | None = None
     created_at: UtcDatetime
     started_at: UtcDatetime | None = None
     heartbeat_at: UtcDatetime | None = None

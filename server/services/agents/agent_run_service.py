@@ -760,7 +760,16 @@ async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunRespons
         instruction=task.instruction,
         usage=usage,
         pending_tool_call=await _pending_tool_call(db, run),
+        landing=_landing(run),
     )
+
+
+def _landing(run: AgentRun):
+    if run.provider != "orca":
+        return None
+    from services.agents import orca_landing_service
+
+    return orca_landing_service.landing_view(run)
 
 
 async def _pending_tool_call(db: AsyncSession, run: AgentRun):

@@ -5,7 +5,8 @@ in-process cancellation registry; ``agent_task_service`` owns the task rows a
 run executes; ``task_delegation_service`` is the entry point that picks a
 skill and provider and starts the run; ``opencode_execution_service``
 runs them in a sandboxed OpenCode server on this machine; ``orca_execution_service``
-bridges them to a chat in the user's running Orca; ``task_execution_recovery_service``
+bridges them to a chat in the user's running Orca, and ``orca_landing_service`` merges
+an approved Orca branch or opens its pull request; ``task_execution_recovery_service``
 releases an unsuccessful run's task back to the graph.
 
 Depends on ``review`` (handoff and queue writes on completion), ``tasks``,

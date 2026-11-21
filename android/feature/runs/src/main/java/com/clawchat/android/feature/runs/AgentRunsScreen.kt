@@ -777,12 +777,17 @@ private fun AgentRun.localizedDisplayTitle(): String =
 private fun AgentRunEvent.localizedType(): String {
     val resource = when (eventType) {
         "approved" -> R.string.runs_event_approved
+        "branch_merged" -> R.string.runs_event_branch_merged
         "cancelled" -> R.string.runs_event_cancelled
         "changes_requested" -> R.string.runs_event_changes_requested
         "error" -> R.string.runs_event_error
         "failed" -> R.string.runs_event_failed
         "interrupted" -> R.string.runs_event_interrupted
+        "merge_conflict" -> R.string.runs_event_merge_conflict
+        "merge_failed" -> R.string.runs_event_merge_failed
         "migrated" -> R.string.runs_event_migrated
+        "pr_failed" -> R.string.runs_event_pr_failed
+        "pr_opened" -> R.string.runs_event_pr_opened
         "progress" -> R.string.runs_event_progress
         "provider_started" -> R.string.runs_event_provider_started
         "queued" -> R.string.runs_event_queued

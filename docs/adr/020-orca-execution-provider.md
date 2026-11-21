@@ -159,6 +159,58 @@ The spike found Orca writing global config. Against `orca-ide` 1.4.267 and
 runs neither `agent hooks off` nor `repo.update`, so that profile's own
 settings, including hooks and worktree location, are the user's.
 
+## After review: landing the branch
+
+Approving a worktree run commits its changes on the run's branch
+(`changes_committed`); commits the agent made itself count as well. A run
+with local isolation worked in the project folder itself, which ClawChat
+never commits to or deletes.
+
+An approved branch then lands from the run card, through
+`POST /api/runs/{id}/land` (`services/agents/orca_landing_service.py`):
+
+- **Merge** goes into the base branch the run was cut from. That is the
+  project's base branch, or the branch checked out in the project folder when
+  the worktree was made, recorded as `base_branch` with `repo_path`.
+  - `git merge-tree --write-tree` computes the result before anything moves.
+    The result is a fast-forward when the base has not moved, otherwise a merge
+    commit made with `commit-tree`.
+  - A conflict refuses the merge and names the files (`merge_conflict`, 409
+    with `details.conflicts`). Both branches and every checkout stay as they
+    were.
+  - Where the base is checked out, it moves with `git merge --ff-only` to the
+    computed commit. That checkout follows, and git refuses, moving nothing,
+    rather than overwrite uncommitted edits or a base that moved meanwhile.
+    Where nobody has the base checked out, a compare-and-swap `update-ref`
+    moves it.
+  - After a merge, Orca removes the worktree and deletes the branch
+    (`branch_merged`, then `workspace_removed`). If Orca cannot do that now,
+    the merge still stands, `workspace_cleanup_failed` says so, and the next
+    Orca run retries the removal (`cleanup_pending`).
+  - Merging never pushes.
+  - It needs git 2.38 or newer.
+- **Open PR** is offered when the project has a GitHub remote (origin first)
+  and `gh` is on the server's PATH.
+  - It pushes only the run's branch, then runs
+    `gh pr create --repo <owner/name> --base <base> --head <branch>`. The title
+    is the task's title, and the body is the run's result with the run id.
+  - The worktree and branch stay, because the PR needs them (`pr_opened`, or
+    `pr_failed` with gh's error).
+  - git and gh run with prompts disabled, so a missing credential fails
+    instead of hanging.
+
+The latest outcome is kept in the run's metadata under `landing` and served
+as `AgentRunResponse.landing`. Its state is `ready`, `merged`, `pr_opened`,
+`conflict` or `failed`, with `can_open_pr`, the merge commit, the PR URL and
+the conflicting files. The GitHub remote is looked up once, at approval, so
+listing runs runs no git command.
+
+The run card shows one primary button. On a GitHub repository that button is
+"Open PR", with "Merge into ‹base›" beside it, because a local merge there
+leaves the base ahead of origin until someone pushes. Elsewhere "Merge into
+‹base›" is the primary button. The outcome shows in words on the card and in
+the run's event log; Android shows the same events.
+
 ## Permission modes
 
 | Mode | Codex sandbox | Escalations |
@@ -182,16 +234,21 @@ confinement and is the cost of using Orca's presets.
   per-worktree trust in `~/.codex/config.toml`. ClawChat's own runtime keeps
   all of that out, except the Codex trust entry described above. Chats work
   without the hooks.
-- An approved worktree is committed on its `clawchat/...` branch, which stays
-  for the person to merge. A worktree whose work will never be adopted is
-  removed together with its branch: the review rejected it, or the run failed
-  or was cancelled. Those runs cannot be resumed, and a retry starts a new run
-  in a new worktree. What it changed is kept on the run as its patch first.
-  When Orca cannot remove a worktree at that moment, the run is marked
-  `cleanup_pending`, and the next run that creates a worktree retries it.
-  The same sweep removes the worktree of a run the watchdog failed after its
-  monitor was gone. A project folder used with local isolation is never
-  committed or removed.
+- An approved worktree is committed on its `clawchat/...` branch, which the
+  run card then merges or sends as a pull request (see "After review"). A
+  merged branch's worktree is removed. A branch sent as a PR, or never landed,
+  stays until the person merges or deletes it. A worktree whose work will
+  never be adopted is removed together with its branch: the review rejected
+  it, or the run failed or was cancelled. Those runs cannot be resumed, and a
+  retry starts a new run in a new worktree. What it changed is kept on the
+  run as its patch first. When Orca cannot remove a worktree at that moment
+  (after a merge as well), the run is marked `cleanup_pending`, and the next
+  run that creates a worktree retries it. The same sweep removes the worktree
+  of a run the watchdog failed after its monitor was gone. A project folder
+  used with local isolation is never committed or removed.
+- Merging writes to the person's repository: it moves the base branch and
+  the checkout that has it. It does so only after `merge-tree` reports a clean
+  result, and only through git's own fast-forward or compare-and-swap.
 - Events are polled. Orca's push subscriptions need its streaming transport,
   which the local socket refuses.
 - Paseo covered the same ground and was removed. Its settings, adapter and

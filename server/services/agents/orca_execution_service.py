@@ -473,11 +473,14 @@ async def execute_run(
                     raise ValidationError(problem[1])
                 repo_path = os.path.expanduser(workspace.path or "")
                 await adapter.ensure_repo(repo_path)
+                base_branch = None
                 if project.execution_workspace_isolation == "worktree":
                     try:
                         await sweep_pending_cleanups(session_factory, adapter=adapter)
                     except Exception:
                         logger.exception("Could not retry leftover Orca worktree cleanups")
+                    # Where the run will land once approved: the branch it is cut from.
+                    base_branch = project.execution_base_branch or await current_branch(repo_path)
                     worktree = await adapter.create_worktree(
                         repo_path=repo_path,
                         name=f"clawchat-{run.id[-8:]}",
@@ -488,7 +491,13 @@ async def execute_run(
                 else:
                     cwd, worktree_id, branch = repo_path, None, None
                 run.workspace_id = cwd
-                metadata.update(cwd=cwd, worktree_id=worktree_id, branch=branch)
+                metadata.update(
+                    cwd=cwd,
+                    worktree_id=worktree_id,
+                    branch=branch,
+                    repo_path=repo_path,
+                    base_branch=base_branch,
+                )
                 _save_metadata(run, metadata)
                 await agent_run_service.record_event(
                     db,
@@ -706,6 +715,31 @@ async def _git(cwd: str, *args: str, check: bool = True) -> tuple[int, str]:
     return process.returncode or 0, output
 
 
+async def current_branch(repo_path: str) -> str | None:
+    """The branch checked out in ``repo_path``, or None (detached, not a repo)."""
+    with suppress(OSError):
+        code, name = await _git(repo_path, "symbolic-ref", "--short", "-q", "HEAD", check=False)
+        if code == 0 and name:
+            return name
+    return None
+
+
+async def unlanded_head(cwd: str, base_branch: str | None) -> str | None:
+    """The worktree's HEAD when it holds commits ``base_branch`` lacks.
+
+    An agent may commit its own work, which leaves nothing for ``commit_all``
+    yet still gives the run a branch to land.
+    """
+    if not base_branch:
+        return None
+    with suppress(OSError):
+        code, _ = await _git(cwd, "merge-base", "--is-ancestor", "HEAD", base_branch, check=False)
+        if code == 1:
+            _, sha = await _git(cwd, "rev-parse", "HEAD", check=False)
+            return sha or None
+    return None
+
+
 async def commit_all(cwd: str, message: str) -> str | None:
     """Commit everything in ``cwd``; the new commit, or None when nothing changed."""
     await _git(cwd, "add", "-A")
@@ -734,7 +768,9 @@ async def settle_workspace(
 
     Only a worktree ClawChat made is touched. With local isolation the agent
     worked in the person's own folder, which is theirs to commit or revert.
-    A failure is recorded on the run and never undoes the decision.
+    A failure is recorded on the run and never undoes the decision. An
+    approved branch is landed afterwards from the run card
+    (``orca_landing_service``).
     """
     if not adopted:
         await discard_workspace(db, run=run, adapter=adapter, reason="rejected")
@@ -753,15 +789,22 @@ async def settle_workspace(
             db, run, "commit_failed", f"Could not commit the approved changes: {exc}"[:500]
         )
         return
+    kept = "Committed to"
+    if sha is None:
+        sha = await unlanded_head(cwd, metadata.get("base_branch"))
+        kept = "Kept the agent's commits on"
     if sha is None:
         return
     metadata["commit"] = sha
     _save_metadata(run, metadata)
+    from services.agents import orca_landing_service
+
+    await orca_landing_service.remember_landing_target(run)
     await agent_run_service.record_event(
         db,
         run,
         "changes_committed",
-        f"Committed to {branch or cwd} ({sha[:7]})",
+        f"{kept} {branch or cwd} ({sha[:7]})",
         payload={"branch": branch, "commit": sha, "cwd": cwd},
     )
 
@@ -786,6 +829,7 @@ async def discard_workspace(
     For work that will never be adopted: the review rejected it, or the run
     failed or was cancelled. Neither of those can be resumed, and a retry
     starts a new run in a new worktree, so nothing reaches the old one again.
+    Also for an approved branch once it was merged (``orca_landing_service``).
     Changes the run has not recorded yet are kept as its patch first. A
     project folder (local isolation) is never touched.
 
@@ -809,6 +853,7 @@ async def discard_workspace(
     except OrcaError as exc:
         if os.path.isdir(cwd):
             metadata["cleanup_pending"] = True
+            metadata["cleanup_reason"] = reason
             _save_metadata(run, metadata)
             if record_failure:
                 await agent_run_service.record_event(
@@ -825,6 +870,7 @@ async def discard_workspace(
         # Someone already removed the folder; there is nothing left to retry.
     metadata["workspace_removed"] = True
     metadata.pop("cleanup_pending", None)
+    metadata.pop("cleanup_reason", None)
     _save_metadata(run, metadata)
     await agent_run_service.record_event(
         db,
@@ -883,7 +929,11 @@ async def sweep_pending_cleanups(
             )
         ).scalars()
         for run in runs:
-            reason = _ENDED_REASONS.get(run.status, "rejected")
+            reason = (
+                _ENDED_REASONS.get(run.status)
+                or _metadata(run).get("cleanup_reason")
+                or "rejected"
+            )
             if await discard_workspace(
                 db, run=run, adapter=adapter, reason=reason, record_failure=False
             ):

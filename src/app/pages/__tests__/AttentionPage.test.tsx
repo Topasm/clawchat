@@ -28,6 +28,7 @@ vi.mock('../../hooks/queries', () => ({
   useDecideToolCall: () => ({ mutate: queryMocks.decideTool, isPending: false }),
   useRetryAgentRun: () => ({ mutate: queryMocks.retry, isPending: false }),
   useCancelAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
+  useLandAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
   useReturnAgentRunToReady: () => ({ mutate: vi.fn(), isPending: false }),
   useAgentRunEventsQuery: () => ({ data: [], isLoading: false }),
   useRunReadyTaskWithProjectDefaults: () => ({

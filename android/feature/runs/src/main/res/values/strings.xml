@@ -74,4 +74,9 @@
     <string name="runs_event_task_plan_reverted">Task plan reverted</string>
     <string name="runs_event_waiting_review">Waiting for review</string>
     <string name="runs_event_workspace_created">Workspace created</string>
+    <string name="runs_event_branch_merged">Merged</string>
+    <string name="runs_event_merge_conflict">Merge would conflict</string>
+    <string name="runs_event_merge_failed">Merge failed</string>
+    <string name="runs_event_pr_opened">Pull request opened</string>
+    <string name="runs_event_pr_failed">Pull request failed</string>
 </resources>

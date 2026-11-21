@@ -97,7 +97,9 @@ export {
   useReturnAgentRunToReady,
   useResumeAgentRun,
   useResolveRunPermission,
+  useLandAgentRun,
 } from './useAgentRunQueries';
+export type { LandMethod } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
 export {
   resolveExecutionSkillId,

@@ -453,6 +453,16 @@
             "title": "Is Adopted",
             "type": "boolean"
           },
+          "landing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunLanding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "model": {
             "anyOf": [
               {
@@ -751,6 +761,24 @@
         "title": "AgentRunHeartbeatRequest",
         "type": "object"
       },
+      "AgentRunLandRequest": {
+        "description": "How an approved Orca run's branch reaches the project.",
+        "properties": {
+          "method": {
+            "enum": [
+              "merge",
+              "pull_request"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method"
+        ],
+        "title": "AgentRunLandRequest",
+        "type": "object"
+      },
       "AgentRunPermissionRequest": {
         "properties": {
           "decision": {
@@ -935,6 +963,16 @@
             "default": false,
             "title": "Is Adopted",
             "type": "boolean"
+          },
+          "landing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunLanding"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "model": {
             "anyOf": [
@@ -9396,6 +9434,88 @@
         ],
         "title": "ReviewSubjectType",
         "type": "string"
+      },
+      "RunLanding": {
+        "description": "Where an approved Orca worktree run's branch stands.\n\n``ready`` until it is merged into the base branch or a pull request is\nopened; ``conflict`` and ``failed`` keep the last refusal so the run card\ncan say why, and both branches are then untouched.",
+        "properties": {
+          "base_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Branch"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "can_open_pr": {
+            "default": false,
+            "title": "Can Open Pr",
+            "type": "boolean"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "merged",
+              "pr_opened",
+              "conflict",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "branch"
+        ],
+        "title": "RunLanding",
+        "type": "object"
       },
       "ScheduleSettingsResponse": {
         "description": "When the daily briefing and the weekly review fire, in the user's zone.",
@@ -19420,6 +19540,64 @@
           }
         ],
         "summary": "Heartbeat Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/land": {
+      "post": {
+        "description": "Merge an approved Orca run's branch into its base, or open a pull request.\n\nA merge that would conflict is refused with 409, names the files, and\nleaves both branches untouched; the refusal is kept on the run either way.",
+        "operationId": "land_run_api_runs__run_id__land_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunLandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Land Run",
         "tags": [
           "runs"
         ]
