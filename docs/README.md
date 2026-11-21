@@ -37,6 +37,7 @@ Model selection and upgrades: [AI model updates](./ai-models.md).
 | [ADR 016: Task Execution Telemetry](./adr/016-task-execution-telemetry-overlay.md)             | Derived Task-level Run, Review, and Artifact overlays without duplicating canonical execution state       |
 | [ADR 017: Approved Agent Execution](./adr/017-ready-only-approved-agent-execution.md)          | Ready-only, provider-aware, single-Run execution with an explicit user confirmation gate                  |
 | [ADR 018: Agent Review Handoff](./adr/018-agent-review-ready-handoff.md)                       | CAS review decisions, downstream Ready handoff, and explicit unsuccessful-Run recovery                    |
+| [ADR 021: Desktop Host Without a Login](./adr/021-headless-desktop-host.md)                   | One server per database, `--server-only` under a systemd user service, and the window using that server   |
 
 ## Key Features
 

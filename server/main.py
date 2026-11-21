@@ -56,6 +56,7 @@ from services.lifecycle import (
     start_vault_index_build,
     vault_outbox_loop,
 )
+from services import database_lock
 from services.scheduler import Scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.access_log import install_access_log_redaction
@@ -70,6 +71,21 @@ async def lifespan(app: FastAPI):
     # The calendar feed authenticates by URL, so the access log would
     # otherwise record a working credential on every poll.
     install_access_log_redaction()
+
+    # One server per database (ADR 021): claim the file before migrations
+    # touch it. The packaged entry point already claimed it; this covers
+    # uvicorn, Docker and tests that run the lifespan.
+    try:
+        database_lock.claim(
+            settings.database_url,
+            host=settings.host,
+            port=settings.port,
+            owner=settings.server_owner,
+            version=APP_VERSION,
+        )
+    except database_lock.DatabaseInUseError as error:
+        logger.error("%s", error)
+        raise
 
     await init_db()
 
@@ -262,6 +278,8 @@ async def lifespan(app: FastAPI):
     # server is back and can be retried (ADR 020).
     if app.state.orca_runtime is not None:
         await app.state.orca_runtime.stop()
+
+    database_lock.release()
 
 
 # The API description is a map of every endpoint. Development keeps it at

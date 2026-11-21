@@ -9,6 +9,11 @@ const STARTUP_LOG_FILE: &str = "startup.log";
 
 pub fn report(message: &str) {
     let _ = writeln!(io::stderr().lock(), "{message}");
+    // Tests drive code that reports. They must not write into the real app
+    // data folder of the machine running them.
+    if cfg!(test) {
+        return;
+    }
     let data_dir = dirs::data_dir();
     append_best_effort(data_dir.as_deref(), message);
 }

@@ -18,14 +18,11 @@ pub fn resolve_native_paths<R: Runtime>(app: &AppHandle<R>) -> Result<NativePath
         .ok_or_else(|| "failed to resolve repository root".to_owned())?
         .join("server");
 
-    Ok(NativePaths {
-        config_path: app_data_dir.join("server-config.json"),
-        server_data_dir: app_data_dir.join("server-data").join("data"),
-        pid_path: app_data_dir.join("server.pid"),
+    Ok(NativePaths::in_app_data_dir(
         app_data_dir,
         resource_dir,
         development_server_dir,
-    })
+    ))
 }
 
 pub fn electron_user_data_candidates(destination: &std::path::Path) -> Vec<PathBuf> {

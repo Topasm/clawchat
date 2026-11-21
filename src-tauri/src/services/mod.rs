@@ -1,4 +1,6 @@
 pub mod config;
+pub mod database_lock;
+pub mod headless;
 pub mod local_session;
 pub mod migration;
 pub mod paths;
