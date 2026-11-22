@@ -23,7 +23,11 @@ class ReviewStatus(StrEnum):
 
 
 class ReviewRiskLevel(StrEnum):
+    #: The run could not have changed anything and never left its prompt.
     LOW = "low"
+    #: The run could not have changed anything, but it looked things up:
+    #: web search, a server the user marked read-only, a shared note.
+    READ_ONLY_TOOLS = "read_only_tools"
     MEDIUM = "medium"
     HIGH = "high"
 

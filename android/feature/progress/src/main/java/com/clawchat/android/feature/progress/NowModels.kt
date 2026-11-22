@@ -201,7 +201,8 @@ private val ReviewRiskLevel.attentionOrder: Int
     get() = when (this) {
         ReviewRiskLevel.HIGH -> 0
         ReviewRiskLevel.MEDIUM -> 1
-        ReviewRiskLevel.LOW -> 2
+        ReviewRiskLevel.READ_ONLY_TOOLS -> 2
+        ReviewRiskLevel.LOW -> 3
     }
 
 private val PROCESSING_INBOX_STATES = setOf("classifying", "planning")

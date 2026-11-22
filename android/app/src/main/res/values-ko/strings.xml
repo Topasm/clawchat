@@ -54,6 +54,7 @@
     <string name="push_run_step">단계 %1$d/%2$d</string>
     <string name="push_run_tap_to_answer">%1$s · 눌러서 답하기</string>
     <string name="push_run_risk_low">위험 낮음 · 파일 변경 없음</string>
+    <string name="push_run_risk_read_only_tools">읽기 전용 도구 사용 · 열어서 확인</string>
     <string name="push_run_risk_medium">위험 보통 · 열어서 확인</string>
     <string name="push_run_risk_high">위험 높음 · 열어서 확인</string>
     <string name="push_run_risk_unknown">열어서 확인</string>
