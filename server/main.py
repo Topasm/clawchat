@@ -110,6 +110,10 @@ async def lifespan(app: FastAPI):
 
     app.state.session_factory = async_session_factory
 
+    from services.automation import project_autonomy_service
+
+    project_autonomy_service.configure(app.state)
+
     from services.agents import opencode_execution_service
 
     app.state.opencode_adapter = opencode_execution_service.adapter_from_settings()

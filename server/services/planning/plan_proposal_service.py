@@ -748,6 +748,14 @@ async def apply_proposal(
         )
         db.add(job)
         await db.commit()
+        if proposal.project_id:
+            # The steps just added are ready leaves; a project that starts
+            # work by itself starts them now.
+            from services.automation import project_autonomy_service
+
+            await project_autonomy_service.start_ready_tasks(
+                db, proposal.project_id, trigger="plan_applied"
+            )
         return response, job.id
     except IntegrityError:
         await db.rollback()

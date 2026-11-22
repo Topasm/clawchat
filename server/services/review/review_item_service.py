@@ -15,6 +15,7 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.review import ReviewItemResponse
+from services.automation import project_autonomy_service
 from services.automation.job_provenance import (
     AUTO_APPROVED_NOTE,
     offers_skip_review,
@@ -259,6 +260,17 @@ async def build_review_response(
             if changed is not None:
                 metadata["changed_files"] = changed[:CHANGED_FILES_SHOWN]
                 metadata["changed_files_count"] = len(changed)
+            policy = project_autonomy_service.policy_provenance(task)
+            if policy is not None:
+                # The project started this run by itself; the card says so,
+                # and Today can tell a result the policy adopted unasked.
+                metadata["policy"] = {
+                    "project_id": policy.get("project_id") or run.project_id,
+                    "trigger": policy.get("trigger"),
+                    "auto_approved": (
+                        item.review_note == project_autonomy_service.POLICY_APPROVED_NOTE
+                    ),
+                }
             job = await scheduled_job_for_task(db, task)
             if job is not None:
                 # The card offers "don't ask next time" right where the result

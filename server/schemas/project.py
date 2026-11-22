@@ -1,11 +1,26 @@
 """API contracts for first-class projects."""
 
+import json
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from domain.project import ProjectStatus
+from domain.project import ProjectAutonomy, ProjectStatus
 from schemas._utc import UtcDatetime
+
+#: A policy chain is short: each skill is one pass over the task.
+MAX_SKILL_CHAIN_LENGTH = 6
+
+
+def _skill_chain_from_storage(value):
+    """The model keeps the chain as JSON text; the contract is a list."""
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return None
+        return parsed if isinstance(parsed, list) else None
+    return value
 
 
 class ProjectCreate(BaseModel):
@@ -22,6 +37,12 @@ class ProjectCreate(BaseModel):
         default="local", pattern="^(local|worktree)$"
     )
     execution_base_branch: str | None = None
+    #: What the project does by itself once a task is ready.
+    autonomy: ProjectAutonomy = ProjectAutonomy.MANUAL
+    #: Skill ids the policy runs on each ready task, in order.
+    default_skill_chain: list[str] | None = Field(
+        default=None, max_length=MAX_SKILL_CHAIN_LENGTH
+    )
 
 
 class ProjectUpdate(BaseModel):
@@ -38,6 +59,10 @@ class ProjectUpdate(BaseModel):
         default=None, pattern="^(local|worktree)$"
     )
     execution_base_branch: str | None = None
+    autonomy: ProjectAutonomy | None = None
+    default_skill_chain: list[str] | None = Field(
+        default=None, max_length=MAX_SKILL_CHAIN_LENGTH
+    )
 
 
 class ProjectResponse(BaseModel):
@@ -55,6 +80,11 @@ class ProjectResponse(BaseModel):
     execution_workspace_path: str | None = None
     execution_workspace_isolation: str = "local"
     execution_base_branch: str | None = None
+    #: What the project does by itself once a task is ready; see
+    #: ``services.automation.project_autonomy_service``.
+    autonomy: ProjectAutonomy = ProjectAutonomy.MANUAL
+    #: Skill ids the policy runs on each ready task, in order.
+    default_skill_chain: list[str] | None = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
     task_count: int = Field(default=0, ge=0)
@@ -67,6 +97,11 @@ class ProjectResponse(BaseModel):
     execution_host_online: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("default_skill_chain", mode="before")
+    @classmethod
+    def _parse_skill_chain(cls, value):
+        return _skill_chain_from_storage(value)
 
 
 class ProjectOverviewResponse(ProjectResponse):
