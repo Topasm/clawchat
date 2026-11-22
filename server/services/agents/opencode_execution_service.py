@@ -37,7 +37,7 @@ from models.todo import Todo
 from services.agents import agent_run_service, agent_task_service, execution_host_service
 from services.agents.execution_host_service import WorkspaceResolution
 from services.review import artifact_service
-from skills import get_skill
+from skills import get_skill, parse_skill_chain
 from skills.builtins import BUILTIN_SKILLS_DIR, user_skills_dir
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -114,11 +114,8 @@ def _skills_paths() -> list[str]:
 
 
 def _skill_id(task: AgentTask) -> str | None:
-    try:
-        chain = json.loads(task.skill_chain) if task.skill_chain else []
-    except (json.JSONDecodeError, TypeError):
-        chain = []
-    if chain and isinstance(chain[0], str):
+    chain = parse_skill_chain(task.skill_chain)
+    if chain:
         return chain[0]
     if task.task_type and task.task_type.startswith("delegate_"):
         return task.task_type.removeprefix("delegate_")

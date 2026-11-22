@@ -179,3 +179,16 @@ def test_user_skills_register_over_builtins_of_the_same_name(tmp_path):
     finally:
         register_builtins()
     assert get_skill("draft").system_prompt != "Draft it our way."
+
+
+def test_parse_skill_chain_reads_ids_in_order_and_drops_what_is_not_one():
+    from skills import parse_skill_chain
+
+    assert parse_skill_chain(None) == []
+    assert parse_skill_chain("") == []
+    assert parse_skill_chain("not json") == []
+    assert parse_skill_chain('{"skill": "plan"}') == []
+    assert parse_skill_chain('["research", 3, null, "", "code-review"]') == [
+        "research",
+        "code_review",
+    ]
